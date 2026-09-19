@@ -11,8 +11,7 @@ import {
   updateDoc,
   onSnapshot,
   serverTimestamp,
-  arrayUnion,
-  arrayRemove
+  runTransaction
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 import {
@@ -30,11 +29,9 @@ const API_BASE_URL =
   "https://connecta-backend-com.onrender.com";
 
 
-/*
-=====================================================
-ACCOUNT VERIFICATION
-=====================================================
-*/
+/* =====================================================
+   ACCOUNT VERIFICATION
+===================================================== */
 
 const VERIFICATION_AMOUNT = 999;
 
@@ -56,22 +53,26 @@ let verificationPolling = false;
 let isFollowing = false;
 
 
+/*
+=====================================================
+CURRENT USER FOLLOWING
+=====================================================
+
+IMPORTANT:
+
+This comes from Firestore:
+
+users/{currentUser.uid}
+
+It does NOT come from the Firebase Auth user object.
+*/
+
+let currentUserFollowing = [];
+
+
 /* =====================================================
    CACHE
 ===================================================== */
-
-/*
-   We intentionally use TWO caches.
-
-   OWN PROFILE:
-   Can contain the user's own private UI information.
-
-   PUBLIC PROFILE:
-   Contains only information that is intended to be
-   displayed to other users.
-
-   We do NOT use the old generic profile cache here.
-*/
 
 const OWN_PROFILE_CACHE_KEY =
   "connectaOwnProfileCache_v2";
@@ -129,28 +130,66 @@ function initials(name = "U") {
 
 function getFullName(user = {}) {
 
+  /*
+  Prefer displayName if it contains a real name.
+  */
+
+  const displayName =
+    String(
+      user.displayName || ""
+    ).trim();
+
+
   if (
-    String(user.displayName || "").trim()
+    displayName &&
+    displayName !== "CONNECTA User"
   ) {
 
-    return user.displayName.trim();
+    return displayName;
 
   }
+
+
+  /*
+  Otherwise build the name from firstName + lastName.
+  */
+
+  const firstName =
+    String(
+      user.firstName || ""
+    ).trim();
+
+
+  const lastName =
+    String(
+      user.lastName || ""
+    ).trim();
 
 
   const fullName =
-    `${user.firstName || ""} ${user.lastName || ""}`
-      .trim();
+    `${firstName} ${lastName}`.trim();
 
 
   if (fullName) {
+
     return fullName;
+
   }
 
 
+  /*
+  Username is the next fallback.
+  */
+
   if (user.username) {
-    return String(user.username)
-      .replace(/^@/, "");
+
+    return String(
+      user.username
+    ).replace(
+      /^@/,
+      ""
+    );
+
   }
 
 
@@ -167,15 +206,30 @@ function escapeHtml(value = "") {
 
   return String(value)
 
-    .replace(/&/g, "&amp;")
+    .replace(
+      /&/g,
+      "&amp;"
+    )
 
-    .replace(/</g, "&lt;")
+    .replace(
+      /</g,
+      "&lt;"
+    )
 
-    .replace(/>/g, "&gt;")
+    .replace(
+      />/g,
+      "&gt;"
+    )
 
-    .replace(/"/g, "&quot;")
+    .replace(
+      /"/g,
+      "&quot;"
+    )
 
-    .replace(/'/g, "&#039;");
+    .replace(
+      /'/g,
+      "&#039;"
+    );
 
 }
 
@@ -322,15 +376,6 @@ function saveOwnProfileCache(profile) {
 
   try {
 
-    /*
-    Own profile is allowed to contain the information
-    required to instantly reconstruct the user's own
-    account page.
-
-    This cache is only used for the authenticated user's
-    own profile.
-    */
-
     const cache = {
 
       uid:
@@ -376,7 +421,9 @@ function saveOwnProfileCache(profile) {
         "not_submitted",
 
       balance:
-        Number(profile.balance || 0),
+        Number(
+          profile.balance || 0
+        ),
 
       status:
         profile.status ||
@@ -403,8 +450,12 @@ function saveOwnProfileCache(profile) {
         ),
 
       following:
-        Array.isArray(profile.following)
-          ? profile.following
+        Array.isArray(
+          profile.following
+        )
+          ? [
+              ...profile.following
+            ]
           : [],
 
       cachedAt:
@@ -485,18 +536,7 @@ function savePublicProfileCache(profile) {
   try {
 
     /*
-    IMPORTANT:
-
-    Only public information is saved here.
-
-    Private fields such as:
-    email
-    phone
-    balance
-    referralCode
-    referralCount
-    verification payment information
-    are deliberately NOT cached.
+    ONLY public information is stored.
     */
 
     const publicProfile = {
@@ -551,7 +591,9 @@ function savePublicProfileCache(profile) {
 
       `${PUBLIC_PROFILE_CACHE_KEY}_${profile.uid}`,
 
-      JSON.stringify(publicProfile)
+      JSON.stringify(
+        publicProfile
+      )
 
     );
 
@@ -579,7 +621,7 @@ function getPublicProfile(profile) {
 
 
   /*
-  This creates a safe public representation for rendering.
+  Only fields that can safely be displayed publicly.
   */
 
   return {
@@ -653,10 +695,13 @@ async function markCurrentUserOnline() {
     await updateDoc(
       userRef,
       {
-        isOnline: true,
+
+        isOnline:
+          true,
 
         lastSeen:
           serverTimestamp()
+
       }
     );
 
@@ -670,6 +715,167 @@ async function markCurrentUserOnline() {
 
     console.warn(
       "Unable to update online status:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   LOAD CURRENT USER FOLLOWING
+===================================================== */
+
+async function loadCurrentUserFollowing() {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  /*
+  =====================================================
+  CACHE FIRST
+  =====================================================
+  */
+
+  try {
+
+    const cached =
+      getOwnProfileCache();
+
+
+    if (
+      cached &&
+      Array.isArray(
+        cached.following
+      )
+    ) {
+
+      currentUserFollowing =
+        [
+          ...cached.following
+        ];
+
+    }
+
+  } catch (error) {
+
+    console.warn(
+      "Following cache read failed:",
+      error
+    );
+
+  }
+
+
+  /*
+  =====================================================
+  FIRESTORE REFRESH
+  =====================================================
+  */
+
+  try {
+
+    const userRef =
+      doc(
+        db,
+        "users",
+        currentUser.uid
+      );
+
+
+    const snapshot =
+      await getDoc(
+        userRef
+      );
+
+
+    if (!snapshot.exists()) {
+      return;
+    }
+
+
+    const data =
+      snapshot.data();
+
+
+    currentUserFollowing =
+      Array.isArray(
+        data.following
+      )
+        ? [
+            ...data.following
+          ]
+        : [];
+
+
+    /*
+    Keep own cache synchronized.
+    */
+
+    const cached =
+      getOwnProfileCache();
+
+
+    if (cached) {
+
+      cached.following =
+        [
+          ...currentUserFollowing
+        ];
+
+
+      cached.followingCount =
+        Number(
+          data.followingCount ??
+          currentUserFollowing.length
+        );
+
+
+      cached.cachedAt =
+        Date.now();
+
+
+      localStorage.setItem(
+        OWN_PROFILE_CACHE_KEY,
+        JSON.stringify(
+          cached
+        )
+      );
+
+    }
+
+
+    /*
+    If viewing another profile,
+    refresh Follow/Following button.
+    */
+
+    if (
+      viewedUser &&
+      !isOwnProfile(
+        viewedUser.uid
+      )
+    ) {
+
+      isFollowing =
+        currentUserFollowing.includes(
+          viewedUser.uid
+        );
+
+
+      renderProfile(
+        viewedUser
+      );
+
+    }
+
+  } catch (error) {
+
+    console.warn(
+      "Unable to load current user's following list:",
       error
     );
 
@@ -709,14 +915,16 @@ function renderProfile(profile) {
 
 
   /*
-  Other users are rendered ONLY from the
-  public profile representation.
+  Other users are rendered only from
+  public profile fields.
   */
 
   const safeProfile =
     own
       ? profile
-      : getPublicProfile(profile);
+      : getPublicProfile(
+          profile
+        );
 
 
   if (!safeProfile) {
@@ -725,25 +933,18 @@ function renderProfile(profile) {
 
 
   /*
-  Track whether current user follows this user.
+  =====================================================
+  FOLLOW STATE
+  =====================================================
   */
 
   if (!own) {
 
-    const following =
-      Array.isArray(
-        currentUser?.following
-      )
-        ? currentUser.following
-        : Array.isArray(
-            profile.following
-          )
-          ? profile.following
-          : [];
-
-
     isFollowing =
-      following.includes(
+      Array.isArray(
+        currentUserFollowing
+      ) &&
+      currentUserFollowing.includes(
         profile.uid
       );
 
@@ -761,11 +962,6 @@ function renderProfile(profile) {
       ? `@${safeProfile.username}`
       : "";
 
-
-  /*
-  Own profile is always treated as online while
-  the authenticated user is actively using CONNECTA.
-  */
 
   const online =
     own
@@ -807,6 +1003,12 @@ function renderProfile(profile) {
 
       : initials(name);
 
+
+  /*
+  =====================================================
+  VERIFIED BADGE
+  =====================================================
+  */
 
   const verifiedBadge =
     verified
@@ -966,11 +1168,9 @@ function renderProfile(profile) {
   }
 
 
-  /*
-  =====================================================
-  OWN PROFILE
-  =====================================================
-  */
+  /* =====================================================
+     OWN PROFILE
+  ===================================================== */
 
   if (own) {
 
@@ -983,9 +1183,7 @@ function renderProfile(profile) {
           <div class="profile-photo-ring">
 
             <div class="profile-avatar">
-
               ${avatar}
-
             </div>
 
           </div>
@@ -1058,9 +1256,7 @@ function renderProfile(profile) {
       </section>
 
 
-      <!-- =========================================
-           ACCOUNT STATISTICS
-      ========================================= -->
+      <!-- ACCOUNT STATISTICS -->
 
       <section class="profile-card">
 
@@ -1093,6 +1289,7 @@ function renderProfile(profile) {
             </div>
 
             <div class="profile-stat-value active">
+
               ${escapeHtml(
                 String(
                   safeProfile.status ||
@@ -1100,10 +1297,42 @@ function renderProfile(profile) {
                 )
                   .charAt(0)
                   .toUpperCase() +
+
                 String(
                   safeProfile.status ||
                   "active"
                 ).slice(1)
+              )}
+
+            </div>
+
+          </div>
+
+
+          <div class="profile-stat-box">
+
+            <div class="profile-stat-label">
+              Followers
+            </div>
+
+            <div class="profile-stat-value">
+              ${formatNumber(
+                safeProfile.followersCount
+              )}
+            </div>
+
+          </div>
+
+
+          <div class="profile-stat-box">
+
+            <div class="profile-stat-label">
+              Following
+            </div>
+
+            <div class="profile-stat-value">
+              ${formatNumber(
+                safeProfile.followingCount
               )}
             </div>
 
@@ -1114,9 +1343,7 @@ function renderProfile(profile) {
       </section>
 
 
-      <!-- =========================================
-           CONTACT INFORMATION
-      ========================================= -->
+      <!-- CONTACT INFORMATION -->
 
       <section class="profile-card">
 
@@ -1160,9 +1387,7 @@ function renderProfile(profile) {
       </section>
 
 
-      <!-- =========================================
-           REFERRAL INFORMATION
-      ========================================= -->
+      <!-- REFERRAL INFORMATION -->
 
       <section class="profile-card">
 
@@ -1215,9 +1440,7 @@ function renderProfile(profile) {
       </section>
 
 
-      <!-- =========================================
-           STORIES
-      ========================================= -->
+      <!-- STORIES -->
 
       <section
         class="profile-card profile-stories-card"
@@ -1238,11 +1461,10 @@ function renderProfile(profile) {
 
   }
 
-  /*
-  =====================================================
-  OTHER USER PROFILE
-  =====================================================
-  */
+
+  /* =====================================================
+     OTHER USER PROFILE
+  ===================================================== */
 
   else {
 
@@ -1255,9 +1477,7 @@ function renderProfile(profile) {
           <div class="profile-photo-ring">
 
             <div class="profile-avatar">
-
               ${avatar}
-
             </div>
 
           </div>
@@ -1302,9 +1522,7 @@ function renderProfile(profile) {
       </section>
 
 
-      <!-- =========================================
-           PUBLIC PROFILE STATISTICS
-      ========================================= -->
+      <!-- PUBLIC PROFILE STATISTICS -->
 
       <section class="profile-card">
 
@@ -1318,7 +1536,9 @@ function renderProfile(profile) {
           <div class="profile-public-stat">
 
             <div class="profile-public-stat-value">
-              ${formatNumber(followers)}
+              ${formatNumber(
+                followers
+              )}
             </div>
 
             <div class="profile-public-stat-label">
@@ -1331,7 +1551,9 @@ function renderProfile(profile) {
           <div class="profile-public-stat">
 
             <div class="profile-public-stat-value">
-              ${formatNumber(following)}
+              ${formatNumber(
+                following
+              )}
             </div>
 
             <div class="profile-public-stat-label">
@@ -1345,9 +1567,7 @@ function renderProfile(profile) {
       </section>
 
 
-      <!-- =========================================
-           PUBLIC STORIES
-      ========================================= -->
+      <!-- PUBLIC STORIES -->
 
       <section
         class="profile-card profile-stories-card"
@@ -1369,11 +1589,9 @@ function renderProfile(profile) {
   }
 
 
-  /*
-  =====================================================
-  UPDATE HEADER TITLE
-  =====================================================
-  */
+  /* =====================================================
+     HEADER TITLE
+  ===================================================== */
 
   const headerTitle =
     $("profileHeaderTitle");
@@ -1389,11 +1607,9 @@ function renderProfile(profile) {
   }
 
 
-  /*
-  =====================================================
-  OWN PROFILE PHOTO UPLOAD
-  =====================================================
-  */
+  /* =====================================================
+     OWN PROFILE PHOTO UPLOAD
+  ===================================================== */
 
   if (own) {
 
@@ -1430,11 +1646,9 @@ function renderProfile(profile) {
   }
 
 
-  /*
-  =====================================================
-  CHAT BUTTON
-  =====================================================
-  */
+  /* =====================================================
+     CHAT BUTTON
+  ===================================================== */
 
   const chatButton =
     $("chatProfileBtn");
@@ -1462,11 +1676,9 @@ function renderProfile(profile) {
   }
 
 
-  /*
-  =====================================================
-  FOLLOW BUTTON
-  =====================================================
-  */
+  /* =====================================================
+     FOLLOW BUTTON
+  ===================================================== */
 
   const followButton =
     $("followProfileBtn");
@@ -1489,11 +1701,9 @@ function renderProfile(profile) {
   }
 
 
-  /*
-  =====================================================
-  VERIFY BUTTON
-  =====================================================
-  */
+  /* =====================================================
+     VERIFY BUTTON
+  ===================================================== */
 
   const verifyButton =
     $("verifyAccountBtn");
@@ -1509,11 +1719,9 @@ function renderProfile(profile) {
   }
 
 
-  /*
-  =====================================================
-  REFER & EARN
-  =====================================================
-  */
+  /* =====================================================
+     REFER & EARN
+  ===================================================== */
 
   const referEarnButton =
     $("referEarnBtn");
@@ -1573,7 +1781,7 @@ async function toggleFollow(
     true;
 
 
-  const wasFollowing =
+  const previousFollowing =
     isFollowing;
 
 
@@ -1595,145 +1803,407 @@ async function toggleFollow(
       );
 
 
-    if (wasFollowing) {
-
-      await updateDoc(
-        currentUserRef,
-        {
-          following:
-            arrayRemove(targetUid)
-        }
-      );
-
-
-      /*
-      Decrease the public follower count.
-
-      This is kept simple for now. Later we can
-      move follow operations to a secure backend
-      transaction.
-      */
-
-      const targetSnap =
-        await getDoc(
-          targetUserRef
-        );
-
-
-      if (targetSnap.exists()) {
-
-        const targetData =
-          targetSnap.data();
-
-
-        const currentCount =
-          Number(
-            targetData.followersCount || 0
-          );
-
-
-        await updateDoc(
-          targetUserRef,
-          {
-            followersCount:
-              Math.max(
-                0,
-                currentCount - 1
-              )
-          }
-        );
-
-      }
-
-
-      isFollowing =
-        false;
-
-
-    } else {
-
-      await updateDoc(
-        currentUserRef,
-        {
-          following:
-            arrayUnion(targetUid)
-        }
-      );
-
-
-      const targetSnap =
-        await getDoc(
-          targetUserRef
-        );
-
-
-      if (targetSnap.exists()) {
-
-        const targetData =
-          targetSnap.data();
-
-
-        const currentCount =
-          Number(
-            targetData.followersCount || 0
-          );
-
-
-        await updateDoc(
-          targetUserRef,
-          {
-            followersCount:
-              currentCount + 1
-          }
-        );
-
-      }
-
-
-      isFollowing =
-        true;
-
-    }
-
-
     /*
-    Update local Firebase user state representation.
+    =================================================
+    FIRESTORE TRANSACTION
+    =================================================
+
+    User A:
+      following
+      followingCount
+
+    User B:
+      followers
+      followersCount
+
+    are updated together.
+
+    Firestore retries the transaction if another
+    client changes a document being read.
     */
 
-    if (!Array.isArray(currentUser.following)) {
+    const result =
+      await runTransaction(
+        db,
+        async transaction => {
 
-      currentUser.following = [];
+          const currentSnapshot =
+            await transaction.get(
+              currentUserRef
+            );
 
-    }
+
+          const targetSnapshot =
+            await transaction.get(
+              targetUserRef
+            );
 
 
-    if (isFollowing) {
+          if (
+            !currentSnapshot.exists()
+          ) {
 
-      if (
-        !currentUser.following.includes(
-          targetUid
-        )
-      ) {
+            throw new Error(
+              "Your CONNECTA account could not be found."
+            );
 
-        currentUser.following.push(
-          targetUid
+          }
+
+
+          if (
+            !targetSnapshot.exists()
+          ) {
+
+            throw new Error(
+              "This user account could not be found."
+            );
+
+          }
+
+
+          const currentData =
+            currentSnapshot.data();
+
+
+          const targetData =
+            targetSnapshot.data();
+
+
+          /*
+          ============================================
+          CURRENT USER FOLLOWING
+          ============================================
+          */
+
+          const following =
+            Array.isArray(
+              currentData.following
+            )
+              ? [
+                  ...currentData.following
+                ]
+              : [];
+
+
+          /*
+          ============================================
+          TARGET USER FOLLOWERS
+          ============================================
+          */
+
+          const followers =
+            Array.isArray(
+              targetData.followers
+            )
+              ? [
+                  ...targetData.followers
+                ]
+              : [];
+
+
+          const alreadyFollowing =
+            following.includes(
+              targetUid
+            );
+
+
+          /*
+          ============================================
+          UNFOLLOW
+          ============================================
+          */
+
+          if (alreadyFollowing) {
+
+            const newFollowing =
+              following.filter(
+                uid =>
+                  uid !== targetUid
+              );
+
+
+            const newFollowers =
+              followers.filter(
+                uid =>
+                  uid !== currentUser.uid
+              );
+
+
+            const oldFollowingCount =
+              Number(
+                currentData.followingCount ??
+                following.length
+              );
+
+
+            const oldFollowersCount =
+              Number(
+                targetData.followersCount ?? 
+                followers.length
+              );
+
+
+            const newFollowingCount =
+              Math.max(
+                0,
+                oldFollowingCount - 1
+              );
+
+
+            const newFollowersCount =
+              Math.max(
+                0,
+                oldFollowersCount - 1
+              );
+
+
+            transaction.update(
+              currentUserRef,
+              {
+
+                following:
+                  newFollowing,
+
+                followingCount:
+                  newFollowingCount
+
+              }
+            );
+
+
+            transaction.update(
+              targetUserRef,
+              {
+
+                followers:
+                  newFollowers,
+
+                followersCount:
+                  newFollowersCount
+
+              }
+            );
+
+
+            return {
+
+              following:
+                false,
+
+              followingList:
+                newFollowing,
+
+              followersCount:
+                newFollowersCount,
+
+              followingCount:
+                newFollowingCount
+
+            };
+
+          }
+
+
+          /*
+          ============================================
+          FOLLOW
+          ============================================
+          */
+
+          const newFollowing =
+            [
+              ...following,
+              targetUid
+            ];
+
+
+          const newFollowers =
+            followers.includes(
+              currentUser.uid
+            )
+              ? followers
+              : [
+                  ...followers,
+                  currentUser.uid
+                ];
+
+
+          const oldFollowingCount =
+            Number(
+              currentData.followingCount ??
+              following.length
+            );
+
+
+          const oldFollowersCount =
+            Number(
+              targetData.followersCount ??
+              followers.length
+            );
+
+
+          /*
+          Only increase target's follower count
+          if this UID was not already there.
+          */
+
+          const followerWasAlreadyPresent =
+            followers.includes(
+              currentUser.uid
+            );
+
+
+          const newFollowersCount =
+            followerWasAlreadyPresent
+              ? oldFollowersCount
+              : oldFollowersCount + 1;
+
+
+          const newFollowingCount =
+            oldFollowingCount + 1;
+
+
+          transaction.update(
+            currentUserRef,
+            {
+
+              following:
+                newFollowing,
+
+              followingCount:
+                newFollowingCount
+
+            }
+          );
+
+
+          transaction.update(
+            targetUserRef,
+            {
+
+              followers:
+                newFollowers,
+
+              followersCount:
+                newFollowersCount
+
+            }
+          );
+
+
+          return {
+
+            following:
+              true,
+
+            followingList:
+              newFollowing,
+
+            followersCount:
+              newFollowersCount,
+
+            followingCount:
+              newFollowingCount
+
+          };
+
+        }
+      );
+
+
+    /*
+    =================================================
+    UPDATE LOCAL STATE
+    =================================================
+    */
+
+    isFollowing =
+      result.following;
+
+
+    currentUserFollowing =
+      Array.isArray(
+        result.followingList
+      )
+        ? [
+            ...result.followingList
+          ]
+        : [];
+
+
+    /*
+    =================================================
+    UPDATE OWN PROFILE CACHE
+    =================================================
+    */
+
+    try {
+
+      const ownCache =
+        getOwnProfileCache();
+
+
+      if (ownCache) {
+
+        ownCache.following =
+          [
+            ...currentUserFollowing
+          ];
+
+
+        ownCache.followingCount =
+          Number(
+            result.followingCount ||
+            currentUserFollowing.length
+          );
+
+
+        ownCache.cachedAt =
+          Date.now();
+
+
+        localStorage.setItem(
+          OWN_PROFILE_CACHE_KEY,
+          JSON.stringify(
+            ownCache
+          )
         );
 
       }
 
-    } else {
+    } catch (cacheError) {
 
-      currentUser.following =
-        currentUser.following.filter(
-          uid =>
-            uid !== targetUid
+      console.warn(
+        "Unable to update following cache:",
+        cacheError
+      );
+
+    }
+
+
+    /*
+    =================================================
+    UPDATE VIEWED PROFILE
+    =================================================
+    */
+
+    if (
+      viewedUser &&
+      viewedUser.uid === targetUid
+    ) {
+
+      viewedUser.followersCount =
+        Number(
+          result.followersCount || 0
         );
 
     }
 
 
     /*
-    Update button immediately.
+    =================================================
+    IMMEDIATE BUTTON UPDATE
+    =================================================
     */
 
     button.textContent =
@@ -1756,18 +2226,32 @@ async function toggleFollow(
     );
 
 
-    alert(
-      "Unable to update follow status. Please try again."
+    isFollowing =
+      previousFollowing;
+
+
+    button.textContent =
+      previousFollowing
+        ? "Following"
+        : "Follow";
+
+
+    button.classList.toggle(
+      "following",
+      previousFollowing
     );
 
 
-    isFollowing =
-      wasFollowing;
+    alert(
+      error?.message ||
+      "Unable to update follow status. Please try again."
+    );
 
   } finally {
 
     button.disabled =
       false;
+
 
     button.dataset.busy =
       "false";
@@ -1839,10 +2323,6 @@ async function handleProfilePhotoUpload(
   }
 
 
-  /*
-  Maximum 5MB.
-  */
-
   if (
     file.size >
     5 * 1024 * 1024
@@ -1880,12 +2360,6 @@ async function handleProfilePhotoUpload(
 
   try {
 
-    /*
-    =================================================
-    STORAGE PATH
-    =================================================
-    */
-
     const extension =
       file.name
         .split(".")
@@ -1899,15 +2373,6 @@ async function handleProfilePhotoUpload(
         `profilePhotos/${currentUser.uid}/profile.${extension}`
       );
 
-
-    /*
-    =================================================
-    RESUMABLE UPLOAD
-    =================================================
-
-    This provides progress instead of appearing to
-    hang while the browser uploads.
-    */
 
     const uploadTask =
       uploadBytesResumable(
@@ -1971,23 +2436,11 @@ async function handleProfilePhotoUpload(
       );
 
 
-    /*
-    =================================================
-    GET DOWNLOAD URL
-    =================================================
-    */
-
     const photoURL =
       await getDownloadURL(
         snapshot.ref
       );
 
-
-    /*
-    =================================================
-    UPDATE FIREBASE AUTH PROFILE
-    =================================================
-    */
 
     await updateProfile(
       currentUser,
@@ -1996,12 +2449,6 @@ async function handleProfilePhotoUpload(
       }
     );
 
-
-    /*
-    =================================================
-    UPDATE FIRESTORE
-    =================================================
-    */
 
     await updateDoc(
       doc(
@@ -2015,12 +2462,6 @@ async function handleProfilePhotoUpload(
     );
 
 
-    /*
-    =================================================
-    UPDATE LOCAL STATE
-    =================================================
-    */
-
     if (viewedUser) {
 
       viewedUser.photoURL =
@@ -2028,12 +2469,6 @@ async function handleProfilePhotoUpload(
 
     }
 
-
-    /*
-    =================================================
-    UPDATE OWN CACHE
-    =================================================
-    */
 
     if (viewedUser) {
 
@@ -2043,12 +2478,6 @@ async function handleProfilePhotoUpload(
 
     }
 
-
-    /*
-    =================================================
-    SUCCESS
-    =================================================
-    */
 
     if (status) {
 
@@ -2060,12 +2489,6 @@ async function handleProfilePhotoUpload(
 
     }
 
-
-    /*
-    =================================================
-    IMMEDIATELY UPDATE PHOTO IN UI
-    =================================================
-    */
 
     const avatar =
       document.querySelector(
@@ -2153,13 +2576,17 @@ function loadCachedProfile(uid) {
 
 
   const own =
-    isOwnProfile(uid);
+    isOwnProfile(
+      uid
+    );
 
 
   const cached =
     own
       ? getOwnProfileCache()
-      : getPublicProfileCache(uid);
+      : getPublicProfileCache(
+          uid
+        );
 
 
   if (!cached) {
@@ -2168,8 +2595,7 @@ function loadCachedProfile(uid) {
 
 
   /*
-  Own profile may have stale online state.
-  The active user is always considered online.
+  Own profile is always online while active.
   */
 
   if (own) {
@@ -2203,8 +2629,13 @@ async function loadProfile(
     $("profileContainer");
 
 
-  if (!container || !uid) {
+  if (
+    !container ||
+    !uid
+  ) {
+
     return;
+
   }
 
 
@@ -2219,12 +2650,6 @@ async function loadProfile(
       uid
     );
 
-
-  /*
-  =====================================================
-  ONLY SHOW LOADING IF NO CACHE EXISTS
-  =====================================================
-  */
 
   if (
     !cached &&
@@ -2241,12 +2666,6 @@ async function loadProfile(
 
   }
 
-
-  /*
-  =====================================================
-  FIRESTORE REFRESH
-  =====================================================
-  */
 
   try {
 
@@ -2302,24 +2721,28 @@ async function loadProfile(
       isOwnProfile(uid)
     ) {
 
-      /*
-      Firebase Auth is the authoritative source for
-      the authenticated user's email.
-      */
-
       profile.email =
         profile.email ||
         currentUser?.email ||
         "";
 
 
-      /*
-      Never allow the user's own profile to appear
-      offline while they are actively authenticated.
-      */
-
       profile.isOnline =
         true;
+
+
+      /*
+      Keep following state synchronized.
+      */
+
+      currentUserFollowing =
+        Array.isArray(
+          profile.following
+        )
+          ? [
+              ...profile.following
+            ]
+          : [];
 
 
       viewedUser =
@@ -2336,6 +2759,7 @@ async function loadProfile(
       );
 
     }
+
 
     /*
     =====================================================
@@ -2370,10 +2794,6 @@ async function loadProfile(
       error
     );
 
-
-    /*
-    If cache exists, keep the cached profile visible.
-    */
 
     if (!cached) {
 
@@ -2463,6 +2883,23 @@ function listenToProfile(uid) {
             true;
 
 
+          /*
+          IMPORTANT:
+
+          Keep current user's following list updated
+          in realtime.
+          */
+
+          currentUserFollowing =
+            Array.isArray(
+              profile.following
+            )
+              ? [
+                  ...profile.following
+                ]
+              : [];
+
+
           viewedUser =
             profile;
 
@@ -2536,10 +2973,6 @@ function openVerificationModal() {
   }
 
 
-  /*
-  Verification is only available on own profile.
-  */
-
   if (
     !viewedUser ||
     !isOwnProfile(
@@ -2579,10 +3012,6 @@ function openVerificationModal() {
 
   }
 
-
-  /*
-  Use phone stored in own profile.
-  */
 
   if (
     phoneInput &&
@@ -2932,7 +3361,7 @@ async function startVerification() {
 
 
 /* =====================================================
-   POLL VERIFICATION STATUS
+   START VERIFICATION POLLING
 ===================================================== */
 
 function startVerificationPolling(
@@ -3411,25 +3840,18 @@ onAuthStateChanged(
     =================================================
     SHOW CACHE FIRST
     =================================================
-
-    This happens BEFORE the Firestore request.
-
-    If this profile was previously opened, the user
-    immediately sees the cached profile.
     */
 
-    loadCachedProfile(
-      profileUid
-    );
+    const hasCachedProfile =
+      loadCachedProfile(
+        profileUid
+      );
 
 
     /*
     =================================================
-    OWN PROFILE
+    OWN PROFILE PRESENCE
     =================================================
-
-    Do not block rendering while marking the user
-    online.
     */
 
     if (
@@ -3454,12 +3876,30 @@ onAuthStateChanged(
 
     /*
     =================================================
-    START REALTIME LISTENER
+    LOAD CURRENT USER FOLLOWING
     =================================================
 
-    Firestore can provide cached listener data and
-    then synchronize with the server when persistence
-    is enabled.
+    This happens in the background and does not
+    block the profile from appearing.
+    */
+
+    loadCurrentUserFollowing()
+      .catch(
+        error => {
+
+          console.warn(
+            "Following startup failed:",
+            error
+          );
+
+        }
+      );
+
+
+    /*
+    =================================================
+    REALTIME PROFILE LISTENER
+    =================================================
     */
 
     listenToProfile(
@@ -3472,24 +3912,24 @@ onAuthStateChanged(
     FIRESTORE REFRESH
     =================================================
 
-    This is intentionally NOT awaited before showing
-    cached data.
+    Cached profile is already visible, so there
+    is no reason to display another loading state.
     */
 
     loadProfile(
       profileUid,
-      !loadCachedProfile(profileUid)
+      !hasCachedProfile
     )
-    .catch(
-      error => {
+      .catch(
+        error => {
 
-        console.error(
-          "Profile startup error:",
-          error
-        );
+          console.error(
+            "Profile startup error:",
+            error
+          );
 
-      }
-    );
+        }
+      );
 
   }
 );
