@@ -110,7 +110,11 @@ function renderOnline(filter = "") {
     return 0;
   });
 
-  $("onlineCount").textContent = `(${onlineUsers.length})`;
+  const onlineCount = onlineUsers.filter(
+  u => u.isOnline === true
+).length;
+
+$("onlineCount").textContent = `(${onlineCount})`;
 
   if (!list.length) {
     box.innerHTML = `
