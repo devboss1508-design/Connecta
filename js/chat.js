@@ -952,6 +952,10 @@ function renderMessages(
     }
 
 
+    /* =================================================
+       EMPTY CHAT
+    ================================================= */
+
     if (!messages.length) {
 
         box.innerHTML = `
@@ -993,6 +997,10 @@ function renderMessages(
     let previousDate = "";
 
 
+    /* =================================================
+       RENDER EACH MESSAGE
+    ================================================= */
+
     messages.forEach(
         message => {
 
@@ -1007,9 +1015,9 @@ function renderMessages(
                 );
 
 
-            /*
-            DATE SEPARATOR
-            */
+            /* =========================================
+               DATE SEPARATOR
+            ========================================= */
 
             if (
                 dateLabel !==
@@ -1039,9 +1047,25 @@ function renderMessages(
             }
 
 
-            /*
-            MESSAGE
-            */
+            /* =========================================
+               MESSAGE TICK
+            ========================================= */
+
+            const tick =
+                mine
+                    ? getMessageTickState(
+                        message
+                    )
+                    : "";
+
+
+            /* =========================================
+               MESSAGE
+               
+               IMPORTANT:
+               TEXT + TIME + CHECKS ARE NOW
+               IN ONE INLINE FLOW.
+            ========================================= */
 
             html += `
 
@@ -1061,35 +1085,27 @@ function renderMessages(
                         class="message-bubble"
                     >
 
-                        <div
+                        <span
                             class="message-text"
-                        >
-                            ${escapeHtml(
-                                message.text
-                            )}
-                        </div>
+                        >${escapeHtml(
+                            message.text
+                        )}</span>
 
-
-                        <div
+                        <span
                             class="message-meta"
                         >
 
-                            <span>
+                            <span
+                                class="message-time"
+                            >
                                 ${formatTime(
                                     message.createdAt
                                 )}
                             </span>
 
+                            ${tick}
 
-                            ${
-                                mine
-                                    ? getMessageTickState(
-                                        message
-                                    )
-                                    : ""
-                            }
-
-                        </div>
+                        </span>
 
                     </div>
 
@@ -1101,9 +1117,17 @@ function renderMessages(
     );
 
 
+    /* =================================================
+       INSERT
+    ================================================= */
+
     box.innerHTML =
         html;
 
+
+    /* =================================================
+       SCROLL TO BOTTOM
+    ================================================= */
 
     if (scrollToBottom) {
 
@@ -1119,7 +1143,6 @@ function renderMessages(
     }
 
 }
-
 
 /* =====================================================
    MARK INCOMING AS READ
