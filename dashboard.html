@@ -4,66 +4,100 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#22C55E">
-  <title>Dashboard — CONNECTA</title>
+  <title>Chats — CONNECTA</title>
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body class="app-page">
+
   <header class="app-header">
-    <button class="icon-btn" id="menuBtn" aria-label="Menu">☰</button>
-    <div class="header-brand">CONNECTA</div>
+    <button class="icon-btn" id="menuBtn" aria-label="Open menu">☰</button>
+    <a class="header-brand" href="dashboard.html">CONNECTA</a>
+
     <div class="header-right">
-      <div class="balance">KSh. <span id="balanceAmount">0.00</span></div>
-      <button class="connection-btn">Get Connection</button>
-      <button class="profile-btn" id="profileBtn">U</button>
+      <div class="balance" id="balancePill">KSh. <span id="balanceAmount">0.00</span></div>
+      <button class="connection-btn" id="connectionBtn">Get Connection</button>
+      <button class="profile-btn" id="profileBtn" aria-label="Open profile">U</button>
     </div>
   </header>
 
-  <aside class="side-menu" id="sideMenu">
-    <div class="menu-brand">CONNECTA</div>
-    <a class="active" href="dashboard.html">⌂ <span>Chats</span></a>
-    <a href="#">♧ <span>Groups</span></a>
-    <a href="#">◉ <span>Stories</span></a>
-    <a href="#">♙ <span>Friends</span></a>
-    <a href="#">🟢 <span>Online Users</span></a>
-    <a href="#">✓ <span>Verification</span></a>
-    <a href="#">🎁 <span>Refer & Earn</span></a>
-    <a href="#">⚙ <span>Settings</span></a>
+  <aside class="side-menu" id="sideMenu" aria-hidden="true">
+    <div class="menu-brand"><span class="brand-mark">C</span> CONNECTA</div>
+    <div class="menu-user">
+      <div class="avatar" id="menuAvatar">U</div>
+      <div><strong id="menuName">CONNECTA User</strong><small id="menuUsername">@username</small></div>
+    </div>
+    <a class="active" href="dashboard.html">💬 <span>Chats</span></a>
+    <a href="#" data-coming="Groups">👥 <span>Groups</span></a>
+    <a href="#" data-coming="Stories">◉ <span>Stories</span></a>
+    <a href="#" data-coming="Friends">👤 <span>Friends</span></a>
+    <a href="#" data-coming="Online Users">🟢 <span>Online Users</span></a>
+    <a href="#" data-coming="Verification">✓ <span>Verification</span></a>
+    <a href="#" data-coming="Refer & Earn">🎁 <span>Refer & Earn</span></a>
+    <a href="#" data-coming="Settings">⚙ <span>Settings</span></a>
     <button id="logoutBtn" class="logout-link">↪ <span>Logout</span></button>
   </aside>
   <div class="menu-overlay" id="menuOverlay"></div>
 
   <main class="dashboard">
+
+    <section class="welcome-strip">
+      <div>
+        <span class="eyebrow">CONNECTA</span>
+        <h1>Welcome back, <span id="welcomeName">there</span> 👋</h1>
+        <p>See who's online and continue your conversations.</p>
+      </div>
+      <div class="welcome-avatar avatar avatar-green" id="welcomeAvatar">U</div>
+    </section>
+
     <section class="online-section card">
-      <div class="section-heading-row"><h2>Online Users <span id="onlineCount">(12)</span></h2><button class="search-btn">⌕</button></div>
-      <div class="online-users">
-        <div class="user-card"><div class="avatar large avatar-green">U</div><strong>You</strong><small class="online-text">online</small><button class="story-btn">Add Story</button></div>
-        <div class="user-card"><div class="avatar large">S</div><strong>Sarah wamboi</strong><small class="online-text">online</small><button>Follow</button></div>
-        <div class="user-card"><div class="avatar large avatar-purple">J</div><strong>John Doe</strong><small class="online-text">online</small><button>Follow</button></div>
-        <div class="user-card"><div class="avatar large">M</div><strong>Mercy</strong><small>last seen 3m ago</small><button>Follow</button></div>
-        <div class="user-card"><div class="avatar large avatar-orange">K</div><strong>Kevin</strong><small>last seen 8m ago</small><button>Follow</button></div>
+      <div class="section-heading-row">
+        <div>
+          <h2>Online Users <span id="onlineCount">(0)</span></h2>
+          <p class="section-subtitle">People currently active on CONNECTA</p>
+        </div>
+        <button class="search-btn" id="onlineSearchBtn" aria-label="Search online users">⌕</button>
+      </div>
+
+      <div class="online-search-wrap" id="onlineSearchWrap">
+        <input id="onlineSearch" type="search" placeholder="Search users..." autocomplete="off">
+      </div>
+
+      <div class="online-users" id="onlineUsers">
+        <div class="empty-state small">Loading online users...</div>
       </div>
     </section>
 
     <section class="recent-section card">
-      <div class="section-heading-row"><h2>Recent Chats</h2><button class="search-btn">⌕</button></div>
-      <div class="chat-list">
-        <a class="chat-item" href="#"><div class="avatar">J</div><div class="chat-copy"><strong>John Doe</strong><p>Hey, how are you?</p></div><div class="chat-meta"><time>5:40 PM</time><span class="unread">1</span></div></a>
-        <a class="chat-item" href="#"><div class="avatar avatar-purple">K</div><div class="chat-copy"><strong>KCSE 2026 Revision</strong><p>Welcome everyone...</p></div><div class="chat-meta"><time>4:32 PM</time><span class="unread">12</span></div></a>
-        <a class="chat-item" href="#"><div class="avatar avatar-green">C</div><div class="chat-copy"><strong>Customer Care</strong><p>🎉 Congratulations!...</p></div><div class="chat-meta"><time>3:15 PM</time></div></a>
-        <a class="chat-item" href="#"><div class="avatar avatar-orange">M</div><div class="chat-copy"><strong>Mercy Wanjiru</strong><p>Let's talk later</p></div><div class="chat-meta"><time>12:35 PM</time></div></a>
+      <div class="section-heading-row">
+        <div>
+          <h2>Recent Chats</h2>
+          <p class="section-subtitle">Your latest conversations</p>
+        </div>
+        <button class="search-btn" id="chatSearchBtn" aria-label="Search chats">⌕</button>
+      </div>
+
+      <div class="chat-search-wrap" id="chatSearchWrap">
+        <input id="chatSearch" type="search" placeholder="Search chats..." autocomplete="off">
+      </div>
+
+      <div class="chat-list" id="chatList">
+        <div class="empty-state">Your conversations will appear here.</div>
       </div>
     </section>
+
   </main>
 
-  <nav class="bottom-nav">
+  <nav class="bottom-nav" aria-label="Main navigation">
     <a class="active" href="dashboard.html"><span>▢</span><small>Chats</small></a>
-    <a href="#"><span>♧</span><small>Groups</small><b>12</b></a>
-    <a href="#"><span>◉</span><small>Stories</small></a>
-    <a href="#"><span>♙</span><small>Friends</small></a>
-    <a href="#"><span>🎁</span><small>Earn</small></a>
+    <a href="#" data-coming="Groups"><span>♧</span><small>Groups</small><b id="groupBadge" hidden>0</b></a>
+    <a href="#" data-coming="Stories"><span>◉</span><small>Stories</small></a>
+    <a href="#" data-coming="Friends"><span>♙</span><small>Friends</small></a>
+    <a href="#" data-coming="Refer & Earn"><span>🎁</span><small>Earn</small></a>
   </nav>
-  <script type="module" src="js/firebase.js"></script>
-<script src="js/dashboard.js"></script>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script type="module" src="js/dashboard.js"></script>
 </body>
 </html>
