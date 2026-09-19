@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    >
+
+    <meta name="theme-color" content="#22C55E">
+
+    <title>Group Chat — CONNECTA</title>
+
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+
+    <style>
+        /* =========================================
+           CONNECTA GROUP CHAT
+        ========================================= */
+
+        :root {
+            --connecta-green: #22C55E;
+            --connecta-green-dark: #16A34A;
+            --connecta-blue: #2196F3;
+            --chat-bg: #f4f7f5;
+            --white: #ffffff;
+            --text-dark: #17211b;
+            --text-muted: #718078;
+            --border: #e5ebe7;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+
+        body {
+            background: var(--chat-bg);
+            color: var(--text-dark);
+            font-family:
+                Inter,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Roboto,
+                Arial,
+                sans-serif;
+            overflow: hidden;
+        }
+
+        /* =========================================
+           HEADER
+        ========================================= */
+
+        .group-chat-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+
+            height: 68px;
+
+            display: flex;
+            align-items: center;
+
+            padding:
+                8px 14px;
+
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+
+            box-shadow:
+                0 2px 10px rgba(0, 0, 0, 0.04);
+        }
+
+        .back-btn {
+            width: 42px;
+            height: 42px;
+
+            border: 0;
+            background: transparent;
+
+            border-radius: 50%;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 25px;
+            color: var(--text-dark);
+
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .back-btn:active {
+            background: #f0f4f1;
+        }
+
+        .group-header-info {
+            min-width: 0;
+            flex: 1;
+
+            display: flex;
+            align-items: center;
+
+            gap: 10px;
+
+            margin-left: 4px;
+        }
+
+        .group-header-avatar {
+            width: 43px;
+            height: 43px;
+
+            border-radius: 14px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #22C55E,
+                    #16A34A
+                );
+
+            color: #ffffff;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 16px;
+            font-weight: 800;
+
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .group-header-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .group-header-text {
+            min-width: 0;
+        }
+
+        .group-header-name-row {
+            display: flex;
+            align-items: center;
+
+            min-width: 0;
+        }
+
+        .group-header-name {
+            margin: 0;
+
+            font-size: 16px;
+            font-weight: 800;
+
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .group-header-status {
+            margin: 3px 0 0;
+
+            font-size: 12px;
+            color: var(--text-muted);
+
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .group-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .header-action-btn {
+            width: 40px;
+            height: 40px;
+
+            border: 0;
+            background: transparent;
+
+            border-radius: 50%;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 21px;
+
+            cursor: pointer;
+        }
+
+        .header-action-btn:active {
+            background: #f0f4f1;
+        }
+
+        /* =========================================
+           VERIFIED BADGE
+        ========================================= */
+
+        .verified-badge {
+            display: inline-flex;
+
+            align-items: center;
+            justify-content: center;
+
+            width: 17px;
+            height: 17px;
+
+            margin-left: 5px;
+
+            border-radius: 50%;
+
+            background: var(--connecta-blue);
+            color: #ffffff;
+
+            font-size: 10px;
+            font-weight: 800;
+
+            line-height: 1;
+
+            flex-shrink: 0;
+        }
+
+        /* =========================================
+           CHAT AREA
+        ========================================= */
+
+        .group-chat-page {
+            height: 100dvh;
+
+            display: flex;
+            flex-direction: column;
+        }
+
+        .messages-area {
+            flex: 1;
+
+            overflow-y: auto;
+            overflow-x: hidden;
+
+            padding:
+                84px
+                12px
+                90px;
+
+            scroll-behavior: smooth;
+        }
+
+        .messages-inner {
+            width: 100%;
+            max-width: 760px;
+
+            margin: 0 auto;
+        }
+
+        /* =========================================
+           LOADING
+        ========================================= */
+
+        .chat-loading {
+            min-height: 180px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            color: var(--text-muted);
+
+            font-size: 14px;
+        }
+
+        .chat-loading-dot {
+            width: 8px;
+            height: 8px;
+
+            margin-right: 7px;
+
+            border-radius: 50%;
+
+            background: var(--connecta-green);
+
+            animation: loadingPulse 1s infinite ease-in-out;
+        }
+
+        @keyframes loadingPulse {
+            0%,
+            100% {
+                opacity: .35;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* =========================================
+           DATE SEPARATOR
+        ========================================= */
+
+        .date-separator {
+            display: flex;
+            justify-content: center;
+
+            margin: 12px 0 18px;
+        }
+
+        .date-separator span {
+            padding: 6px 11px;
+
+            border-radius: 20px;
+
+            background: #e7eee9;
+
+            color: #66736b;
+
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        /* =========================================
+           MESSAGE ROW
+        ========================================= */
+
+        .message-row {
+            display: flex;
+
+            width: 100%;
+
+            margin-bottom: 9px;
+        }
+
+        .message-row.mine {
+            justify-content: flex-end;
+        }
+
+        .message-row.other {
+            justify-content: flex-start;
+        }
+
+        .message-avatar {
+            width: 34px;
+            height: 34px;
+
+            margin-right: 7px;
+
+            border-radius: 11px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #d9fbe5,
+                    #b9f2cb
+                );
+
+            color: var(--connecta-green-dark);
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 11px;
+            font-weight: 800;
+
+            overflow: hidden;
+
+            flex-shrink: 0;
+
+            align-self: flex-end;
+        }
+
+        .message-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .message-content {
+            max-width: min(78%, 520px);
+        }
+
+        .message-sender {
+            display: flex;
+            align-items: center;
+
+            margin: 0 0 3px 5px;
+
+            color: #526058;
+
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .message-bubble {
+            padding: 9px 12px;
+
+            border-radius: 17px;
+
+            background: #ffffff;
+
+            border: 1px solid var(--border);
+
+            box-shadow:
+                0 1px 3px rgba(0, 0, 0, .025);
+
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+        }
+
+        .mine .message-bubble {
+            background: var(--connecta-green);
+            border-color: var(--connecta-green);
+
+            color: #ffffff;
+
+            border-bottom-right-radius: 5px;
+        }
+
+        .other .message-bubble {
+            border-bottom-left-radius: 5px;
+        }
+
+        .message-text {
+            margin: 0;
+
+            font-size: 14px;
+            line-height: 1.45;
+
+            white-space: pre-wrap;
+        }
+
+        .message-meta {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+
+            gap: 4px;
+
+            margin-top: 4px;
+
+            font-size: 10px;
+
+            color: #8a9790;
+        }
+
+        .mine .message-meta {
+            color: rgba(255, 255, 255, .78);
+        }
+
+        .message-status {
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        /* =========================================
+           EMPTY STATE
+        ========================================= */
+
+        .empty-chat {
+            min-height: 320px;
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+
+            text-align: center;
+
+            padding: 30px;
+        }
+
+        .empty-chat-icon {
+            width: 66px;
+            height: 66px;
+
+            margin-bottom: 13px;
+
+            border-radius: 22px;
+
+            background: #e5f9eb;
+
+            color: var(--connecta-green-dark);
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 29px;
+        }
+
+        .empty-chat h3 {
+            margin: 0 0 6px;
+
+            font-size: 17px;
+        }
+
+        .empty-chat p {
+            max-width: 290px;
+
+            margin: 0;
+
+            color: var(--text-muted);
+
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* =========================================
+           TYPING INDICATOR
+        ========================================= */
+
+        .typing-area {
+            min-height: 22px;
+
+            padding: 0 14px 4px;
+
+            color: var(--text-muted);
+
+            font-size: 11px;
+        }
+
+        .typing-area:empty {
+            display: none;
+        }
+
+        /* =========================================
+           COMPOSER
+        ========================================= */
+
+        .composer-wrap {
+            position: fixed;
+
+            left: 0;
+            right: 0;
+            bottom: 0;
+
+            z-index: 90;
+
+            padding:
+                8px
+                10px
+                calc(8px + env(safe-area-inset-bottom));
+
+            background: rgba(255, 255, 255, .97);
+
+            border-top: 1px solid var(--border);
+
+            backdrop-filter: blur(12px);
+        }
+
+        .composer {
+            width: 100%;
+            max-width: 760px;
+
+            margin: 0 auto;
+
+            display: flex;
+            align-items: flex-end;
+
+            gap: 7px;
+        }
+
+        .composer-action {
+            width: 43px;
+            height: 43px;
+
+            border: 0;
+
+            border-radius: 50%;
+
+            background: #eef4ef;
+
+            color: #536159;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 21px;
+
+            cursor: pointer;
+
+            flex-shrink: 0;
+        }
+
+        .composer-action:active {
+            transform: scale(.96);
+        }
+
+        .message-input-wrap {
+            flex: 1;
+
+            min-width: 0;
+
+            display: flex;
+            align-items: flex-end;
+
+            padding: 4px 7px 4px 12px;
+
+            border: 1px solid #dce5df;
+
+            background: #ffffff;
+
+            border-radius: 22px;
+        }
+
+        .message-input {
+            width: 100%;
+
+            min-height: 34px;
+            max-height: 110px;
+
+            padding: 7px 3px;
+
+            border: 0;
+            outline: none;
+
+            resize: none;
+
+            background: transparent;
+
+            color: var(--text-dark);
+
+            font-family: inherit;
+            font-size: 14px;
+
+            line-height: 1.35;
+        }
+
+        .message-input::placeholder {
+            color: #99a49e;
+        }
+
+        .send-btn {
+            width: 38px;
+            height: 38px;
+
+            border: 0;
+
+            border-radius: 50%;
+
+            background: var(--connecta-green);
+
+            color: #ffffff;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 18px;
+            font-weight: 800;
+
+            cursor: pointer;
+
+            flex-shrink: 0;
+        }
+
+        .send-btn:active {
+            transform: scale(.95);
+        }
+
+        .send-btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        /* =========================================
+           GROUP INFO SHEET
+        ========================================= */
+
+        .group-info-overlay {
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 200;
+
+            display: none;
+
+            align-items: flex-end;
+
+            background: rgba(0, 0, 0, .35);
+        }
+
+        .group-info-overlay.open {
+            display: flex;
+        }
+
+        .group-info-sheet {
+            width: 100%;
+
+            max-height: 86vh;
+
+            overflow-y: auto;
+
+            padding: 10px 16px 28px;
+
+            background: #ffffff;
+
+            border-radius: 24px 24px 0 0;
+
+            animation: sheetUp .2s ease-out;
+        }
+
+        @keyframes sheetUp {
+            from {
+                transform: translateY(30px);
+                opacity: .5;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .sheet-handle {
+            width: 42px;
+            height: 5px;
+
+            margin: 2px auto 18px;
+
+            border-radius: 10px;
+
+            background: #d9e1dc;
+        }
+
+        .group-info-top {
+            display: flex;
+            align-items: center;
+
+            gap: 12px;
+
+            margin-bottom: 18px;
+        }
+
+        .info-group-avatar {
+            width: 58px;
+            height: 58px;
+
+            border-radius: 18px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #22C55E,
+                    #16A34A
+                );
+
+            color: #ffffff;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 20px;
+            font-weight: 800;
+
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .info-group-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .info-group-name {
+            margin: 0;
+
+            font-size: 18px;
+            font-weight: 800;
+        }
+
+        .info-group-meta {
+            margin-top: 4px;
+
+            color: var(--text-muted);
+
+            font-size: 12px;
+        }
+
+        .info-section {
+            margin-top: 18px;
+        }
+
+        .info-section-title {
+            margin: 0 0 8px;
+
+            font-size: 12px;
+            font-weight: 800;
+
+            color: #657169;
+
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .info-description {
+            margin: 0;
+
+            color: #46534b;
+
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .info-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+
+            padding: 11px 12px;
+
+            background: #f6f9f7;
+
+            border-radius: 13px;
+
+            font-size: 13px;
+        }
+
+        .info-row span:first-child {
+            color: var(--text-muted);
+        }
+
+        .info-row strong {
+            color: var(--text-dark);
+        }
+
+        .close-sheet-btn {
+            width: 100%;
+
+            height: 46px;
+
+            margin-top: 22px;
+
+            border: 0;
+
+            border-radius: 14px;
+
+            background: #eef4ef;
+
+            color: #344139;
+
+            font-size: 14px;
+            font-weight: 700;
+
+            cursor: pointer;
+        }
+
+        /* =========================================
+           TOAST
+        ========================================= */
+
+        .toast {
+            position: fixed;
+
+            left: 50%;
+            bottom: 76px;
+
+            z-index: 400;
+
+            transform:
+                translate(-50%, 15px);
+
+            min-width: 190px;
+            max-width: calc(100vw - 30px);
+
+            padding: 11px 15px;
+
+            border-radius: 13px;
+
+            background: #17211b;
+            color: #ffffff;
+
+            text-align: center;
+
+            font-size: 12px;
+            line-height: 1.4;
+
+            opacity: 0;
+            visibility: hidden;
+
+            transition:
+                opacity .2s ease,
+                transform .2s ease,
+                visibility .2s ease;
+
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            visibility: visible;
+
+            transform:
+                translate(-50%, 0);
+        }
+
+        /* =========================================
+           ACCESS BLOCKED
+        ========================================= */
+
+        .access-block {
+            display: none;
+
+            min-height: 100dvh;
+
+            align-items: center;
+            justify-content: center;
+
+            padding: 30px;
+        }
+
+        .access-block.show {
+            display: flex;
+        }
+
+        .access-card {
+            width: 100%;
+            max-width: 390px;
+
+            padding: 28px 22px;
+
+            text-align: center;
+
+            background: #ffffff;
+
+            border: 1px solid var(--border);
+
+            border-radius: 22px;
+
+            box-shadow:
+                0 8px 30px rgba(0, 0, 0, .06);
+        }
+
+        .access-icon {
+            width: 65px;
+            height: 65px;
+
+            margin: 0 auto 14px;
+
+            border-radius: 21px;
+
+            background: #fff5db;
+
+            color: #b7791f;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-size: 27px;
+        }
+
+        .access-card h2 {
+            margin: 0 0 7px;
+
+            font-size: 19px;
+        }
+
+        .access-card p {
+            margin: 0;
+
+            color: var(--text-muted);
+
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .back-to-groups {
+            width: 100%;
+            height: 45px;
+
+            margin-top: 18px;
+
+            border: 0;
+            border-radius: 13px;
+
+            background: var(--connecta-green);
+            color: #ffffff;
+
+            font-size: 14px;
+            font-weight: 700;
+
+            cursor: pointer;
+        }
+
+        /* =========================================
+           RESPONSIVE
+        ========================================= */
+
+        @media (min-width: 700px) {
+            .messages-area {
+                padding-left: 22px;
+                padding-right: 22px;
+            }
+
+            .composer-wrap {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="group-chat-page" id="groupChatPage">
+
+    <!-- =========================================
+         GROUP HEADER
+    ========================================== -->
+
+    <header class="group-chat-header">
+
+        <button
+            type="button"
+            class="back-btn"
+            id="backBtn"
+            aria-label="Back to groups"
+        >
+            ‹
+        </button>
+
+        <div class="group-header-info">
+
+            <div
+                class="group-header-avatar"
+                id="groupHeaderAvatar"
+            >
+                G
+            </div>
+
+            <div class="group-header-text">
+
+                <div class="group-header-name-row">
+
+                    <h1
+                        class="group-header-name"
+                        id="groupName"
+                    >
+                        Loading...
+                    </h1>
+
+                </div>
+
+                <p
+                    class="group-header-status"
+                    id="groupStatus"
+                >
+                    Loading group...
+                </p>
+
+            </div>
+
+        </div>
+
+        <div class="group-header-actions">
+
+            <button
+                type="button"
+                class="header-action-btn"
+                id="groupInfoBtn"
+                aria-label="Group information"
+                title="Group information"
+            >
+                ⋮
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <!-- =========================================
+         MESSAGES
+    ========================================== -->
+
+    <main
+        class="messages-area"
+        id="messagesArea"
+        aria-label="Group messages"
+    >
+
+        <div class="messages-inner" id="messagesInner">
+
+            <div class="chat-loading" id="chatLoading">
+                <span class="chat-loading-dot"></span>
+                Loading group...
+            </div>
+
+        </div>
+
+    </main>
+
+
+    <!-- =========================================
+         TYPING
+    ========================================== -->
+
+    <div
+        class="typing-area"
+        id="typingArea"
+        aria-live="polite"
+    ></div>
+
+
+    <!-- =========================================
+         MESSAGE COMPOSER
+    ========================================== -->
+
+    <div class="composer-wrap">
+
+        <form
+            class="composer"
+            id="messageForm"
+            autocomplete="off"
+        >
+
+            <button
+                type="button"
+                class="composer-action"
+                id="emojiBtn"
+                aria-label="Emoji"
+                title="Emoji"
+            >
+                ☺
+            </button>
+
+            <div class="message-input-wrap">
+
+                <textarea
+                    id="messageInput"
+                    class="message-input"
+                    rows="1"
+                    maxlength="2000"
+                    placeholder="Write a message..."
+                    autocomplete="off"
+                    enterkeyhint="send"
+                ></textarea>
+
+                <button
+                    type="submit"
+                    class="send-btn"
+                    id="sendBtn"
+                    aria-label="Send message"
+                    title="Send"
+                    disabled
+                >
+                    ➤
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+<!-- =========================================
+     ACCESS BLOCK
+========================================== -->
+
+<section
+    class="access-block"
+    id="accessBlock"
+>
+
+    <div class="access-card">
+
+        <div class="access-icon">
+            🔒
+        </div>
+
+        <h2 id="accessTitle">
+            Group access required
+        </h2>
+
+        <p id="accessMessage">
+            You don't currently have access to this group.
+        </p>
+
+        <button
+            type="button"
+            class="back-to-groups"
+            id="backToGroupsBtn"
+        >
+            Back to Groups
+        </button>
+
+    </div>
+
+</section>
+
+
+<!-- =========================================
+     GROUP INFO SHEET
+========================================== -->
+
+<div
+    class="group-info-overlay"
+    id="groupInfoOverlay"
+    aria-hidden="true"
+>
+
+    <section
+        class="group-info-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="infoGroupName"
+    >
+
+        <div class="sheet-handle"></div>
+
+        <div class="group-info-top">
+
+            <div
+                class="info-group-avatar"
+                id="infoGroupAvatar"
+            >
+                G
+            </div>
+
+            <div>
+
+                <h2
+                    class="info-group-name"
+                    id="infoGroupName"
+                >
+                    Group
+                </h2>
+
+                <div
+                    class="info-group-meta"
+                    id="infoGroupMeta"
+                >
+                    CONNECTA Group
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="info-section">
+
+            <h3 class="info-section-title">
+                About
+            </h3>
+
+            <p
+                class="info-description"
+                id="infoGroupDescription"
+            >
+                No group description available.
+            </p>
+
+        </div>
+
+
+        <div class="info-section">
+
+            <h3 class="info-section-title">
+                Group Information
+            </h3>
+
+            <div class="info-list">
+
+                <div class="info-row">
+                    <span>Type</span>
+                    <strong id="infoGroupType">Public</strong>
+                </div>
+
+                <div class="info-row">
+                    <span>Members</span>
+                    <strong id="infoGroupMembers">0</strong>
+                </div>
+
+                <div class="info-row">
+                    <span>Subscription</span>
+                    <strong id="infoGroupSubscription">Free</strong>
+                </div>
+
+                <div class="info-row">
+                    <span>Created by</span>
+                    <strong id="infoGroupOwner">CONNECTA</strong>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <button
+            type="button"
+            class="close-sheet-btn"
+            id="closeInfoBtn"
+        >
+            Close
+        </button>
+
+    </section>
+
+</div>
+
+
+<!-- =========================================
+     TOAST
+========================================== -->
+
+<div
+    class="toast"
+    id="toast"
+    role="status"
+    aria-live="polite"
+></div>
+
+
+<!-- =========================================
+     JAVASCRIPT
+========================================== -->
+
+<script type="module" src="js/group-chat.js"></script>
+
+</body>
+</html>
