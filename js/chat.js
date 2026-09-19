@@ -15,26 +15,40 @@ import {
     query,
     orderBy,
     serverTimestamp,
-    writeBatch
+    writeBatch,
+    increment
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 
 /* =====================================================
-   CONNECTA CHAT
+   CONNECTA CHAT ENGINE
 ===================================================== */
 
-const $ = id => document.getElementById(id);
+const $ = id =>
+    document.getElementById(id);
+
 
 let currentUser = null;
-let currentProfile = null;
+
 let otherUser = null;
 
 let chatId = null;
 
 let stopMessages = null;
+
 let stopOtherUser = null;
 
+let stopChat = null;
+
 let latestMessages = [];
+
+let isOtherUserTyping = false;
+
+let typingTimer = null;
+
+let lastTypingWrite = 0;
+
+let isMarkingMessages = false;
 
 
 /* =====================================================
@@ -63,6 +77,7 @@ function getFullName(user = {}) {
     const displayName =
         String(user.displayName || "").trim();
 
+
     if (displayName) {
         return displayName;
     }
@@ -71,11 +86,14 @@ function getFullName(user = {}) {
     const firstName =
         String(user.firstName || "").trim();
 
+
     const lastName =
         String(user.lastName || "").trim();
 
+
     const fullName =
         `${firstName} ${lastName}`.trim();
+
 
     if (fullName) {
         return fullName;
@@ -84,6 +102,7 @@ function getFullName(user = {}) {
 
     const username =
         String(user.username || "").trim();
+
 
     if (username) {
         return username.replace(/^@/, "");
@@ -114,13 +133,15 @@ function escapeHtml(value) {
 
 
 /* =====================================================
-   GET OTHER USER UID
+   GET OTHER UID
 ===================================================== */
 
 function getOtherUid() {
 
     const params =
-        new URLSearchParams(location.search);
+        new URLSearchParams(
+            location.search
+        );
 
     return params.get("uid");
 
@@ -128,7 +149,7 @@ function getOtherUid() {
 
 
 /* =====================================================
-   CREATE DETERMINISTIC CHAT ID
+   CREATE CHAT ID
 ===================================================== */
 
 function createChatId(uid1, uid2) {
@@ -150,13 +171,16 @@ function formatTime(timestamp) {
         return "";
     }
 
-    return timestamp.toDate().toLocaleTimeString(
-        [],
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    );
+
+    return timestamp
+        .toDate()
+        .toLocaleTimeString(
+            [],
+            {
+                hour: "numeric",
+                minute: "2-digit"
+            }
+        );
 
 }
 
@@ -171,14 +195,18 @@ function formatDate(timestamp) {
         return "Today";
     }
 
+
     const date =
         timestamp.toDate();
+
 
     const today =
         new Date();
 
+
     const yesterday =
         new Date();
+
 
     yesterday.setDate(
         yesterday.getDate() - 1
@@ -189,7 +217,9 @@ function formatDate(timestamp) {
         date.toDateString() ===
         today.toDateString()
     ) {
+
         return "Today";
+
     }
 
 
@@ -197,7 +227,9 @@ function formatDate(timestamp) {
         date.toDateString() ===
         yesterday.toDateString()
     ) {
+
         return "Yesterday";
+
     }
 
 
@@ -206,9 +238,11 @@ function formatDate(timestamp) {
         {
             day: "numeric",
             month: "short",
-            year: date.getFullYear() !== today.getFullYear()
-                ? "numeric"
-                : undefined
+            year:
+                date.getFullYear() !==
+                today.getFullYear()
+                    ? "numeric"
+                    : undefined
         }
     );
 
@@ -216,13 +250,19 @@ function formatDate(timestamp) {
 
 
 /* =====================================================
-   RENDER HEADER
+   RENDER CHAT HEADER
 ===================================================== */
 
 function renderChatHeader(user) {
 
+    if (!user) {
+        return;
+    }
+
+
     const name =
         getFullName(user);
+
 
     const photo =
         user.photoURL ||
@@ -233,13 +273,20 @@ function renderChatHeader(user) {
     const nameElement =
         $("chatUserName");
 
+
     const avatarElement =
         $("chatAvatar");
+
+
+    if (!nameElement || !avatarElement) {
+        return;
+    }
 
 
     /* NAME */
 
     nameElement.innerHTML = `
+
         ${escapeHtml(name)}
 
         ${
@@ -252,31 +299,21 @@ function renderChatHeader(user) {
                 `
                 : ""
         }
+
     `;
 
 
-    /* AVATAR */
+    /* PHOTO */
 
     if (photo) {
 
         avatarElement.innerHTML = `
+
             <img
                 src="${escapeHtml(photo)}"
                 alt="${escapeHtml(name)}"
-                style="
-                    width:100%;
-                    height:100%;
-                    object-fit:cover;
-                    border-radius:50%;
-                    display:block;
-                "
-                onerror="
-                    this.style.display='none';
-                    this.parentElement.textContent='${escapeHtml(
-                        initials(name)
-                    )}';
-                "
             >
+
         `;
 
     } else {
@@ -287,23 +324,25 @@ function renderChatHeader(user) {
     }
 
 
-    updateUserStatus(user);
+    updateStatusDisplay();
 
 }
 
 
 /* =====================================================
-   UPDATE USER STATUS
+   STATUS DISPLAY
 ===================================================== */
 
-function updateUserStatus(user) {
+function updateStatusDisplay() {
 
-    const online =
-        user?.isOnline === true;
+    if (!otherUser) {
+        return;
+    }
 
 
     const statusText =
         $("chatStatusText");
+
 
     const statusDot =
         $("chatStatusDot");
@@ -314,25 +353,74 @@ function updateUserStatus(user) {
     }
 
 
-    if (online) {
+    /*
+    TYPING TAKES PRIORITY
+    */
 
-        statusText.textContent =
-            "Online";
+    if (isOtherUserTyping) {
 
-        if (statusDot) {
-            statusDot.style.display =
-                "flex";
-        }
+        statusText.innerHTML = `
 
-    } else {
+            <span class="typing-status">
 
-        statusText.textContent =
-            getLastSeenText(user);
+                <span class="typing-label">
+                    typing
+                </span>
+
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+
+            </span>
+
+        `;
 
         if (statusDot) {
             statusDot.style.display =
                 "none";
         }
+
+        return;
+
+    }
+
+
+    /*
+    ONLINE
+    */
+
+    if (otherUser.isOnline === true) {
+
+        statusText.textContent =
+            "Online";
+
+
+        if (statusDot) {
+
+            statusDot.style.display =
+                "flex";
+
+        }
+
+        return;
+
+    }
+
+
+    /*
+    OFFLINE
+    */
+
+    statusText.textContent =
+        getLastSeenText(
+            otherUser
+        );
+
+
+    if (statusDot) {
+
+        statusDot.style.display =
+            "none";
 
     }
 
@@ -354,11 +442,31 @@ function getLastSeenText(user) {
         user.lastSeen.toDate();
 
 
-    return `Last seen ${date.toLocaleTimeString(
+    const today =
+        new Date();
+
+
+    if (
+        date.toDateString() ===
+        today.toDateString()
+    ) {
+
+        return `Last seen ${date.toLocaleTimeString(
+            [],
+            {
+                hour: "numeric",
+                minute: "2-digit"
+            }
+        )}`;
+
+    }
+
+
+    return `Last seen ${date.toLocaleDateString(
         [],
         {
-            hour: "numeric",
-            minute: "2-digit"
+            day: "numeric",
+            month: "short"
         }
     )}`;
 
@@ -371,11 +479,10 @@ function getLastSeenText(user) {
 
 async function loadOtherUser(uid) {
 
-    const userRef =
-        doc(db, "users", uid);
-
     const snap =
-        await getDoc(userRef);
+        await getDoc(
+            doc(db, "users", uid)
+        );
 
 
     if (!snap.exists()) {
@@ -388,8 +495,11 @@ async function loadOtherUser(uid) {
 
 
     otherUser = {
+
         uid,
+
         ...snap.data()
+
     };
 
 
@@ -401,13 +511,15 @@ async function loadOtherUser(uid) {
 
 
 /* =====================================================
-   LISTEN TO OTHER USER
+   LISTEN TO USER
 ===================================================== */
 
 function listenToOtherUser(uid) {
 
     if (stopOtherUser) {
+
         stopOtherUser();
+
     }
 
 
@@ -423,28 +535,27 @@ function listenToOtherUser(uid) {
 
 
                 otherUser = {
+
                     uid,
+
                     ...snapshot.data()
+
                 };
 
 
-                renderChatHeader(
-                    otherUser
-                );
+                updateStatusDisplay();
 
 
                 /*
-                Re-render messages because the
-                recipient's online state can affect
-                the delivery tick.
+                If recipient becomes online,
+                mark our sent messages as delivered.
                 */
 
-                if (latestMessages.length) {
+                if (
+                    otherUser.isOnline === true
+                ) {
 
-                    renderMessages(
-                        latestMessages,
-                        false
-                    );
+                    markMessagesDelivered();
 
                 }
 
@@ -477,38 +588,181 @@ async function ensureChat() {
 
 
     const chatRef =
-        doc(db, "chats", chatId);
+        doc(
+            db,
+            "chats",
+            chatId
+        );
 
 
-    const chatSnap =
+    const snap =
         await getDoc(chatRef);
 
 
-    if (!chatSnap.exists()) {
+    if (!snap.exists()) {
 
         await setDoc(
             chatRef,
             {
+
                 id: chatId,
 
                 participants: [
+
                     currentUser.uid,
+
                     otherUser.uid
+
                 ],
 
                 lastMessage: "",
 
                 lastSenderId: "",
 
+                unreadCount: {
+
+                    [currentUser.uid]: 0,
+
+                    [otherUser.uid]: 0
+
+                },
+
+                typing: {
+
+                    [currentUser.uid]: false,
+
+                    [otherUser.uid]: false
+
+                },
+
                 updatedAt:
                     serverTimestamp(),
 
                 createdAt:
                     serverTimestamp()
+
             }
         );
 
     }
+
+
+    /*
+    Make sure older chats get
+    the newer fields.
+    */
+
+    else {
+
+        const data =
+            snap.data();
+
+
+        const updates = {};
+
+
+        if (!data.unreadCount) {
+
+            updates.unreadCount = {
+
+                [currentUser.uid]: 0,
+
+                [otherUser.uid]: 0
+
+            };
+
+        }
+
+
+        if (!data.typing) {
+
+            updates.typing = {
+
+                [currentUser.uid]: false,
+
+                [otherUser.uid]: false
+
+            };
+
+        }
+
+
+        if (
+            Object.keys(updates).length
+        ) {
+
+            await updateDoc(
+                chatRef,
+                updates
+            );
+
+        }
+
+    }
+
+}
+
+
+/* =====================================================
+   LISTEN TO CHAT DOCUMENT
+===================================================== */
+
+function listenToChat() {
+
+    if (!chatId) {
+        return;
+    }
+
+
+    if (stopChat) {
+
+        stopChat();
+
+    }
+
+
+    stopChat =
+        onSnapshot(
+            doc(
+                db,
+                "chats",
+                chatId
+            ),
+
+            snapshot => {
+
+                if (!snapshot.exists()) {
+                    return;
+                }
+
+
+                const data =
+                    snapshot.data();
+
+
+                const typing =
+                    data.typing || {};
+
+
+                isOtherUserTyping =
+                    typing[
+                        otherUser.uid
+                    ] === true;
+
+
+                updateStatusDisplay();
+
+            },
+
+            error => {
+
+                console.warn(
+                    "Chat listener:",
+                    error
+                );
+
+            }
+        );
 
 }
 
@@ -552,8 +806,11 @@ function listenToMessages() {
                 const messages =
                     snapshot.docs.map(
                         message => ({
+
                             id: message.id,
+
                             ...message.data()
+
                         })
                     );
 
@@ -568,8 +825,9 @@ function listenToMessages() {
 
 
                 /*
-                If this user is the recipient,
-                mark incoming messages as delivered/read.
+                Messages received while this
+                conversation is open become
+                delivered + read.
                 */
 
                 await markIncomingMessages(
@@ -597,21 +855,20 @@ function listenToMessages() {
 
 
 /* =====================================================
-   MESSAGE TICK STATE
+   MESSAGE TICK
 ===================================================== */
 
-function getMessageTickState(message) {
-
-    /*
-    Only outgoing messages have ticks.
-    */
-
+function getMessageTickState(
+    message
+) {
 
     if (
         message.senderId !==
         currentUser.uid
     ) {
+
         return "";
+
     }
 
 
@@ -619,16 +876,19 @@ function getMessageTickState(message) {
     READ
     */
 
-    if (message.read === true) {
+    if (
+        message.read === true
+    ) {
 
         return `
+
             <span
                 class="message-checks read"
-                aria-label="Read"
                 title="Read"
             >
                 ✓✓
             </span>
+
         `;
 
     }
@@ -639,18 +899,18 @@ function getMessageTickState(message) {
     */
 
     if (
-        message.delivered === true ||
-        otherUser?.isOnline === true
+        message.delivered === true
     ) {
 
         return `
+
             <span
                 class="message-checks"
-                aria-label="Delivered"
                 title="Delivered"
             >
                 ✓✓
             </span>
+
         `;
 
     }
@@ -661,13 +921,14 @@ function getMessageTickState(message) {
     */
 
     return `
+
         <span
             class="message-checks"
-            aria-label="Sent"
             title="Sent"
         >
             ✓
         </span>
+
     `;
 
 }
@@ -684,6 +945,11 @@ function renderMessages(
 
     const box =
         $("messagesContainer");
+
+
+    if (!box) {
+        return;
+    }
 
 
     if (!messages.length) {
@@ -705,7 +971,9 @@ function renderMessages(
                     <p>
                         Say hello to
                         ${escapeHtml(
-                            getFullName(otherUser)
+                            getFullName(
+                                otherUser
+                            )
                         )}
                     </p>
 
@@ -725,88 +993,112 @@ function renderMessages(
     let previousDate = "";
 
 
-    messages.forEach(message => {
+    messages.forEach(
+        message => {
 
-        const mine =
-            message.senderId ===
-            currentUser.uid;
-
-
-        const dateLabel =
-            formatDate(
-                message.createdAt
-            );
+            const mine =
+                message.senderId ===
+                currentUser.uid;
 
 
-        /*
-        DATE SEPARATOR
-        */
+            const dateLabel =
+                formatDate(
+                    message.createdAt
+                );
 
-        if (
-            dateLabel !==
-            previousDate
-        ) {
+
+            /*
+            DATE SEPARATOR
+            */
+
+            if (
+                dateLabel !==
+                previousDate
+            ) {
+
+                html += `
+
+                    <div
+                        class="date-separator"
+                    >
+
+                        <span>
+                            ${escapeHtml(
+                                dateLabel
+                            )}
+                        </span>
+
+                    </div>
+
+                `;
+
+
+                previousDate =
+                    dateLabel;
+
+            }
+
+
+            /*
+            MESSAGE
+            */
 
             html += `
 
-                <div class="date-separator">
+                <div
+                    class="
+                        message-row
+                        ${mine
+                            ? "outgoing"
+                            : "incoming"}
+                    "
+                    data-message-id="${escapeHtml(
+                        message.id
+                    )}"
+                >
 
-                    <span>
-                        ${escapeHtml(dateLabel)}
-                    </span>
+                    <div
+                        class="message-bubble"
+                    >
+
+                        <div
+                            class="message-text"
+                        >
+                            ${escapeHtml(
+                                message.text
+                            )}
+                        </div>
+
+
+                        <div
+                            class="message-meta"
+                        >
+
+                            <span>
+                                ${formatTime(
+                                    message.createdAt
+                                )}
+                            </span>
+
+
+                            ${
+                                mine
+                                    ? getMessageTickState(
+                                        message
+                                    )
+                                    : ""
+                            }
+
+                        </div>
+
+                    </div>
 
                 </div>
 
             `;
 
-            previousDate =
-                dateLabel;
-
         }
-
-
-        /*
-        MESSAGE
-        */
-
-        html += `
-
-            <div
-                class="
-                    message-row
-                    ${mine ? "outgoing" : "incoming"}
-                "
-                data-message-id="${escapeHtml(message.id)}"
-            >
-
-                <div class="message-bubble">
-
-                    <div class="message-text">
-                        ${escapeHtml(message.text)}
-                    </div>
-
-
-                    <div class="message-meta">
-
-                        <span>
-                            ${formatTime(message.createdAt)}
-                        </span>
-
-                        ${
-                            mine
-                                ? getMessageTickState(message)
-                                : ""
-                        }
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        `;
-
-    });
+    );
 
 
     box.innerHTML =
@@ -815,12 +1107,14 @@ function renderMessages(
 
     if (scrollToBottom) {
 
-        requestAnimationFrame(() => {
+        requestAnimationFrame(
+            () => {
 
-            box.scrollTop =
-                box.scrollHeight;
+                box.scrollTop =
+                    box.scrollHeight;
 
-        });
+            }
+        );
 
     }
 
@@ -828,20 +1122,35 @@ function renderMessages(
 
 
 /* =====================================================
-   MARK INCOMING MESSAGES
+   MARK INCOMING AS READ
 ===================================================== */
 
-async function markIncomingMessages(messages) {
+async function markIncomingMessages(
+    messages
+) {
 
-    if (!currentUser || !chatId) {
+    if (
+        !currentUser ||
+        !chatId ||
+        isMarkingMessages
+    ) {
+
         return;
+
     }
 
 
     const incoming =
-        messages.filter(message =>
-            message.receiverId === currentUser.uid &&
-            message.senderId !== currentUser.uid
+        messages.filter(
+            message =>
+
+                message.receiverId ===
+                currentUser.uid &&
+
+                message.senderId !==
+                currentUser.uid &&
+
+                message.read !== true
         );
 
 
@@ -850,68 +1159,164 @@ async function markIncomingMessages(messages) {
     }
 
 
-    const batch =
-        writeBatch(db);
-
-    let changes = 0;
-
-
-    incoming.forEach(message => {
-
-        /*
-        Because the conversation is currently open,
-        the message is both delivered and viewed.
-        */
-
-        if (
-            message.delivered !== true ||
-            message.read !== true
-        ) {
-
-            const messageRef =
-                doc(
-                    db,
-                    "chats",
-                    chatId,
-                    "messages",
-                    message.id
-                );
-
-
-            batch.update(
-                messageRef,
-                {
-                    delivered: true,
-                    deliveredAt:
-                        serverTimestamp(),
-
-                    read: true,
-                    readAt:
-                        serverTimestamp()
-                }
-            );
-
-
-            changes++;
-
-        }
-
-    });
-
-
-    if (changes === 0) {
-        return;
-    }
+    isMarkingMessages =
+        true;
 
 
     try {
+
+        const batch =
+            writeBatch(db);
+
+
+        incoming.forEach(
+            message => {
+
+                const messageRef =
+                    doc(
+                        db,
+                        "chats",
+                        chatId,
+                        "messages",
+                        message.id
+                    );
+
+
+                batch.update(
+                    messageRef,
+                    {
+
+                        delivered: true,
+
+                        deliveredAt:
+                            serverTimestamp(),
+
+                        read: true,
+
+                        readAt:
+                            serverTimestamp()
+
+                    }
+                );
+
+            }
+        );
+
+
+        /*
+        RESET UNREAD COUNT
+        */
+
+        const chatRef =
+            doc(
+                db,
+                "chats",
+                chatId
+            );
+
+
+        batch.update(
+            chatRef,
+            {
+                [`unreadCount.${currentUser.uid}`]: 0
+            }
+        );
+
 
         await batch.commit();
 
     } catch (error) {
 
         console.warn(
-            "Unable to update message receipts:",
+            "Read receipt update failed:",
+            error
+        );
+
+    } finally {
+
+        isMarkingMessages =
+            false;
+
+    }
+
+}
+
+
+/* =====================================================
+   MARK SENT MESSAGES AS DELIVERED
+===================================================== */
+
+async function markMessagesDelivered() {
+
+    if (
+        !currentUser ||
+        !otherUser ||
+        !chatId ||
+        otherUser.isOnline !== true
+    ) {
+
+        return;
+
+    }
+
+
+    const messages =
+        latestMessages.filter(
+            message =>
+
+                message.senderId ===
+                currentUser.uid &&
+
+                message.delivered !== true
+        );
+
+
+    if (!messages.length) {
+        return;
+    }
+
+
+    try {
+
+        const batch =
+            writeBatch(db);
+
+
+        messages.forEach(
+            message => {
+
+                const messageRef =
+                    doc(
+                        db,
+                        "chats",
+                        chatId,
+                        "messages",
+                        message.id
+                    );
+
+
+                batch.update(
+                    messageRef,
+                    {
+
+                        delivered: true,
+
+                        deliveredAt:
+                            serverTimestamp()
+
+                    }
+                );
+
+            }
+        );
+
+
+        await batch.commit();
+
+    } catch (error) {
+
+        console.warn(
+            "Delivery receipt update failed:",
             error
         );
 
@@ -929,6 +1334,12 @@ async function sendMessage() {
     const input =
         $("messageInput");
 
+
+    if (!input) {
+        return;
+    }
+
+
     const text =
         input.value.trim();
 
@@ -938,13 +1349,14 @@ async function sendMessage() {
     }
 
 
-    if (!currentUser || !otherUser) {
-        return;
-    }
+    if (
+        !currentUser ||
+        !otherUser ||
+        !chatId
+    ) {
 
-
-    if (!chatId) {
         return;
+
     }
 
 
@@ -952,11 +1364,28 @@ async function sendMessage() {
         $("sendButton");
 
 
-    sendButton.disabled =
-        true;
+    if (sendButton) {
+
+        sendButton.disabled =
+            true;
+
+    }
 
 
     try {
+
+        /*
+        STOP TYPING
+        */
+
+        await setTyping(
+            false
+        );
+
+
+        /*
+        CREATE MESSAGE
+        */
 
         const messagesRef =
             collection(
@@ -970,6 +1399,7 @@ async function sendMessage() {
         await addDoc(
             messagesRef,
             {
+
                 senderId:
                     currentUser.uid,
 
@@ -981,37 +1411,33 @@ async function sendMessage() {
                 createdAt:
                     serverTimestamp(),
 
-                /*
-                Initial state:
-                one gray tick.
+                delivered:
+                    false,
 
-                The UI changes to double gray
-                when recipient is online/delivered,
-                and blue when read.
-                */
+                deliveredAt:
+                    null,
 
-                delivered: false,
+                read:
+                    false,
 
-                deliveredAt: null,
+                readAt:
+                    null
 
-                read: false,
-
-                readAt: null
             }
         );
 
 
-        await setDoc(
+        /*
+        UPDATE CHAT
+        */
+
+        await updateDoc(
             doc(
                 db,
                 "chats",
                 chatId
             ),
             {
-                participants: [
-                    currentUser.uid,
-                    otherUser.uid
-                ],
 
                 lastMessage:
                     text,
@@ -1020,14 +1446,18 @@ async function sendMessage() {
                     currentUser.uid,
 
                 updatedAt:
-                    serverTimestamp()
+                    serverTimestamp(),
 
-            },
-            {
-                merge: true
+                [`unreadCount.${otherUser.uid}`]:
+                    increment(1)
+
             }
         );
 
+
+        /*
+        CLEAR INPUT
+        */
 
         input.value = "";
 
@@ -1048,8 +1478,13 @@ async function sendMessage() {
 
     } finally {
 
-        sendButton.disabled =
-            false;
+        if (sendButton) {
+
+            sendButton.disabled =
+                false;
+
+        }
+
 
         input.focus();
 
@@ -1059,7 +1494,133 @@ async function sendMessage() {
 
 
 /* =====================================================
-   TEXTAREA AUTO RESIZE
+   TYPING
+===================================================== */
+
+async function setTyping(
+    typing
+) {
+
+    if (
+        !currentUser ||
+        !chatId
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        await updateDoc(
+            doc(
+                db,
+                "chats",
+                chatId
+            ),
+            {
+
+                [`typing.${currentUser.uid}`]:
+                    typing
+
+            }
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "Typing status update failed:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =====================================================
+   HANDLE TYPING
+===================================================== */
+
+function handleTyping() {
+
+    const input =
+        $("messageInput");
+
+
+    if (!input) {
+        return;
+    }
+
+
+    const text =
+        input.value.trim();
+
+
+    /*
+    Empty input = stop typing.
+    */
+
+    if (!text) {
+
+        clearTimeout(
+            typingTimer
+        );
+
+        setTyping(false);
+
+        return;
+
+    }
+
+
+    /*
+    Don't hammer Firestore with writes.
+    */
+
+    const now =
+        Date.now();
+
+
+    if (
+        now - lastTypingWrite >
+        1000
+    ) {
+
+        lastTypingWrite =
+            now;
+
+        setTyping(true);
+
+    }
+
+
+    /*
+    Automatically stop typing after
+    1.8 seconds without input.
+    */
+
+    clearTimeout(
+        typingTimer
+    );
+
+
+    typingTimer =
+        setTimeout(
+            () => {
+
+                setTyping(false);
+
+            },
+            1800
+        );
+
+}
+
+
+/* =====================================================
+   TEXTAREA RESIZE
 ===================================================== */
 
 function resizeTextarea() {
@@ -1080,7 +1641,7 @@ function resizeTextarea() {
     input.style.height =
         Math.min(
             input.scrollHeight,
-            100
+            110
         ) + "px";
 
 }
@@ -1090,7 +1651,9 @@ function resizeTextarea() {
    CHAT ERROR
 ===================================================== */
 
-function showChatError(message) {
+function showChatError(
+    message
+) {
 
     const box =
         $("messagesContainer");
@@ -1111,7 +1674,9 @@ function showChatError(message) {
                 font-size:14px;
             "
         >
+
             ${escapeHtml(message)}
+
         </div>
 
     `;
@@ -1120,7 +1685,7 @@ function showChatError(message) {
 
 
 /* =====================================================
-   ATTACHMENT BUTTON
+   ATTACHMENT
 ===================================================== */
 
 function setupAttachmentButton() {
@@ -1140,25 +1705,12 @@ function setupAttachmentButton() {
 
             /*
             Attachments will be implemented
-            after the core chat system is complete.
+            after the core chat system.
             */
 
-            showChatError(
-                "Attachments will be available soon."
+            alert(
+                "Photo and file sharing will be added soon."
             );
-
-            setTimeout(() => {
-
-                if (latestMessages.length) {
-
-                    renderMessages(
-                        latestMessages,
-                        false
-                    );
-
-                }
-
-            }, 1200);
 
         }
     );
@@ -1173,9 +1725,9 @@ function setupAttachmentButton() {
 function setupUI() {
 
 
-    /* ================================================
+    /* =================================================
        BACK
-    ================================================ */
+    ================================================= */
 
     const back =
         $("backBtn");
@@ -1187,7 +1739,9 @@ function setupUI() {
             "click",
             () => {
 
-                if (history.length > 1) {
+                if (
+                    history.length > 1
+                ) {
 
                     history.back();
 
@@ -1204,9 +1758,9 @@ function setupUI() {
     }
 
 
-    /* ================================================
+    /* =================================================
        PROFILE
-    ================================================ */
+    ================================================= */
 
     const profile =
         $("profileBtn");
@@ -1234,9 +1788,9 @@ function setupUI() {
     }
 
 
-    /* ================================================
+    /* =================================================
        USER HEADER
-    ================================================ */
+    ================================================= */
 
     const userArea =
         $("chatUserArea");
@@ -1246,18 +1800,7 @@ function setupUI() {
 
         userArea.addEventListener(
             "click",
-            event => {
-
-                /*
-                Don't interfere with buttons.
-                */
-
-                if (
-                    event.target.closest("button")
-                ) {
-                    return;
-                }
-
+            () => {
 
                 if (!otherUser?.uid) {
                     return;
@@ -1275,9 +1818,9 @@ function setupUI() {
     }
 
 
-    /* ================================================
-       SEND FORM
-    ================================================ */
+    /* =================================================
+       SEND
+    ================================================= */
 
     const form =
         $("messageForm");
@@ -1299,15 +1842,27 @@ function setupUI() {
     }
 
 
-    /* ================================================
-       ENTER TO SEND
-    ================================================ */
+    /* =================================================
+       INPUT
+    ================================================= */
 
     const input =
         $("messageInput");
 
 
     if (input) {
+
+        input.addEventListener(
+            "input",
+            () => {
+
+                resizeTextarea();
+
+                handleTyping();
+
+            }
+        );
+
 
         input.addEventListener(
             "keydown",
@@ -1320,18 +1875,11 @@ function setupUI() {
 
                     event.preventDefault();
 
-                    $("messageForm")
-                        .requestSubmit();
+                    form.requestSubmit();
 
                 }
 
             }
-        );
-
-
-        input.addEventListener(
-            "input",
-            resizeTextarea
         );
 
     }
@@ -1343,7 +1891,7 @@ function setupUI() {
 
 
 /* =====================================================
-   AUTHENTICATION
+   AUTH
 ===================================================== */
 
 onAuthStateChanged(
@@ -1366,15 +1914,13 @@ onAuthStateChanged(
             user;
 
 
-        /*
-        ==============================================
-        GET OTHER USER
-        ==============================================
-        */
-
         const otherUid =
             getOtherUid();
 
+
+        /*
+        NO USER
+        */
 
         if (!otherUid) {
 
@@ -1383,15 +1929,8 @@ onAuthStateChanged(
             );
 
 
-            const form =
-                $("messageForm");
-
-
-            if (form) {
-                form.style.display =
-                    "none";
-            }
-
+            $("messageForm").style.display =
+                "none";
 
             return;
 
@@ -1399,9 +1938,7 @@ onAuthStateChanged(
 
 
         /*
-        ==============================================
-        PREVENT SELF CHAT
-        ==============================================
+        SELF CHAT
         */
 
         if (
@@ -1414,15 +1951,8 @@ onAuthStateChanged(
             );
 
 
-            const form =
-                $("messageForm");
-
-
-            if (form) {
-                form.style.display =
-                    "none";
-            }
-
+            $("messageForm").style.display =
+                "none";
 
             return;
 
@@ -1433,7 +1963,7 @@ onAuthStateChanged(
 
             /*
             ==========================================
-            LOAD USER PROFILE
+            LOAD RECIPIENT
             ==========================================
             */
 
@@ -1444,11 +1974,20 @@ onAuthStateChanged(
 
             /*
             ==========================================
-            CREATE / VERIFY CHAT
+            CREATE / LOAD CHAT
             ==========================================
             */
 
             await ensureChat();
+
+
+            /*
+            ==========================================
+            LISTEN TO CHAT METADATA
+            ==========================================
+            */
+
+            listenToChat();
 
 
             /*
@@ -1462,13 +2001,25 @@ onAuthStateChanged(
 
             /*
             ==========================================
-            LIVE ONLINE / OFFLINE STATUS
+            LIVE ONLINE / OFFLINE
             ==========================================
             */
 
             listenToOtherUser(
                 otherUid
             );
+
+
+            /*
+            ==========================================
+            OPENING CHAT = READ
+            ==========================================
+            */
+
+            /*
+            Messages listener will immediately
+            mark incoming messages as read.
+            */
 
 
         } catch (error) {
@@ -1497,12 +2048,49 @@ window.addEventListener(
     "beforeunload",
     () => {
 
+        clearTimeout(
+            typingTimer
+        );
+
+
+        /*
+        Best effort to clear typing state.
+        */
+
+        if (
+            currentUser &&
+            chatId
+        ) {
+
+            updateDoc(
+                doc(
+                    db,
+                    "chats",
+                    chatId
+                ),
+                {
+                    [`typing.${currentUser.uid}`]:
+                        false
+                }
+            ).catch(
+                () => {}
+            );
+
+        }
+
+
         if (stopMessages) {
             stopMessages();
         }
 
+
         if (stopOtherUser) {
             stopOtherUser();
+        }
+
+
+        if (stopChat) {
+            stopChat();
         }
 
     }
@@ -1510,7 +2098,7 @@ window.addEventListener(
 
 
 /* =====================================================
-   START UI
+   START
 ===================================================== */
 
 setupUI();
