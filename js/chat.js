@@ -2638,7 +2638,9 @@ onAuthStateChanged(
 
 
         /*
-        NO USER
+        =================================================
+        NO USER SELECTED
+        =================================================
         */
 
         if (!otherUid) {
@@ -2648,8 +2650,15 @@ onAuthStateChanged(
             );
 
 
-            $("messageForm").style.display =
-                "none";
+            const form =
+                $("messageForm");
+
+            if (form) {
+
+                form.style.display =
+                    "none";
+
+            }
 
             return;
 
@@ -2657,7 +2666,9 @@ onAuthStateChanged(
 
 
         /*
+        =================================================
         SELF CHAT
+        =================================================
         */
 
         if (
@@ -2670,149 +2681,175 @@ onAuthStateChanged(
             );
 
 
-            $("messageForm").style.display =
-                "none";
+            const form =
+                $("messageForm");
+
+            if (form) {
+
+                form.style.display =
+                    "none";
+
+            }
 
             return;
 
         }
 
 
+        /*
+        =================================================
+        CHAT INITIALIZATION
+        =================================================
+        */
+
         try {
 
-    /*
-    =================================================
-    SET CHAT ID IMMEDIATELY
-    =================================================
+            /*
+            =================================================
+            1. CREATE CHAT ID IMMEDIATELY
+            =================================================
 
-    We already know both UIDs.
+            We already know both UIDs, so there is no
+            reason to wait for Firestore.
+            */
 
-    There is no reason to wait for Firestore
-    before calculating the chat ID.
-    */
-
-    chatId =
-        createChatId(
-            currentUser.uid,
-            otherUid
-        );
+            chatId =
+                createChatId(
+                    currentUser.uid,
+                    otherUid
+                );
 
 
-    /*
-    =================================================
-    LOAD CACHED PROFILE IMMEDIATELY
-    =================================================
-    */
+            /*
+            =================================================
+            2. LOAD CACHED PROFILE IMMEDIATELY
+            =================================================
+            */
 
-    const cachedProfile =
-        getCachedProfile(
-            otherUid
-        );
-
-
-    if (cachedProfile) {
-
-        otherUser = {
-
-            uid:
-                otherUid,
-
-            ...cachedProfile
-
-        };
+            const cachedProfile =
+                getCachedProfile(
+                    otherUid
+                );
 
 
-        renderChatHeader(
-            otherUser
-        );
+            if (cachedProfile) {
+
+                otherUser = {
+
+                    uid:
+                        otherUid,
+
+                    ...cachedProfile
+
+                };
+
+
+                renderChatHeader(
+                    otherUser
+                );
+
+            }
+
+
+            /*
+            =================================================
+            3. LOAD CACHED MESSAGES IMMEDIATELY
+            =================================================
+            */
+
+            const cachedMessages =
+                getMessageCache(
+                    chatId
+                );
+
+
+            if (
+                cachedMessages.length
+            ) {
+
+                latestMessages =
+                    cachedMessages;
+
+
+                renderMessages(
+                    cachedMessages
+                );
+
+            }
+
+
+            /*
+            =================================================
+            4. START REALTIME LISTENERS
+            =================================================
+
+            These start immediately.
+
+            Firestore can return cached/local data first
+            when persistence is enabled, then synchronize
+            with the server.
+            */
+
+            listenToMessages();
+
+            listenToChat();
+
+            listenToOtherUser(
+                otherUid
+            );
+
+
+            /*
+            =================================================
+            5. REFRESH PROFILE FROM FIRESTORE
+            =================================================
+            */
+
+            await loadOtherUser(
+                otherUid
+            );
+
+
+            /*
+            =================================================
+            6. CREATE / REPAIR CHAT DOCUMENT
+            =================================================
+            */
+
+            await ensureChat();
+
+
+        } catch (error) {
+
+            console.error(
+                "Chat initialization error:",
+                error
+            );
+
+
+            /*
+            =================================================
+            CACHED CHAT FALLBACK
+            =================================================
+
+            If cached messages already exist, don't replace
+            them with an error screen.
+            */
+
+            if (
+                !latestMessages.length
+            ) {
+
+                showChatError(
+                    "Could not open this conversation. Please try again."
+                );
+
+            }
+
+        }
 
     }
-
-
-    /*
-    =================================================
-    LOAD CACHED MESSAGES IMMEDIATELY
-    =================================================
-    */
-
-    const cachedMessages =
-        getMessageCache(
-            chatId
-        );
-
-
-    if (
-        cachedMessages.length
-    ) {
-
-        latestMessages =
-            cachedMessages;
-
-
-        renderMessages(
-            cachedMessages
-        );
-
-    }
-
-
-    /*
-    =================================================
-    START REALTIME LISTENERS IMMEDIATELY
-    =================================================
-
-    Firestore persistence can provide cached
-    listener data while it synchronizes with
-    the server.
-    */
-
-    listenToMessages();
-
-    listenToChat();
-
-    listenToOtherUser(
-        otherUid
-    );
-
-
-    /*
-    =================================================
-    FIRESTORE INITIALIZATION IN BACKGROUND
-    =================================================
-    */
-
-    await loadOtherUser(
-        otherUid
-    );
-
-
-    await ensureChat();
-
-
-} catch (error) {
-
-    console.error(
-        "Chat initialization error:",
-        error
-    );
-
-
-    /*
-    Only show an error if we have
-    no cached conversation to fall back to.
-    */
-
-    if (
-        !latestMessages.length
-    ) {
-
-        showChatError(
-            "Could not open this conversation. Please try again."
-        );
-
-    }
-
-}
+);
 
 
 /* =====================================================
@@ -2829,7 +2866,9 @@ window.addEventListener(
 
 
         /*
-        Best effort to clear typing state.
+        =================================================
+        BEST-EFFORT TYPING CLEANUP
+        =================================================
         */
 
         if (
@@ -2854,18 +2893,42 @@ window.addEventListener(
         }
 
 
+        /*
+        =================================================
+        STOP MESSAGE LISTENER
+        =================================================
+        */
+
         if (stopMessages) {
+
             stopMessages();
+
         }
 
+
+        /*
+        =================================================
+        STOP USER LISTENER
+        =================================================
+        */
 
         if (stopOtherUser) {
+
             stopOtherUser();
+
         }
 
 
+        /*
+        =================================================
+        STOP CHAT LISTENER
+        =================================================
+        */
+
         if (stopChat) {
+
             stopChat();
+
         }
 
     }
@@ -2873,7 +2936,11 @@ window.addEventListener(
 
 
 /* =====================================================
-   START
+   START UI
+=====================================================
+
+   UI listeners are attached once when the page loads.
+   They do not need to wait for Firebase authentication.
 ===================================================== */
 
 setupUI();
