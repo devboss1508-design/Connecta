@@ -23,13 +23,28 @@
 
     /* ========================================
        CONNECTA PROFILE
+       REFERENCE STRUCTURE + CONNECTA COLORS
     ======================================== */
 
     .profile-page {
       min-height: 100vh;
+
       background: #f7faf7;
-      padding-bottom: 30px;
+
+      padding-bottom: 35px;
     }
+
+
+    .profile-container {
+      width: 100%;
+
+      max-width: 620px;
+
+      margin: 0 auto;
+
+      padding: 0 12px;
+    }
+
 
     /* ========================================
        HEADER
@@ -37,175 +52,261 @@
 
     .profile-header {
       height: 64px;
+
       background: var(--primary);
+
       color: #fff;
 
       display: flex;
+
       align-items: center;
 
       padding: 0 14px;
+
       gap: 10px;
 
       position: sticky;
+
       top: 0;
-      z-index: 20;
+
+      z-index: 50;
 
       box-shadow:
         0 4px 15px rgba(21,128,61,.18);
     }
+
 
     .profile-back {
       width: 42px;
       height: 42px;
 
       border: 0;
+
       background: transparent;
 
       color: #fff;
 
       display: grid;
+
       place-items: center;
 
       font-size: 27px;
+
       border-radius: 12px;
 
       cursor: pointer;
     }
 
+
     .profile-back:active {
       background: rgba(255,255,255,.15);
     }
 
+
     .profile-header-title {
       font-size: 19px;
+
       font-weight: 900;
     }
 
+
     /* ========================================
-       PROFILE CONTAINER
+       PROFILE HERO
     ======================================== */
 
-    .profile-container {
-      width: 100%;
-      max-width: 650px;
+    .profile-hero {
+      text-align: center;
 
-      margin: 14px auto;
-
-      padding: 0 12px;
+      padding: 25px 10px 10px;
     }
 
+
     /* ========================================
-       PROFILE CARD
+       PROFILE PHOTO
     ======================================== */
 
-    .profile-card {
-      background: #fff;
+    .profile-photo-area {
+      position: relative;
 
-      border: 1px solid #e1e9e3;
-      border-radius: 24px;
+      width: 150px;
 
-      overflow: hidden;
+      height: 150px;
 
-      box-shadow:
-        0 5px 18px rgba(31,41,55,.06);
+      margin: 0 auto;
     }
 
-    /* ========================================
-       COVER
-    ======================================== */
 
-    .profile-cover {
-      height: 125px;
+    .profile-photo-ring {
+      width: 145px;
+
+      height: 145px;
+
+      padding: 5px;
+
+      border-radius: 50%;
 
       background:
         linear-gradient(
           135deg,
-          #22c55e,
-          #16a34a
+          #22C55E,
+          #16A34A
         );
 
-      position: relative;
+      box-shadow:
+        0 5px 18px rgba(21,128,61,.18);
+
+      display: grid;
+
+      place-items: center;
     }
 
-    /* ========================================
-       AVATAR
-    ======================================== */
-
-    .profile-avatar-wrap {
-      position: relative;
-
-      width: 106px;
-      height: 106px;
-
-      margin: -53px auto 0;
-
-      z-index: 3;
-    }
 
     .profile-avatar {
-      width: 106px;
-      height: 106px;
+      width: 135px;
+
+      height: 135px;
 
       border-radius: 50%;
 
+      overflow: hidden;
+
       background: #baf0ca;
-
-      border: 5px solid #fff;
-
-      display: grid;
-      place-items: center;
 
       color: #08752f;
 
-      font-size: 32px;
+      display: grid;
+
+      place-items: center;
+
+      font-size: 42px;
+
       font-weight: 900;
-
-      overflow: hidden;
-
-      box-shadow:
-        0 4px 15px rgba(0,0,0,.12);
     }
+
 
     .profile-avatar img {
       width: 100%;
+
       height: 100%;
+
       object-fit: cover;
     }
 
+
     /* ========================================
-       PROFILE INFO
+       CAMERA / PHOTO UPLOAD
     ======================================== */
 
-    .profile-info {
-      text-align: center;
+    .profile-photo-upload {
+      position: absolute;
 
-      padding: 10px 18px 20px;
+      right: -2px;
+
+      bottom: 4px;
+
+      width: 48px;
+
+      height: 48px;
+
+      border-radius: 50%;
+
+      border: 4px solid #fff;
+
+      background: #fff;
+
+      color: #15803D;
+
+      display: grid;
+
+      place-items: center;
+
+      font-size: 20px;
+
+      cursor: pointer;
+
+      box-shadow:
+        0 3px 12px rgba(0,0,0,.15);
     }
 
-    .profile-name {
-      display: flex;
 
-      justify-content: center;
-      align-items: center;
+    .profile-photo-upload:active {
+      transform: scale(.94);
+    }
 
-      gap: 5px;
+
+    #profilePhotoInput {
+      display: none;
+    }
+
+
+    .profile-upload-text {
+      margin-top: 4px;
+
+      color: #737b76;
+
+      font-size: 13px;
+    }
+
+
+    .profile-upload-status {
+      min-height: 18px;
 
       margin-top: 4px;
 
-      font-size: 22px;
+      font-size: 11px;
+
+      color: #737b76;
+    }
+
+
+    .profile-upload-status.success {
+      color: #15803D;
+    }
+
+
+    .profile-upload-status.error {
+      color: #DC2626;
+    }
+
+
+    /* ========================================
+       NAME
+    ======================================== */
+
+    .profile-name-row {
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      gap: 6px;
+
+      margin-top: 15px;
+    }
+
+
+    .profile-name {
+      font-size: 28px;
+
+      line-height: 1.2;
+
       font-weight: 900;
 
       color: #17201b;
     }
 
+
     /* ========================================
-       BLUE VERIFIED BADGE
+       VERIFIED BADGE
     ======================================== */
 
     .verified-badge {
-      width: 20px;
-      height: 20px;
-      min-width: 20px;
+      width: 21px;
+
+      height: 21px;
+
+      min-width: 21px;
 
       border-radius: 50%;
 
@@ -214,10 +315,13 @@
       color: #fff;
 
       display: inline-flex;
+
       align-items: center;
+
       justify-content: center;
 
       font-size: 12px;
+
       font-weight: 900;
 
       line-height: 1;
@@ -226,38 +330,50 @@
         0 1px 3px rgba(0,0,0,.15);
     }
 
+
     .profile-username {
-      margin-top: 4px;
+      margin-top: 5px;
 
       color: #66706a;
 
       font-size: 13px;
     }
 
+
+    /* ========================================
+       STATUS
+    ======================================== */
+
     .profile-status {
       display: flex;
 
       justify-content: center;
+
       align-items: center;
 
-      gap: 5px;
+      gap: 6px;
 
       margin-top: 8px;
 
       font-size: 12px;
+
       font-weight: 700;
     }
 
+
     .profile-status.online {
-      color: #16a34a;
+      color: #16A34A;
     }
 
+
     .profile-status.offline {
-      color: #9ca3af;
+      color: #9CA3AF;
     }
+
 
     .profile-status-dot {
       width: 8px;
+
       height: 8px;
 
       border-radius: 50%;
@@ -265,100 +381,61 @@
       display: inline-block;
     }
 
+
     .profile-status-dot.online {
-      background: #22c55e;
+      background: #22C55E;
 
       box-shadow:
         0 0 0 3px rgba(34,197,94,.12);
     }
 
+
     .profile-status-dot.offline {
-      background: #9ca3af;
+      background: #9CA3AF;
     }
+
 
     /* ========================================
        BIO
     ======================================== */
 
     .profile-bio {
-      margin: 12px auto 0;
-
       max-width: 420px;
+
+      margin: 10px auto 0;
 
       color: #66706a;
 
       font-size: 13px;
+
       line-height: 1.5;
     }
 
+
     /* ========================================
-       STATS
+       MAIN ACTION
     ======================================== */
 
-    .profile-stats {
-      display: grid;
+    .profile-main-action {
+      padding: 8px 0 18px;
 
-      grid-template-columns: 1fr 1fr;
-
-      border-top: 1px solid #edf1ee;
-      border-bottom: 1px solid #edf1ee;
-
-      margin-top: 18px;
-    }
-
-    .profile-stat {
       text-align: center;
-
-      padding: 14px 8px;
     }
 
-    .profile-stat + .profile-stat {
-      border-left: 1px solid #edf1ee;
-    }
 
-    .profile-stat strong {
-      display: block;
-
-      font-size: 18px;
-      font-weight: 900;
-
-      color: #17201b;
-    }
-
-    .profile-stat span {
-      display: block;
-
-      margin-top: 2px;
-
-      color: #7b847f;
-
-      font-size: 11px;
-    }
-
-    /* ========================================
-       ACTIONS
-    ======================================== */
-
-    .profile-actions {
-      padding: 17px 18px 4px;
-
-      display: grid;
-      gap: 9px;
-    }
-
+    .profile-verify-btn,
     .profile-chat-btn,
-    .profile-edit-btn,
-    .profile-verify-btn {
-      width: 100%;
+    .profile-edit-btn {
+      width: 240px;
 
-      min-height: 46px;
+      min-height: 48px;
 
       border: 0;
-      border-radius: 24px;
 
-      color: #fff;
+      border-radius: 28px;
 
       font-size: 14px;
+
       font-weight: 900;
 
       cursor: pointer;
@@ -366,83 +443,233 @@
       transition: .15s;
     }
 
-    .profile-chat-btn {
-      background: var(--primary);
-    }
-
-    .profile-edit-btn {
-      background: #eefbf1;
-      color: var(--primary-dark);
-    }
 
     .profile-verify-btn {
-      background: #1d9bf0;
+      background: var(--primary);
+
+      color: #fff;
+
+      box-shadow:
+        0 5px 15px rgba(21,128,61,.15);
     }
 
-    .profile-chat-btn:active,
-    .profile-edit-btn:active,
-    .profile-verify-btn:active {
-      transform: scale(.98);
+
+    .profile-chat-btn {
+      background: var(--primary);
+
+      color: #fff;
     }
+
+
+    .profile-edit-btn {
+      background: #eaf9ee;
+
+      color: var(--primary-dark);
+
+      border: 1px solid #d4eedb;
+    }
+
+
+    .profile-verify-btn:active,
+    .profile-chat-btn:active,
+    .profile-edit-btn:active {
+      transform: scale(.97);
+    }
+
 
     .profile-verify-btn:disabled {
-      opacity: .65;
+      opacity: .6;
+
       cursor: not-allowed;
-      transform: none;
     }
 
-    .profile-verified-message {
-      margin-top: 8px;
 
-      padding: 9px 12px;
+    .profile-verified-text {
+      display: inline-flex;
 
-      border-radius: 12px;
+      align-items: center;
+
+      gap: 6px;
+
+      padding: 10px 18px;
+
+      border-radius: 25px;
 
       background: #eef7ff;
 
       color: #1769aa;
 
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 13px;
 
-      text-align: center;
+      font-weight: 800;
     }
 
+
     /* ========================================
-       STORIES AREA
+       INFORMATION CARDS
     ======================================== */
 
-    .profile-section {
-      margin-top: 12px;
-
+    .profile-card {
       background: #fff;
 
       border: 1px solid #e1e9e3;
-      border-radius: 22px;
 
-      padding: 16px;
+      border-radius: 21px;
+
+      padding: 18px;
+
+      margin-top: 13px;
 
       box-shadow:
-        0 4px 14px rgba(31,41,55,.05);
+        0 5px 18px rgba(31,41,55,.05);
     }
 
-    .profile-section-title {
-      font-size: 17px;
 
+    .profile-card-title {
       color: var(--primary-dark);
+
+      font-size: 19px;
+
+      font-weight: 900;
+
+      padding-bottom: 12px;
+
+      border-bottom: 1px solid #e5ebe7;
+    }
+
+
+    /* ========================================
+       ACCOUNT STATISTICS
+    ======================================== */
+
+    .profile-stat-grid {
+      display: grid;
+
+      grid-template-columns: 1fr 1fr;
+
+      margin-top: 14px;
+    }
+
+
+    .profile-stat-box {
+      padding: 4px 10px;
+    }
+
+
+    .profile-stat-box + .profile-stat-box {
+      border-left: 1px solid #e5ebe7;
+    }
+
+
+    .profile-stat-label {
+      color: #727b75;
+
+      font-size: 12px;
+    }
+
+
+    .profile-stat-value {
+      margin-top: 5px;
+
+      color: #17201b;
+
+      font-size: 17px;
 
       font-weight: 900;
     }
 
+
+    .profile-stat-value.active {
+      color: #16A34A;
+    }
+
+
+    /* ========================================
+       INFO ROWS
+    ======================================== */
+
+    .profile-info-row {
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      gap: 15px;
+
+      padding: 8px 0;
+
+      font-size: 14px;
+    }
+
+
+    .profile-info-label {
+      color: #68726c;
+    }
+
+
+    .profile-info-value {
+      color: #17201b;
+
+      font-weight: 700;
+
+      text-align: right;
+
+      overflow-wrap: anywhere;
+    }
+
+
+    /* ========================================
+       EARN / REFER BUTTON
+    ======================================== */
+
+    .profile-earn-btn {
+      width: 100%;
+
+      height: 48px;
+
+      margin-top: 14px;
+
+      border: 0;
+
+      border-radius: 25px;
+
+      background: #eaf9ee;
+
+      color: var(--primary-dark);
+
+      font-size: 14px;
+
+      font-weight: 900;
+
+      cursor: pointer;
+    }
+
+
+    .profile-earn-btn:active {
+      transform: scale(.98);
+    }
+
+
+    /* ========================================
+       STORIES
+    ======================================== */
+
+    .profile-stories-card {
+      margin-top: 13px;
+    }
+
+
     .profile-empty {
       text-align: center;
 
-      padding: 28px 10px;
+      padding: 27px 10px 12px;
 
       color: #8a928d;
 
       font-size: 13px;
     }
+
 
     /* ========================================
        LOADING
@@ -452,12 +679,14 @@
       min-height: 350px;
 
       display: grid;
+
       place-items: center;
 
       color: #7b847f;
 
       font-size: 14px;
     }
+
 
     /* ========================================
        ERROR
@@ -479,6 +708,7 @@
       font-size: 13px;
     }
 
+
     /* ========================================
        VERIFICATION MODAL
     ======================================== */
@@ -493,19 +723,21 @@
       display: none;
 
       align-items: flex-end;
+
       justify-content: center;
 
       background: rgba(0,0,0,.48);
-
-      padding: 0;
     }
+
 
     .verification-modal.show {
       display: flex;
     }
 
+
     .verification-box {
       width: 100%;
+
       max-width: 520px;
 
       background: #fff;
@@ -516,38 +748,32 @@
 
       box-shadow:
         0 -10px 35px rgba(0,0,0,.18);
-
-      animation: verificationUp .2s ease-out;
     }
 
-    @keyframes verificationUp {
-      from {
-        transform: translateY(30px);
-        opacity: 0;
-      }
-
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
-    }
 
     .verification-close-row {
       display: flex;
+
       align-items: center;
+
       justify-content: space-between;
 
       margin-bottom: 12px;
     }
 
+
     .verification-title {
       font-size: 19px;
+
       font-weight: 900;
+
       color: #17201b;
     }
 
+
     .verification-close {
       width: 38px;
+
       height: 38px;
 
       border: 0;
@@ -563,24 +789,29 @@
       cursor: pointer;
     }
 
+
     .verification-icon {
       width: 58px;
+
       height: 58px;
 
       margin: 4px auto 12px;
 
       border-radius: 50%;
 
-      background: #e8f5ff;
+      background: #eaf9ee;
 
-      color: #1d9bf0;
+      color: var(--primary);
 
       display: grid;
+
       place-items: center;
 
       font-size: 27px;
+
       font-weight: 900;
     }
+
 
     .verification-description {
       color: #66706a;
@@ -594,16 +825,19 @@
       margin-bottom: 16px;
     }
 
+
     .verification-price {
       text-align: center;
 
       font-size: 26px;
+
       font-weight: 900;
 
       color: #17201b;
 
       margin-bottom: 17px;
     }
+
 
     .verification-price span {
       display: block;
@@ -617,6 +851,7 @@
       font-weight: 600;
     }
 
+
     .verification-label {
       display: block;
 
@@ -628,6 +863,7 @@
 
       font-weight: 800;
     }
+
 
     .verification-input {
       width: 100%;
@@ -647,12 +883,14 @@
       background: #fafcfb;
     }
 
+
     .verification-input:focus {
       border-color: #22c55e;
 
       box-shadow:
         0 0 0 3px rgba(34,197,94,.10);
     }
+
 
     .verification-submit {
       width: 100%;
@@ -665,7 +903,7 @@
 
       border-radius: 25px;
 
-      background: #1d9bf0;
+      background: var(--primary);
 
       color: #fff;
 
@@ -676,11 +914,13 @@
       cursor: pointer;
     }
 
+
     .verification-submit:disabled {
       opacity: .6;
 
       cursor: not-allowed;
     }
+
 
     .verification-message {
       min-height: 20px;
@@ -694,17 +934,21 @@
       line-height: 1.45;
     }
 
+
     .verification-message.error {
       color: #dc2626;
     }
+
 
     .verification-message.success {
       color: #15803d;
     }
 
+
     .verification-message.pending {
       color: #1769aa;
     }
+
 
     /* ========================================
        MOBILE
@@ -713,43 +957,52 @@
     @media (max-width: 600px) {
 
       .profile-container {
-        margin-top: 9px;
-        padding: 0 8px;
+        padding: 0 9px;
       }
 
-      .profile-cover {
-        height: 110px;
+
+      .profile-hero {
+        padding-top: 23px;
       }
 
-      .profile-avatar-wrap {
-        width: 106px;
-        min-height: 106px;
-        height: 106px;
 
-        margin: -53px auto 0;
+      .profile-photo-area {
+        width: 145px;
+        height: 145px;
       }
+
+
+      .profile-photo-ring {
+        width: 140px;
+        height: 140px;
+      }
+
 
       .profile-avatar {
-        width: 96px;
-        height: 96px;
+        width: 130px;
+        height: 130px;
 
-        font-size: 28px;
+        font-size: 38px;
       }
+
+
+      .profile-photo-upload {
+        width: 46px;
+        height: 46px;
+
+        right: -1px;
+      }
+
 
       .profile-name {
-        font-size: 20px;
+        font-size: 25px;
       }
+
 
       .profile-card {
-        border-radius: 20px;
-      }
+        border-radius: 19px;
 
-      .verification-modal {
-        align-items: flex-end;
-      }
-
-      .verification-box {
-        border-radius: 25px 25px 0 0;
+        padding: 17px;
       }
 
     }
@@ -849,13 +1102,18 @@
       <p class="verification-description">
         Get the blue verified badge on your CONNECTA profile.
         Verification requires a one-time payment of KSh 999.
-        Your payment will be processed securely through the CONNECTA backend.
+        Your payment will be processed securely through CONNECTA.
       </p>
 
 
       <div class="verification-price">
+
         KSh 999
-        <span>One-time account verification</span>
+
+        <span>
+          One-time account verification
+        </span>
+
       </div>
 
 
