@@ -48,7 +48,7 @@ function renderProfile(profile) {
   const username = profile?.username ? `@${profile.username.replace(/^@/,"")}` : "@username";
   const init = initials(name);
 
-  $("welcomeName").textContent = name.split(" ")[0];
+  $("welcomeName").textContent = name;
   $("welcomeAvatar").innerHTML = profile?.photoURL ? `<img src="${profile.photoURL}" alt="">` : init;
   $("profileBtn").innerHTML = profile?.photoURL ? `<img src="${profile.photoURL}" alt="">` : init;
   $("menuAvatar").innerHTML = profile?.photoURL ? `<img src="${profile.photoURL}" alt="">` : init;
@@ -74,7 +74,7 @@ function renderOnline(filter = "") {
 
   box.innerHTML = list.map(u => {
     const isMe = u.uid === currentUser?.uid;
-    const name = u.displayName || u.username || "CONNECTA User";
+    const name = u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.username || "CONNECTA User";
     const following = Array.isArray(currentProfile?.following) && currentProfile.following.includes(u.uid);
 
     return `
