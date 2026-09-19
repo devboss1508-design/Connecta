@@ -1,41 +1,308 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#22C55E">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="theme-color"
+    content="#22C55E"
+  >
+
   <title>Create Account — CONNECTA</title>
-  <link rel="stylesheet" href="css/main.css">
-  <link rel="stylesheet" href="css/auth.css">
+
+  <link
+    rel="stylesheet"
+    href="css/main.css"
+  >
+
+  <link
+    rel="stylesheet"
+    href="css/auth.css"
+  >
+
 </head>
+
+
 <body class="auth-page">
+
   <main class="auth-shell">
-    <a class="brand auth-brand" href="index.html"><span class="brand-mark">C</span> CONNECTA</a>
+
+    <a
+      class="brand auth-brand"
+      href="index.html"
+    >
+      <span class="brand-mark">C</span>
+      CONNECTA
+    </a>
+
+
     <section class="auth-card register-card">
-      <div class="auth-icon">C</div>
-      <h1>Create your account</h1>
-      <p>Join CONNECTA and start connecting.</p>
+
+      <div class="auth-icon">
+        C
+      </div>
+
+
+      <h1>
+        Create your account
+      </h1>
+
+
+      <p>
+        Join CONNECTA and start connecting.
+      </p>
+
+
       <form id="registerForm">
+
+
+        <!-- ======================================
+             FIRST + LAST NAME
+        ======================================= -->
+
         <div class="two-inputs">
-          <div><label>First name</label><input id="firstName" type="text" placeholder="First name" required></div>
-          <div><label>Last name</label><input id="lastName" type="text" placeholder="Last name" required></div>
+
+          <div>
+
+            <label for="firstName">
+              First name
+            </label>
+
+            <input
+              id="firstName"
+              type="text"
+              placeholder="First name"
+              autocomplete="given-name"
+              required
+              maxlength="50"
+            >
+
+          </div>
+
+
+          <div>
+
+            <label for="lastName">
+              Last name
+            </label>
+
+            <input
+              id="lastName"
+              type="text"
+              placeholder="Last name"
+              autocomplete="family-name"
+              required
+              maxlength="50"
+            >
+
+          </div>
+
         </div>
-        <label>Username</label>
-        <input id="username" type="text" placeholder="@username" required>
-        <label>Email</label>
-        <input id="email" type="email" placeholder="you@example.com" required>
-        <label>Phone number</label>
-        <input id="phone" type="tel" placeholder="07XXXXXXXX" required>
-        <label>Password</label>
-        <div class="password-field"><input id="registerPassword" type="password" placeholder="Create a password" required minlength="6"><button type="button" class="show-password" data-target="registerPassword">Show</button></div>
-        <label class="check terms"><input type="checkbox" required> I agree to the CONNECTA terms and privacy policy.</label>
-        <p class="auth-note">Email and password are used for account login. Your phone can be added to your profile.</p>
-        <button class="btn btn-primary full" type="submit">Create Account</button>
-        <div id="registerMessage" class="form-message"></div>
+
+
+        <!-- ======================================
+             USERNAME
+        ======================================= -->
+
+        <label for="username">
+          Username
+        </label>
+
+        <input
+          id="username"
+          type="text"
+          placeholder="@username"
+          autocomplete="username"
+          required
+          maxlength="30"
+          autocapitalize="none"
+          spellcheck="false"
+        >
+
+
+        <!-- ======================================
+             EMAIL
+        ======================================= -->
+
+        <label for="email">
+          Email
+        </label>
+
+        <input
+          id="email"
+          type="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+          required
+        >
+
+
+        <!-- ======================================
+             PHONE
+        ======================================= -->
+
+        <label for="phone">
+          Phone number
+        </label>
+
+        <input
+          id="phone"
+          type="tel"
+          placeholder="07XXXXXXXX"
+          autocomplete="tel"
+          required
+          maxlength="15"
+        >
+
+
+        <!-- ======================================
+             PASSWORD
+        ======================================= -->
+
+        <label for="registerPassword">
+          Password
+        </label>
+
+        <div class="password-field">
+
+          <input
+            id="registerPassword"
+            type="password"
+            placeholder="Create a password"
+            autocomplete="new-password"
+            required
+            minlength="6"
+          >
+
+          <button
+            type="button"
+            class="show-password"
+            data-target="registerPassword"
+          >
+            Show
+          </button>
+
+        </div>
+
+
+        <!-- ======================================
+             CONFIRM PASSWORD
+        ======================================= -->
+
+        <label for="confirmPassword">
+          Confirm password
+        </label>
+
+        <div class="password-field">
+
+          <input
+            id="confirmPassword"
+            type="password"
+            placeholder="Confirm your password"
+            autocomplete="new-password"
+            required
+            minlength="6"
+          >
+
+          <button
+            type="button"
+            class="show-password"
+            data-target="confirmPassword"
+          >
+            Show
+          </button>
+
+        </div>
+
+
+        <!-- ======================================
+             PASSWORD MATCH MESSAGE
+        ======================================= -->
+
+        <div
+          id="passwordMatchMessage"
+          class="form-message"
+          aria-live="polite"
+        ></div>
+
+
+        <!-- ======================================
+             TERMS
+        ======================================= -->
+
+        <label class="check terms">
+
+          <input
+            id="terms"
+            type="checkbox"
+            required
+          >
+
+          <span>
+            I agree to the CONNECTA terms and
+            privacy policy.
+          </span>
+
+        </label>
+
+
+        <p class="auth-note">
+          Email and password are used for account
+          login. Your phone can be added to your
+          profile.
+        </p>
+
+
+        <!-- ======================================
+             SUBMIT
+        ======================================= -->
+
+        <button
+          id="registerButton"
+          class="btn btn-primary full"
+          type="submit"
+        >
+          Create Account
+        </button>
+
+
+        <div
+          id="registerMessage"
+          class="form-message"
+          aria-live="polite"
+        ></div>
+
+
       </form>
-      <p class="switch-text">Already have an account? <a href="login.html">Login</a></p>
+
+
+      <p class="switch-text">
+
+        Already have an account?
+
+        <a href="login.html">
+          Login
+        </a>
+
+      </p>
+
     </section>
+
   </main>
-  <script type="module" src="js/auth.js"></script>
+
+
+  <script
+    type="module"
+    src="js/auth.js"
+  ></script>
+
 </body>
-</html>
+
+  </html>
