@@ -851,20 +851,22 @@ function renderChats(
 
 
   const term =
-    filter.trim().toLowerCase();
+    String(filter || "")
+      .trim()
+      .toLowerCase();
 
 
   const filtered =
     chats.filter(chat => {
 
-      const text =
+      const searchText =
         `${chat.name || ""}
          ${chat.lastMessage || ""}
          ${chat.username || ""}`
           .toLowerCase();
 
       return !term ||
-        text.includes(term);
+        searchText.includes(term);
 
     });
 
@@ -876,7 +878,7 @@ function renderChats(
         ${
           term
             ? "No matching chats."
-            : "No conversations yet. Start chatting when the chat feature is enabled."
+            : "No conversations yet."
         }
       </div>
     `;
@@ -892,16 +894,62 @@ function renderChats(
         chat.otherUid || "";
 
 
-      /*
-      IMPORTANT:
-      Clicking Recent Chat opens
-      chat.html with the other user's UID.
-      */
-
       const href =
         otherUid
           ? `chat.html?uid=${encodeURIComponent(otherUid)}`
           : "#";
+
+
+      /*
+      Always convert unread to a real number.
+      */
+
+      const unread =
+        Number(chat.unread || 0);
+
+
+      /*
+      Badge HTML.
+
+      Inline styling intentionally makes the badge
+      visible even if dashboard.css doesn't yet
+      contain a .unread style.
+      */
+
+      const unreadBadge =
+        unread > 0
+
+          ? `
+            <span
+              class="unread"
+              aria-label="${unread} unread messages"
+              style="
+                min-width:22px;
+                height:22px;
+                padding:0 7px;
+                margin-top:5px;
+                border-radius:999px;
+                background:#22c55e;
+                color:#ffffff;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:11px;
+                line-height:22px;
+                font-weight:800;
+                flex-shrink:0;
+                box-sizing:border-box;
+              "
+            >
+              ${
+                unread > 99
+                  ? "99+"
+                  : unread
+              }
+            </span>
+          `
+
+          : "";
 
 
       return `
@@ -919,7 +967,9 @@ function renderChats(
                 ? `
                   <img
                     src="${escapeHtml(chat.photoURL)}"
-                    alt="${escapeHtml(chat.name || "User")}"
+                    alt="${escapeHtml(
+                      chat.name || "User"
+                    )}"
                   >
                 `
 
@@ -949,7 +999,17 @@ function renderChats(
           </div>
 
 
-          <div class="chat-meta">
+          <div
+            class="chat-meta"
+            style="
+              margin-left:auto;
+              display:flex;
+              flex-direction:column;
+              align-items:flex-end;
+              justify-content:center;
+              min-width:40px;
+            "
+          >
 
             <time>
               ${escapeHtml(
@@ -957,21 +1017,7 @@ function renderChats(
               )}
             </time>
 
-            ${
-              chat.unread
-
-                ? `
-                  <span class="unread">
-                    ${
-                      chat.unread > 99
-                        ? "99+"
-                        : chat.unread
-                    }
-                  </span>
-                `
-
-                : ""
-            }
+            ${unreadBadge}
 
           </div>
 
@@ -980,7 +1026,7 @@ function renderChats(
 
     }).join("");
 
-}
+  }
 
 
 /* =========================================================
@@ -1006,139 +1052,155 @@ async function listenToChats(uid) {
       onSnapshot(
         q,
 
-        async snapshot => {
+        snapshot => {
 
           const chats = [];
 
 
-          /*
-          Build initial chat information
-          immediately.
-          */
+          snapshot.forEach(
+            s => {
 
-          snapshot.forEach(s => {
+              const d =
+                s.data();
 
-            const d =
-              s.data();
-
-
-            if (
-              !Array.isArray(
-                d.participants
-              )
-            ) {
-              return;
-            }
-
-
-            if (
-              !d.participants.includes(uid)
-            ) {
-              return;
-            }
-
-
-            /*
-            Find the OTHER participant.
-            */
-
-            const otherUid =
-              d.participants.find(
-                participantUid =>
-                  participantUid !== uid
-              );
-
-
-            if (!otherUid) {
-              return;
-            }
-
-
-            /*
-            First look at users already
-            loaded by dashboard.
-            */
-
-            const knownUser =
-              onlineUsers.find(
-                u => u.uid === otherUid
-              );
-
-
-            /*
-            Then cache.
-            */
-
-            const cachedUser =
-              knownUser ||
-              getCachedProfile(
-                otherUid
-              );
-
-
-            const name =
-              cachedUser
-                ? getFullName(
-                    cachedUser
-                  )
-                : (
-                    d.otherUserName ||
-                    "Loading..."
-                  );
-
-
-            const photoURL =
-              cachedUser?.photoURL ||
-              d.photoURL ||
-              d.otherUserPhotoURL ||
-              "";
-
-
-            chats.push({
-
-              id: s.id,
-
-              otherUid,
-
-              name,
-
-              username:
-                cachedUser?.username ||
-                "",
-
-              photoURL,
-
-              lastMessage:
-                d.lastMessage || "",
-
-              time:
-                formatTimestamp(
-                  d.updatedAt
-                ),
-
-              unread:
-         Number(
-            d.unreadCount?.[uid] ??
-            d.unread?.[uid] ??
-           0
-          ),
 
               /*
-              This is now the REAL URL.
+              Only conversations belonging
+              to the current user.
               */
 
-              href:
-                `chat.html?uid=${encodeURIComponent(otherUid)}`
+              if (
+                !Array.isArray(
+                  d.participants
+                )
+              ) {
 
-            });
+                return;
 
-          });
+              }
+
+
+              if (
+                !d.participants.includes(uid)
+              ) {
+
+                return;
+
+              }
+
+
+              /*
+              Find the other participant.
+              */
+
+              const otherUid =
+                d.participants.find(
+                  participantUid =>
+                    participantUid !== uid
+                );
+
+
+              if (!otherUid) {
+                return;
+              }
+
+
+              /*
+              Find profile from live users,
+              cache, or chat metadata.
+              */
+
+              const knownUser =
+                onlineUsers.find(
+                  u =>
+                    u.uid === otherUid
+                );
+
+
+              const cachedUser =
+                knownUser ||
+                getCachedProfile(
+                  otherUid
+                );
+
+
+              const name =
+                cachedUser
+
+                  ? getFullName(
+                      cachedUser
+                    )
+
+                  : (
+                      d.otherUserName ||
+                      "CONNECTA User"
+                    );
+
+
+              const photoURL =
+                cachedUser?.photoURL ||
+                d.photoURL ||
+                d.otherUserPhotoURL ||
+                "";
+
+
+              /*
+              ==========================================
+              IMPORTANT UNREAD COUNT
+              ==========================================
+              */
+
+              const unreadCount =
+                Number(
+                  d.unreadCount?.[uid] ??
+                  d.unread?.[uid] ??
+                  0
+                );
+
+
+              chats.push({
+
+                id: s.id,
+
+                otherUid,
+
+                name,
+
+                username:
+                  cachedUser?.username ||
+                  "",
+
+                photoURL,
+
+                lastMessage:
+                  d.lastMessage || "",
+
+                time:
+                  formatTimestamp(
+                    d.updatedAt
+                  ),
+
+                /*
+                THIS is the value that the UI
+                displays as 1, 2, 3...
+                */
+
+                unread:
+                  unreadCount,
+
+                href:
+                  `chat.html?uid=${encodeURIComponent(
+                    otherUid
+                  )}`
+
+              });
+
+            }
+          );
 
 
           /*
-          Sort latest conversation first.
-          Firestore already does this,
-          but keep the order.
+          Store globally.
           */
 
           recentChats =
@@ -1146,7 +1208,7 @@ async function listenToChats(uid) {
 
 
           /*
-          RENDER IMMEDIATELY
+          Render immediately.
           */
 
           renderChats(
@@ -1154,54 +1216,16 @@ async function listenToChats(uid) {
             $("chatSearch")?.value || ""
           );
 
-
-          /*
-          If profile isn't known yet,
-          load it in the background.
-          */
-
-          const missingProfiles =
-            recentChats.filter(
-              chat => {
-
-                return (
-                  !onlineUsers.some(
-                    u =>
-                      u.uid ===
-                      chat.otherUid
-                  ) &&
-                  !getCachedProfile(
-                    chat.otherUid
-                  )
-                );
-
-              }
-            );
-
-
-          /*
-          Load missing users without
-          blocking the first render.
-          */
-
-          await Promise.all(
-            missingProfiles.map(
-              chat =>
-                refreshUserProfile(
-                  chat.otherUid
-                )
-            )
-          );
-
         },
 
 
         error => {
 
-          console.warn(
-            "Chats listener:",
+          console.error(
+            "Chats listener error:",
             error
           );
+
 
           renderChats([]);
 
@@ -1215,6 +1239,7 @@ async function listenToChats(uid) {
       "Could not listen to chats:",
       error
     );
+
 
     renderChats([]);
 
