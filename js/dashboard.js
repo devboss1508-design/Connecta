@@ -229,24 +229,84 @@ function getProfileCache() {
 }
 
 function saveProfileToCache(uid, profile) {
-  if (!uid || !profile) return;
+
+  if (!uid || !profile) {
+    return;
+  }
 
   try {
-    const cache = getProfileCache();
+
+    const cache =
+      getProfileCache();
+
+
+    /*
+    Only cache information required
+    by the frontend UI.
+
+    Do NOT store private fields such as
+    email, phone, etc. in localStorage.
+    */
 
     cache[uid] = {
-      ...cache[uid],
-      ...profile,
-      cachedAt: Date.now()
+
+      uid,
+
+      firstName:
+        profile.firstName || "",
+
+      lastName:
+        profile.lastName || "",
+
+      displayName:
+        profile.displayName || "",
+
+      username:
+        profile.username || "",
+
+      photoURL:
+        profile.photoURL || "",
+
+      bio:
+        profile.bio || "",
+
+      isOnline:
+        profile.isOnline === true,
+
+      isVerified:
+        profile.isVerified === true,
+
+      following:
+        Array.isArray(profile.following)
+          ? profile.following
+          : [],
+
+      followersCount:
+        Number(profile.followersCount || 0),
+
+      followingCount:
+        Number(profile.followingCount || 0),
+
+      cachedAt:
+        Date.now()
+
     };
+
 
     localStorage.setItem(
       PROFILE_CACHE_KEY,
       JSON.stringify(cache)
     );
+
   } catch (error) {
-    console.warn("Profile cache save failed:", error);
+
+    console.warn(
+      "Profile cache save failed:",
+      error
+    );
+
   }
+
 }
 
 function getCachedProfile(uid) {
@@ -1758,10 +1818,53 @@ onAuthStateChanged(
     currentUser = user;
 
 
-    /* =====================================================
-       LOAD CURRENT PROFILE
-    ===================================================== */
+/* =====================================================
+   INSTANT DASHBOARD CACHE
+===================================================== */
 
+/*
+Load everything we already know BEFORE
+waiting for Firestore.
+
+This makes the dashboard appear immediately
+on repeat visits.
+*/
+
+loadDashboardCache(
+  user.uid
+);
+
+
+/*
+Also load the individual profile cache
+if the dashboard cache does not contain it.
+*/
+
+if (!currentProfile) {
+
+  const cachedProfile =
+    getCachedProfile(
+      user.uid
+    );
+
+  if (cachedProfile) {
+
+    currentProfile =
+      cachedProfile;
+
+    renderProfile(
+      cachedProfile
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   LOAD CURRENT PROFILE FROM FIRESTORE
+===================================================== */
+    
     try {
 
       const userRef =
@@ -1894,10 +1997,24 @@ onAuthStateChanged(
 
 
     /* =====================================================
-       PRESENCE
-    ===================================================== */
+   PRESENCE
+===================================================== */
 
-    await setPresence(true);
+/*
+Do NOT block dashboard loading while
+the presence write is happening.
+*/
+
+setPresence(true).catch(
+  error => {
+
+    console.warn(
+      "Initial presence update failed:",
+      error
+    );
+
+  }
+);
 
 
     /*
@@ -1966,7 +2083,7 @@ onAuthStateChanged(
 ===================================================== */
 
 saveDashboardCache(
-  uid
+  currentUser.uid
 );
 
 
