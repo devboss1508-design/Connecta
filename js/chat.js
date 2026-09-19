@@ -599,13 +599,20 @@ async function ensureChat() {
         await getDoc(chatRef);
 
 
+    /*
+    =====================================================
+    CREATE NEW CHAT
+    =====================================================
+    */
+
     if (!snap.exists()) {
 
         await setDoc(
             chatRef,
             {
 
-                id: chatId,
+                id:
+                    chatId,
 
                 participants: [
 
@@ -615,23 +622,35 @@ async function ensureChat() {
 
                 ],
 
-                lastMessage: "",
+                lastMessage:
+                    "",
 
-                lastSenderId: "",
+                lastSenderId:
+                    "",
+
+                /*
+                IMPORTANT:
+                Each user gets their own
+                unread counter.
+                */
 
                 unreadCount: {
 
-                    [currentUser.uid]: 0,
+                    [currentUser.uid]:
+                        0,
 
-                    [otherUser.uid]: 0
+                    [otherUser.uid]:
+                        0
 
                 },
 
                 typing: {
 
-                    [currentUser.uid]: false,
+                    [currentUser.uid]:
+                        false,
 
-                    [otherUser.uid]: false
+                    [otherUser.uid]:
+                        false
 
                 },
 
@@ -644,59 +663,182 @@ async function ensureChat() {
             }
         );
 
+
+        return;
+
     }
 
 
     /*
-    Make sure older chats get
-    the newer fields.
+    =====================================================
+    EXISTING CHAT
+    =====================================================
     */
 
-    else {
-
-        const data =
-            snap.data();
+    const data =
+        snap.data();
 
 
-        const updates = {};
+    const updates = {};
 
 
-        if (!data.unreadCount) {
+    /*
+    =====================================================
+    MAKE SURE PARTICIPANTS EXIST
+    =====================================================
+    */
 
-            updates.unreadCount = {
+    if (
+        !Array.isArray(
+            data.participants
+        ) ||
+        !data.participants.includes(
+            currentUser.uid
+        ) ||
+        !data.participants.includes(
+            otherUser.uid
+        )
+    ) {
 
-                [currentUser.uid]: 0,
+        updates.participants = [
 
-                [otherUser.uid]: 0
+            currentUser.uid,
 
-            };
+            otherUser.uid
+
+        ];
+
+    }
+
+
+    /*
+    =====================================================
+    REPAIR UNREAD COUNTERS
+    =====================================================
+    */
+
+    if (
+        !data.unreadCount ||
+        typeof data.unreadCount !== "object"
+    ) {
+
+        updates.unreadCount = {
+
+            [currentUser.uid]:
+                0,
+
+            [otherUser.uid]:
+                0
+
+        };
+
+    } else {
+
+        /*
+        Current user's counter missing?
+        */
+
+        if (
+            typeof
+            data.unreadCount[
+                currentUser.uid
+            ] !== "number"
+        ) {
+
+            updates[
+                `unreadCount.${currentUser.uid}`
+            ] = 0;
 
         }
 
 
-        if (!data.typing) {
+        /*
+        Other user's counter missing?
+        */
 
-            updates.typing = {
+        if (
+            typeof
+            data.unreadCount[
+                otherUser.uid
+            ] !== "number"
+        ) {
 
-                [currentUser.uid]: false,
+            updates[
+                `unreadCount.${otherUser.uid}`
+            ] = 0;
 
-                [otherUser.uid]: false
+        }
 
-            };
+    }
+
+
+    /*
+    =====================================================
+    REPAIR TYPING
+    =====================================================
+    */
+
+    if (
+        !data.typing ||
+        typeof data.typing !== "object"
+    ) {
+
+        updates.typing = {
+
+            [currentUser.uid]:
+                false,
+
+            [otherUser.uid]:
+                false
+
+        };
+
+    } else {
+
+        if (
+            typeof
+            data.typing[
+                currentUser.uid
+            ] !== "boolean"
+        ) {
+
+            updates[
+                `typing.${currentUser.uid}`
+            ] = false;
 
         }
 
 
         if (
-            Object.keys(updates).length
+            typeof
+            data.typing[
+                otherUser.uid
+            ] !== "boolean"
         ) {
 
-            await updateDoc(
-                chatRef,
-                updates
-            );
+            updates[
+                `typing.${otherUser.uid}`
+            ] = false;
 
         }
+
+    }
+
+
+    /*
+    =====================================================
+    APPLY REPAIRS
+    =====================================================
+    */
+
+    if (
+        Object.keys(updates).length > 0
+    ) {
+
+        await updateDoc(
+            chatRef,
+            updates
+        );
 
     }
 
@@ -1379,6 +1521,7 @@ async function sendMessage() {
     ) {
 
         return;
+
     }
 
 
@@ -1397,9 +1540,9 @@ async function sendMessage() {
     try {
 
         /*
-        ==============================================
+        =================================================
         STOP TYPING
-        ==============================================
+        =================================================
         */
 
         clearTimeout(
@@ -1413,9 +1556,9 @@ async function sendMessage() {
 
 
         /*
-        ==============================================
-        REFERENCES
-        ==============================================
+        =================================================
+        CHAT DOCUMENT
+        =================================================
         */
 
         const chatRef =
@@ -1426,24 +1569,35 @@ async function sendMessage() {
             );
 
 
-        const messageRef =
-            doc(
-                collection(
-                    db,
-                    "chats",
-                    chatId,
-                    "messages"
-                )
+        /*
+        =================================================
+        MESSAGE COLLECTION
+        =================================================
+        */
+
+        const messagesRef =
+            collection(
+                db,
+                "chats",
+                chatId,
+                "messages"
             );
 
 
         /*
-        ==============================================
-        ATOMIC BATCH
-        ==============================================
+        =================================================
+        NEW MESSAGE DOCUMENT
+        =================================================
+        */
 
-        Message creation and unread counter
-        are committed together.
+        const messageRef =
+            doc(messagesRef);
+
+
+        /*
+        =================================================
+        ATOMIC BATCH
+        =================================================
         */
 
         const batch =
@@ -1451,7 +1605,9 @@ async function sendMessage() {
 
 
         /*
-        CREATE MESSAGE
+        =================================================
+        1. CREATE MESSAGE
+        =================================================
         */
 
         batch.set(
@@ -1464,15 +1620,11 @@ async function sendMessage() {
                 receiverId:
                     otherUser.uid,
 
-                text,
+                text:
+                    text,
 
                 createdAt:
                     serverTimestamp(),
-
-                /*
-                Initial state:
-                one gray tick.
-                */
 
                 delivered:
                     false,
@@ -1491,20 +1643,14 @@ async function sendMessage() {
 
 
         /*
-        UPDATE CHAT
+        =================================================
+        2. UPDATE LAST MESSAGE
+        =================================================
         */
 
-        batch.set(
+        batch.update(
             chatRef,
             {
-
-                participants: [
-
-                    currentUser.uid,
-
-                    otherUser.uid
-
-                ],
 
                 lastMessage:
                     text,
@@ -1513,31 +1659,58 @@ async function sendMessage() {
                     currentUser.uid,
 
                 updatedAt:
-                    serverTimestamp(),
+                    serverTimestamp()
 
-                /*
-                THIS IS THE UNREAD COUNTER.
-                */
-
-                [`unreadCount.${otherUser.uid}`]:
-                    increment(1)
-
-            },
-            {
-                merge: true
             }
         );
 
 
         /*
-        COMMIT BOTH TOGETHER
+        =================================================
+        3. INCREASE RECEIVER UNREAD COUNT
+        =================================================
+
+        VERY IMPORTANT:
+
+        We increase the OTHER USER'S counter,
+        NOT our own counter.
+        */
+
+        batch.update(
+            chatRef,
+            {
+
+                [`unreadCount.${otherUser.uid}`]:
+                    increment(1)
+
+            }
+        );
+
+
+        /*
+        =================================================
+        COMMIT
+        =================================================
         */
 
         await batch.commit();
 
 
+        console.log(
+            "Message sent successfully."
+        );
+
+
+        console.log(
+            "Unread count increased for UID:",
+            otherUser.uid
+        );
+
+
         /*
+        =================================================
         CLEAR INPUT
+        =================================================
         */
 
         input.value = "";
@@ -1548,14 +1721,27 @@ async function sendMessage() {
     } catch (error) {
 
         console.error(
-            "Send message error:",
+            "SEND MESSAGE ERROR:",
             error
+        );
+
+
+        console.error(
+            "Error code:",
+            error?.code
+        );
+
+
+        console.error(
+            "Error message:",
+            error?.message
         );
 
 
         showChatError(
             "Message could not be sent."
         );
+
 
     } finally {
 
