@@ -1117,9 +1117,11 @@ async function listenToChats(uid) {
                 ),
 
               unread:
-                Number(
-                  d.unread?.[uid] || 0
-                ),
+         Number(
+            d.unreadCount?.[uid] ??
+            d.unread?.[uid] ??
+           0
+          ),
 
               /*
               This is now the REAL URL.
