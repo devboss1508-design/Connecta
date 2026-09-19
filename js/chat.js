@@ -50,6 +50,127 @@ let lastTypingWrite = 0;
 
 let isMarkingMessages = false;
 
+/* =====================================================
+   CHAT PROFILE CACHE
+   Uses the same profile cache created by dashboard.js.
+===================================================== */
+
+const PROFILE_CACHE_KEY =
+    "connectaProfileCache";
+
+
+function getProfileCache() {
+
+    try {
+
+        return JSON.parse(
+            localStorage.getItem(
+                PROFILE_CACHE_KEY
+            ) || "{}"
+        );
+
+    } catch {
+
+        return {};
+
+    }
+
+}
+
+
+function getCachedProfile(uid) {
+
+    if (!uid) {
+        return null;
+    }
+
+
+    try {
+
+        const cache =
+            getProfileCache();
+
+
+        return cache[uid] || null;
+
+    } catch {
+
+        return null;
+
+    }
+
+}
+
+
+/* =====================================================
+   SAVE CHAT PROFILE CACHE
+===================================================== */
+
+function saveChatProfile(uid, profile) {
+
+    if (!uid || !profile) {
+        return;
+    }
+
+
+    try {
+
+        const cache =
+            getProfileCache();
+
+
+        cache[uid] = {
+
+            ...cache[uid],
+
+            uid,
+
+            firstName:
+                profile.firstName || "",
+
+            lastName:
+                profile.lastName || "",
+
+            displayName:
+                profile.displayName || "",
+
+            username:
+                profile.username || "",
+
+            photoURL:
+                profile.photoURL || "",
+
+            isOnline:
+                profile.isOnline === true,
+
+            isVerified:
+                profile.isVerified === true,
+
+            lastSeen:
+                profile.lastSeen || null,
+
+            cachedAt:
+                Date.now()
+
+        };
+
+
+        localStorage.setItem(
+            PROFILE_CACHE_KEY,
+            JSON.stringify(cache)
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "Chat profile cache failed:",
+            error
+        );
+
+    }
+
+}
+
 
 /* =====================================================
    INITIALS
@@ -167,20 +288,43 @@ function createChatId(uid1, uid2) {
 
 function formatTime(timestamp) {
 
-    if (!timestamp?.toDate) {
-        return "";
+    let date = null;
+
+
+    if (
+        timestamp?.toDate
+    ) {
+
+        date =
+            timestamp.toDate();
+
+    } else if (
+        typeof timestamp === "number"
+    ) {
+
+        date =
+            new Date(timestamp);
+
     }
 
 
-    return timestamp
-        .toDate()
-        .toLocaleTimeString(
-            [],
-            {
-                hour: "numeric",
-                minute: "2-digit"
-            }
-        );
+    if (
+        !date ||
+        Number.isNaN(date.getTime())
+    ) {
+
+        return "";
+
+    }
+
+
+    return date.toLocaleTimeString(
+        [],
+        {
+            hour: "numeric",
+            minute: "2-digit"
+        }
+    );
 
 }
 
@@ -191,13 +335,34 @@ function formatTime(timestamp) {
 
 function formatDate(timestamp) {
 
-    if (!timestamp?.toDate) {
-        return "Today";
+    let date = null;
+
+
+    if (
+        timestamp?.toDate
+    ) {
+
+        date =
+            timestamp.toDate();
+
+    } else if (
+        typeof timestamp === "number"
+    ) {
+
+        date =
+            new Date(timestamp);
+
     }
 
 
-    const date =
-        timestamp.toDate();
+    if (
+        !date ||
+        Number.isNaN(date.getTime())
+    ) {
+
+        return "Today";
+
+    }
 
 
     const today =
@@ -475,40 +640,310 @@ function getLastSeenText(user) {
 
 /* =====================================================
    LOAD OTHER USER
+   CACHE FIRST → FIRESTORE SECOND
 ===================================================== */
 
 async function loadOtherUser(uid) {
 
-    const snap =
-        await getDoc(
-            doc(db, "users", uid)
-        );
+    /*
+    =====================================================
+    CACHE FIRST
+    =====================================================
+    */
+
+    const cached =
+        getCachedProfile(uid);
 
 
-    if (!snap.exists()) {
+    if (cached) {
 
-        throw new Error(
-            "User profile not found."
+        otherUser = {
+
+            uid,
+
+            ...cached
+
+        };
+
+
+        /*
+        Show cached header immediately.
+        */
+
+        renderChatHeader(
+            otherUser
         );
 
     }
 
 
-    otherUser = {
+    /*
+    =====================================================
+    FIRESTORE REFRESH
+    =====================================================
+    */
 
-        uid,
+    try {
 
-        ...snap.data()
+        const snap =
+            await getDoc(
+                doc(
+                    db,
+                    "users",
+                    uid
+                )
+            );
 
-    };
+
+        if (!snap.exists()) {
+
+            /*
+            If cache exists, keep using it.
+            */
+
+            if (cached) {
+                return;
+            }
 
 
-    renderChatHeader(
-        otherUser
-    );
+            throw new Error(
+                "User profile not found."
+            );
+
+        }
+
+
+        otherUser = {
+
+            uid,
+
+            ...snap.data()
+
+        };
+
+
+        /*
+        Save latest profile.
+        */
+
+        saveChatProfile(
+            uid,
+            otherUser
+        );
+
+
+        /*
+        Update header with fresh data.
+        */
+
+        renderChatHeader(
+            otherUser
+        );
+
+
+    } catch (error) {
+
+        /*
+        Cached profile can continue
+        working if network is unavailable.
+        */
+
+        if (cached) {
+
+            console.warn(
+                "Using cached chat profile:",
+                error
+            );
+
+            return;
+
+        }
+
+
+        throw error;
+
+    }
 
 }
 
+
+/* =====================================================
+   MESSAGE CACHE
+===================================================== */
+
+const MESSAGE_CACHE_PREFIX =
+    "connectaMessages_v1_";
+
+
+function getMessageCache(chatId) {
+
+    if (!chatId) {
+        return [];
+    }
+
+
+    try {
+
+        const raw =
+            localStorage.getItem(
+                `${MESSAGE_CACHE_PREFIX}${chatId}`
+            );
+
+
+        if (!raw) {
+            return [];
+        }
+
+
+        const cached =
+            JSON.parse(raw);
+
+
+        if (!Array.isArray(cached)) {
+            return [];
+        }
+
+
+        /*
+        Convert cached numeric timestamps
+        back into objects compatible with
+        formatTime() and formatDate().
+        */
+
+        return cached.map(
+            message => {
+
+                const restored = {
+                    ...message
+                };
+
+
+                if (
+                    typeof restored.createdAt ===
+                    "number"
+                ) {
+
+                    restored.createdAt = {
+                        toDate: () =>
+                            new Date(
+                                restored.createdAt
+                            )
+                    };
+
+                }
+
+
+                return restored;
+
+            }
+        );
+
+
+    } catch (error) {
+
+        console.warn(
+            "Message cache read failed:",
+            error
+        );
+
+
+        return [];
+
+    }
+
+}
+
+
+/* =====================================================
+   SAVE MESSAGE CACHE
+===================================================== */
+
+function saveMessageCache(
+    chatId,
+    messages
+) {
+
+    if (
+        !chatId ||
+        !Array.isArray(messages)
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        /*
+        Keep only the latest 100 messages.
+        */
+
+        const latest =
+            messages.slice(-100);
+
+
+        const serializable =
+            latest.map(
+                message => {
+
+                    let createdAt =
+                        null;
+
+
+                    if (
+                        message.createdAt?.toDate
+                    ) {
+
+                        createdAt =
+                            message.createdAt
+                                .toDate()
+                                .getTime();
+
+                    } else if (
+                        typeof message.createdAt ===
+                        "number"
+                    ) {
+
+                        createdAt =
+                            message.createdAt;
+
+                    }
+
+
+                    return {
+
+                        ...message,
+
+                        createdAt
+
+                    };
+
+                }
+            );
+
+
+        localStorage.setItem(
+
+            `${MESSAGE_CACHE_PREFIX}${chatId}`,
+
+            JSON.stringify(
+                serializable
+            )
+
+        );
+
+
+    } catch (error) {
+
+        console.warn(
+            "Message cache save failed:",
+            error
+        );
+
+    }
+
+}
 
 /* =====================================================
    LISTEN TO USER
@@ -958,12 +1393,30 @@ function listenToMessages() {
 
 
                 latestMessages =
-                    messages;
+    messages;
 
 
-                renderMessages(
-                    messages
-                );
+/*
+=====================================================
+SAVE LATEST MESSAGES FOR INSTANT NEXT OPEN
+=====================================================
+*/
+
+saveMessageCache(
+    chatId,
+    messages
+);
+
+
+/*
+=====================================================
+RENDER IMMEDIATELY
+=====================================================
+*/
+
+renderMessages(
+    messages
+);
 
 
                 /*
@@ -2227,83 +2680,139 @@ onAuthStateChanged(
 
         try {
 
-            /*
-            ==========================================
-            LOAD RECIPIENT
-            ==========================================
-            */
+    /*
+    =================================================
+    SET CHAT ID IMMEDIATELY
+    =================================================
 
-            await loadOtherUser(
-                otherUid
-            );
+    We already know both UIDs.
 
+    There is no reason to wait for Firestore
+    before calculating the chat ID.
+    */
 
-            /*
-            ==========================================
-            CREATE / LOAD CHAT
-            ==========================================
-            */
-
-            await ensureChat();
+    chatId =
+        createChatId(
+            currentUser.uid,
+            otherUid
+        );
 
 
-            /*
-            ==========================================
-            LISTEN TO CHAT METADATA
-            ==========================================
-            */
+    /*
+    =================================================
+    LOAD CACHED PROFILE IMMEDIATELY
+    =================================================
+    */
 
-            listenToChat();
-
-
-            /*
-            ==========================================
-            LISTEN TO MESSAGES
-            ==========================================
-            */
-
-            listenToMessages();
+    const cachedProfile =
+        getCachedProfile(
+            otherUid
+        );
 
 
-            /*
-            ==========================================
-            LIVE ONLINE / OFFLINE
-            ==========================================
-            */
+    if (cachedProfile) {
 
-            listenToOtherUser(
-                otherUid
-            );
+        otherUser = {
 
+            uid:
+                otherUid,
 
-            /*
-            ==========================================
-            OPENING CHAT = READ
-            ==========================================
-            */
+            ...cachedProfile
 
-            /*
-            Messages listener will immediately
-            mark incoming messages as read.
-            */
+        };
 
 
-        } catch (error) {
-
-            console.error(
-                "Chat initialization error:",
-                error
-            );
-
-
-            showChatError(
-                "Could not open this conversation. Please try again."
-            );
-
-        }
+        renderChatHeader(
+            otherUser
+        );
 
     }
-);
+
+
+    /*
+    =================================================
+    LOAD CACHED MESSAGES IMMEDIATELY
+    =================================================
+    */
+
+    const cachedMessages =
+        getMessageCache(
+            chatId
+        );
+
+
+    if (
+        cachedMessages.length
+    ) {
+
+        latestMessages =
+            cachedMessages;
+
+
+        renderMessages(
+            cachedMessages
+        );
+
+    }
+
+
+    /*
+    =================================================
+    START REALTIME LISTENERS IMMEDIATELY
+    =================================================
+
+    Firestore persistence can provide cached
+    listener data while it synchronizes with
+    the server.
+    */
+
+    listenToMessages();
+
+    listenToChat();
+
+    listenToOtherUser(
+        otherUid
+    );
+
+
+    /*
+    =================================================
+    FIRESTORE INITIALIZATION IN BACKGROUND
+    =================================================
+    */
+
+    await loadOtherUser(
+        otherUid
+    );
+
+
+    await ensureChat();
+
+
+} catch (error) {
+
+    console.error(
+        "Chat initialization error:",
+        error
+    );
+
+
+    /*
+    Only show an error if we have
+    no cached conversation to fall back to.
+    */
+
+    if (
+        !latestMessages.length
+    ) {
+
+        showChatError(
+            "Could not open this conversation. Please try again."
+        );
+
+    }
+
+}
 
 
 /* =====================================================
