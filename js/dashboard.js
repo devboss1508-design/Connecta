@@ -34,6 +34,182 @@ let recentChats = [];
 let stopUsers = null;
 let stopChats = null;
 
+/* =========================================================
+   DASHBOARD CACHE
+   Stores the last dashboard state so it can render instantly.
+========================================================= */
+
+const DASHBOARD_CACHE_PREFIX =
+  "connectaDashboardCache_v1_";
+
+
+function getDashboardCache(uid) {
+
+  if (!uid) {
+    return null;
+  }
+
+  try {
+
+    const raw =
+      localStorage.getItem(
+        `${DASHBOARD_CACHE_PREFIX}${uid}`
+      );
+
+    if (!raw) {
+      return null;
+    }
+
+    return JSON.parse(raw);
+
+  } catch (error) {
+
+    console.warn(
+      "Dashboard cache read failed:",
+      error
+    );
+
+    return null;
+  }
+
+}
+
+
+function saveDashboardCache(uid) {
+
+  if (!uid) {
+    return;
+  }
+
+  try {
+
+    const cache = {
+
+      profile:
+        currentProfile || null,
+
+      users:
+        Array.isArray(onlineUsers)
+          ? onlineUsers
+          : [],
+
+      chats:
+        Array.isArray(recentChats)
+          ? recentChats
+          : [],
+
+      cachedAt:
+        Date.now()
+
+    };
+
+
+    localStorage.setItem(
+
+      `${DASHBOARD_CACHE_PREFIX}${uid}`,
+
+      JSON.stringify(cache)
+
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Dashboard cache save failed:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   LOAD DASHBOARD FROM CACHE
+========================================================= */
+
+function loadDashboardCache(uid) {
+
+  const cache =
+    getDashboardCache(uid);
+
+
+  if (!cache) {
+    return false;
+  }
+
+
+  let hasData = false;
+
+
+  /* =====================================================
+     PROFILE
+  ===================================================== */
+
+  if (
+    cache.profile &&
+    typeof cache.profile === "object"
+  ) {
+
+    currentProfile =
+      cache.profile;
+
+    renderProfile(
+      currentProfile
+    );
+
+    hasData = true;
+
+  }
+
+
+  /* =====================================================
+     USERS
+  ===================================================== */
+
+  if (
+    Array.isArray(cache.users) &&
+    cache.users.length
+  ) {
+
+    onlineUsers =
+      cache.users;
+
+    renderOnline(
+      $("onlineSearch")?.value || ""
+    );
+
+    hasData = true;
+
+  }
+
+
+  /* =====================================================
+     CHATS
+  ===================================================== */
+
+  if (
+    Array.isArray(cache.chats) &&
+    cache.chats.length
+  ) {
+
+    recentChats =
+      cache.chats;
+
+    renderChats(
+      recentChats,
+      $("chatSearch")?.value || ""
+    );
+
+    hasData = true;
+
+  }
+
+
+  return hasData;
+
+}
+
 
 /* =========================================================
    USER PROFILE CACHE
@@ -1204,17 +1380,30 @@ async function listenToChats(uid) {
           */
 
           recentChats =
-            chats;
+  chats;
 
 
-          /*
-          Render immediately.
-          */
+/*
+=========================================================
+SAVE CHATS FOR NEXT VISIT
+=========================================================
+*/
 
-          renderChats(
-            recentChats,
-            $("chatSearch")?.value || ""
-          );
+saveDashboardCache(
+  uid
+);
+
+
+/*
+=========================================================
+RENDER IMMEDIATELY
+=========================================================
+*/
+
+renderChats(
+  recentChats,
+  $("chatSearch")?.value || ""
+);
 
         },
 
@@ -1771,6 +1960,14 @@ onAuthStateChanged(
           renderOnline(
             $("onlineSearch").value
           );
+
+          /* =====================================================
+   SAVE COMPLETE DASHBOARD STATE
+===================================================== */
+
+saveDashboardCache(
+  uid
+);
 
 
           /*
