@@ -91,39 +91,101 @@ function renderProfile(profile) {
 function renderOnline(filter = "") {
   const box = $("onlineUsers");
   const term = filter.trim().toLowerCase();
+
   const list = onlineUsers.filter(u => {
-    if (u.uid === currentUser?.uid) return true;
-    const haystack = `${getFullName(u, u.uid === currentUser?.uid ? currentUser : null)} ${u.username || ""}`.toLowerCase();
+    const fullName = getFullName(
+      u,
+      u.uid === currentUser?.uid ? currentUser : null
+    );
+
+    const haystack = `${fullName} ${u.username || ""}`.toLowerCase();
+
     return !term || haystack.includes(term);
   });
 
   $("onlineCount").textContent = `(${onlineUsers.length})`;
 
   if (!list.length) {
-    box.innerHTML = `<div class="empty-state small">No matching online users.</div>`;
+    box.innerHTML = `
+      <div class="empty-state small">
+        No users found.
+      </div>
+    `;
     return;
   }
 
   box.innerHTML = list.map(u => {
     const isMe = u.uid === currentUser?.uid;
-    const name = getFullName(u, u.uid === currentUser?.uid ? currentUser : null);
-    const following = Array.isArray(currentProfile?.following) && currentProfile.following.includes(u.uid);
+
+    const name = getFullName(
+      u,
+      isMe ? currentUser : null
+    );
+
+    const isOnline = u.isOnline === true;
+
+    const statusClass = isOnline ? "online" : "offline";
+
+    const statusText = isMe
+      ? "online • you"
+      : (isOnline ? "online" : "offline");
 
     return `
       <article class="user-card">
-        ${avatarMarkup(u, u.photoURL ? "" : "avatar-green")}
+
+        ${avatarMarkup(
+          u,
+          u.photoURL ? "" : "avatar-green"
+        )}
+
         <strong>${escapeHtml(name)}</strong>
-        <small class="online-text">${isMe ? "online • you" : "online"}</small>
-        <button class="${following ? "following" : ""}" data-follow="${u.uid}" ${isMe ? "disabled" : ""}>
-          ${isMe ? "Add Story" : (following ? "Following" : "Follow")}
-        </button>
-      </article>`;
+
+        <small class="online-text ${statusClass}">
+          <span class="status-dot ${statusClass}"></span>
+          ${escapeHtml(statusText)}
+        </small>
+
+        ${
+          isMe
+            ? `
+              <button
+                class="following"
+                disabled>
+                You
+              </button>
+            `
+            : `
+              <button
+                class="chat-user-btn"
+                data-chat-user="${escapeHtml(u.uid)}">
+                Chat
+              </button>
+            `
+        }
+
+      </article>
+    `;
   }).join("");
 
-  box.querySelectorAll("[data-follow]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      await toggleFollow(btn.dataset.follow);
+  /*
+  ========================================
+  OPEN PRIVATE CHAT
+  ========================================
+  */
+
+  box.querySelectorAll("[data-chat-user]").forEach(btn => {
+
+    btn.addEventListener("click", () => {
+
+      const targetUid = btn.dataset.chatUser;
+
+      if (!targetUid) return;
+
+      location.href =
+        `chat.html?uid=${encodeURIComponent(targetUid)}`;
+
     });
+
   });
 }
 
@@ -337,16 +399,35 @@ onAuthStateChanged(auth, async user => {
   // Refresh presence while the app is open.
   setInterval(() => setPresence(true), 45000);
 
-  const usersQuery = query(collection(db, "users"), limit(100));
-  stopUsers = onSnapshot(usersQuery, snapshot => {
-    onlineUsers = snapshot.docs
-      .map(s => ({ uid: s.id, ...s.data() }))
-      .filter(u => u.isOnline === true);
+  const usersQuery = query(
+  collection(db, "users"),
+  limit(100)
+);
+
+stopUsers = onSnapshot(
+  usersQuery,
+  snapshot => {
+
+    onlineUsers = snapshot.docs.map(s => ({
+      uid: s.id,
+      ...s.data()
+    }));
+
     renderOnline($("onlineSearch").value);
-  }, error => {
+
+  },
+  error => {
+
     console.error("Users listener:", error);
-    $("onlineUsers").innerHTML = `<div class="empty-state small">Could not load online users. Check Firestore rules.</div>`;
-  });
+
+    $("onlineUsers").innerHTML = `
+      <div class="empty-state small">
+        Could not load users. Check Firestore rules.
+      </div>
+    `;
+
+  }
+);
 
   listenToChats(user.uid);
 });
