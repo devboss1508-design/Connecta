@@ -1,13 +1,22 @@
-import { auth, db } from "./firebase.js";
+import { auth, db, storage } from "./firebase.js";
 
 import {
-  onAuthStateChanged
+  onAuthStateChanged,
+  updateProfile
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
 import {
   doc,
-  getDoc
+  getDoc,
+  updateDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
 
 
 /* ========================================
@@ -18,22 +27,32 @@ const API_BASE_URL =
   "https://connecta-backend-com.onrender.com";
 
 
+/*
+ * IMPORTANT:
+ * Account verification costs KSh 999.
+ */
 const VERIFICATION_AMOUNT = 1;
 
 
 /* ========================================
-   HELPERS
+   STATE
 ======================================== */
 
-const $ = (id) =>
-  document.getElementById(id);
-
-
 let currentUser = null;
+
 let viewedUser = null;
 
 let verificationPollTimer = null;
+
 let verificationPolling = false;
+
+
+/* ========================================
+   HELPER
+======================================== */
+
+const $ = id =>
+  document.getElementById(id);
 
 
 /* ========================================
@@ -42,25 +61,32 @@ let verificationPolling = false;
 
 function initials(name = "U") {
 
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  const parts =
+    name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
 
   if (!parts.length) {
     return "U";
   }
 
+
   if (parts.length === 1) {
+
     return parts[0]
       .slice(0, 2)
       .toUpperCase();
+
   }
+
 
   return (
     parts[0][0] +
     parts[parts.length - 1][0]
   ).toUpperCase();
+
 }
 
 
@@ -74,19 +100,24 @@ function getFullName(user = {}) {
     return user.displayName.trim();
   }
 
+
   const fullName =
     `${user.firstName || ""} ${user.lastName || ""}`
       .trim();
+
 
   if (fullName) {
     return fullName;
   }
 
+
   if (user.username) {
     return user.username;
   }
 
+
   return "CONNECTA User";
+
 }
 
 
@@ -97,36 +128,117 @@ function getFullName(user = {}) {
 function escapeHtml(value = "") {
 
   return String(value)
+
     .replace(/&/g, "&amp;")
+
     .replace(/</g, "&lt;")
+
     .replace(/>/g, "&gt;")
+
     .replace(/"/g, "&quot;")
+
     .replace(/'/g, "&#039;");
+
 }
 
 
 /* ========================================
-   GET PROFILE UID
+   PROFILE UID
 ======================================== */
 
 function getProfileUid() {
 
   const params =
-    new URLSearchParams(window.location.search);
+    new URLSearchParams(
+      window.location.search
+    );
+
 
   return params.get("uid");
+
 }
 
 
 /* ========================================
-   FORMAT NUMBER
+   NUMBER FORMAT
 ======================================== */
 
 function formatNumber(value) {
 
-  const number = Number(value || 0);
+  const number =
+    Number(value || 0);
+
 
   return number.toLocaleString();
+
+}
+
+
+/* ========================================
+   BALANCE FORMAT
+======================================== */
+
+function formatBalance(value) {
+
+  const number =
+    Number(value || 0);
+
+
+  return `KSh ${number.toLocaleString(
+    undefined,
+    {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }
+  )}`;
+
+}
+
+
+/* ========================================
+   MARK USER ONLINE
+======================================== */
+
+async function markCurrentUserOnline() {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  try {
+
+    const userRef =
+      doc(
+        db,
+        "users",
+        currentUser.uid
+      );
+
+
+    await updateDoc(
+      userRef,
+      {
+        isOnline: true,
+        lastSeen: serverTimestamp()
+      }
+    );
+
+
+    console.log(
+      "CONNECTA: user marked online"
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Unable to update online status:",
+      error
+    );
+
+  }
+
 }
 
 
@@ -138,8 +250,10 @@ function renderProfile(profile) {
 
   viewedUser = profile;
 
+
   const container =
     $("profileContainer");
+
 
   if (!container) {
     return;
@@ -156,8 +270,23 @@ function renderProfile(profile) {
       : "";
 
 
+  /*
+   * IMPORTANT:
+   *
+   * If this is the logged-in user's own
+   * profile, treat them as online because
+   * they are currently inside CONNECTA.
+   */
+
+  const isOwnProfile =
+    currentUser &&
+    currentUser.uid === profile.uid;
+
+
   const isOnline =
-    profile.isOnline === true;
+    isOwnProfile
+      ? true
+      : profile.isOnline === true;
 
 
   const isVerified =
@@ -165,11 +294,25 @@ function renderProfile(profile) {
 
 
   const followers =
-    Number(profile.followersCount || 0);
+    Number(
+      profile.followersCount || 0
+    );
 
 
   const following =
-    Number(profile.followingCount || 0);
+    Number(
+      profile.followingCount || 0
+    );
+
+
+  const balance =
+    Number(
+      profile.balance || 0
+    );
+
+
+  const status =
+    profile.status || "active";
 
 
   const photo =
@@ -207,63 +350,75 @@ function renderProfile(profile) {
       : "";
 
 
-  const statusHtml = isOnline
+  /* ========================================
+     STATUS
+  ======================================== */
 
-    ? `
-      <div class="profile-status online">
+  const statusHtml =
+    isOnline
 
-        <span class="profile-status-dot online"></span>
+      ? `
+        <div class="profile-status online">
 
-        Online
+          <span
+            class="profile-status-dot online"
+          ></span>
 
-      </div>
-    `
+          Online
 
-    : `
-      <div class="profile-status offline">
+        </div>
+      `
 
-        <span class="profile-status-dot offline"></span>
+      : `
+        <div class="profile-status offline">
 
-        Offline
+          <span
+            class="profile-status-dot offline"
+          ></span>
 
-      </div>
-    `;
+          Offline
 
-
-  const bio =
-    profile.bio
-      ? escapeHtml(profile.bio)
-      : "";
-
-
-  const isOwnProfile =
-    currentUser &&
-    currentUser.uid === profile.uid;
-
-
-  let actionsHtml = "";
+        </div>
+      `;
 
 
   /* ========================================
-     OWN PROFILE
+     BIO
   ======================================== */
+
+  const bioHtml =
+    profile.bio
+
+      ? `
+        <div class="profile-bio">
+          ${escapeHtml(profile.bio)}
+        </div>
+      `
+
+      : "";
+
+
+  /* ========================================
+     ACTION
+  ======================================== */
+
+  let actionHtml = "";
+
 
   if (isOwnProfile) {
 
     if (isVerified) {
 
-      actionsHtml = `
+      actionHtml = `
 
-        <button
-          id="editProfileBtn"
-          class="profile-edit-btn"
-          type="button"
-        >
-          Edit Profile
-        </button>
+        <div class="profile-verified-text">
 
-        <div class="profile-verified-message">
-          ✓ Your account is verified
+          <span class="verified-badge">
+            ✓
+          </span>
+
+          Account Verified
+
         </div>
 
       `;
@@ -271,18 +426,11 @@ function renderProfile(profile) {
     } else {
 
       const paymentPending =
-        profile.verificationStatus === "payment_pending";
+        profile.verificationStatus ===
+        "payment_pending";
 
 
-      actionsHtml = `
-
-        <button
-          id="editProfileBtn"
-          class="profile-edit-btn"
-          type="button"
-        >
-          Edit Profile
-        </button>
+      actionHtml = `
 
         <button
           id="verifyAccountBtn"
@@ -290,26 +438,22 @@ function renderProfile(profile) {
           type="button"
           ${paymentPending ? "disabled" : ""}
         >
+
           ${
             paymentPending
-              ? "Verification Payment Pending..."
-              : "✓ Verify Account — KSh 999"
+              ? "Verification Pending..."
+              : "Verify Account"
           }
+
         </button>
 
       `;
 
     }
 
-  }
+  } else {
 
-  /* ========================================
-     OTHER USER
-  ======================================== */
-
-  else {
-
-    actionsHtml = `
+    actionHtml = `
 
       <button
         id="chatProfileBtn"
@@ -324,112 +468,307 @@ function renderProfile(profile) {
   }
 
 
+  /* ========================================
+     PROFILE STRUCTURE
+  ======================================== */
+
   container.innerHTML = `
 
-    <article class="profile-card">
+    <!-- ====================================
+         PROFILE HERO
+    ==================================== -->
 
-      <div class="profile-cover"></div>
+    <section class="profile-hero">
 
+      <div class="profile-photo-area">
 
-      <div class="profile-avatar-wrap">
+        <div class="profile-photo-ring">
 
-        <div class="profile-avatar">
+          <div class="profile-avatar">
 
-          ${avatar}
+            ${avatar}
+
+          </div>
 
         </div>
+
+
+        ${
+          isOwnProfile
+
+            ? `
+
+              <button
+                id="profilePhotoUploadBtn"
+                class="profile-photo-upload"
+                type="button"
+                aria-label="Upload profile photo"
+              >
+                📷
+              </button>
+
+              <input
+                id="profilePhotoInput"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+              >
+
+            `
+
+            : ""
+        }
 
       </div>
 
 
-      <div class="profile-info">
+      ${
+        isOwnProfile
+
+          ? `
+
+            <div class="profile-upload-text">
+              Tap to upload photo
+            </div>
+
+            <div
+              id="profileUploadStatus"
+              class="profile-upload-status"
+            ></div>
+
+          `
+
+          : ""
+      }
+
+
+      <div class="profile-name-row">
 
         <div class="profile-name">
-
-          <span>
-            ${escapeHtml(name)}
-          </span>
-
-          ${verifiedBadge}
-
+          ${escapeHtml(name)}
         </div>
 
+        ${verifiedBadge}
 
-        ${
-          username
-
-            ? `
-              <div class="profile-username">
-                ${escapeHtml(username)}
-              </div>
-            `
-
-            : ""
-        }
+      </div>
 
 
-        ${statusHtml}
+      ${
+        username
+
+          ? `
+            <div class="profile-username">
+              ${escapeHtml(username)}
+            </div>
+          `
+
+          : ""
+      }
 
 
-        ${
-          bio
-
-            ? `
-              <div class="profile-bio">
-                ${bio}
-              </div>
-            `
-
-            : ""
-        }
+      ${statusHtml}
 
 
-        <div class="profile-stats">
+      ${bioHtml}
 
-          <div class="profile-stat">
 
-            <strong>
-              ${formatNumber(followers)}
-            </strong>
+      <div class="profile-main-action">
 
-            <span>
-              Followers
-            </span>
+        ${actionHtml}
 
+      </div>
+
+    </section>
+
+
+    <!-- ====================================
+         ACCOUNT STATISTICS
+    ==================================== -->
+
+    <section class="profile-card">
+
+      <div class="profile-card-title">
+        Account Statistics
+      </div>
+
+
+      <div class="profile-stat-grid">
+
+        <div class="profile-stat-box">
+
+          <div class="profile-stat-label">
+            Balance
           </div>
 
-
-          <div class="profile-stat">
-
-            <strong>
-              ${formatNumber(following)}
-            </strong>
-
-            <span>
-              Following
-            </span>
-
+          <div class="profile-stat-value">
+            ${formatBalance(balance)}
           </div>
 
         </div>
 
 
-        <div class="profile-actions">
+        <div class="profile-stat-box">
 
-          ${actionsHtml}
+          <div class="profile-stat-label">
+            Status
+          </div>
+
+          <div class="profile-stat-value active">
+            ${escapeHtml(
+              status.charAt(0).toUpperCase() +
+              status.slice(1)
+            )}
+          </div>
 
         </div>
 
       </div>
 
-    </article>
+
+      <div class="profile-stat-grid">
+
+        <div class="profile-stat-box">
+
+          <div class="profile-stat-label">
+            Followers
+          </div>
+
+          <div class="profile-stat-value">
+            ${formatNumber(followers)}
+          </div>
+
+        </div>
 
 
-    <section class="profile-section">
+        <div class="profile-stat-box">
 
-      <div class="profile-section-title">
+          <div class="profile-stat-label">
+            Following
+          </div>
+
+          <div class="profile-stat-value">
+            ${formatNumber(following)}
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ====================================
+         CONTACT INFORMATION
+    ==================================== -->
+
+    <section class="profile-card">
+
+      <div class="profile-card-title">
+        Contact Information
+      </div>
+
+
+      <div class="profile-info-row">
+
+        <span class="profile-info-label">
+          Email:
+        </span>
+
+        <span class="profile-info-value">
+          ${escapeHtml(profile.email || "Not provided")}
+        </span>
+
+      </div>
+
+
+      <div class="profile-info-row">
+
+        <span class="profile-info-label">
+          Phone:
+        </span>
+
+        <span class="profile-info-value">
+          ${escapeHtml(profile.phone || "Not provided")}
+        </span>
+
+      </div>
+
+    </section>
+
+
+    <!-- ====================================
+         REFERRAL INFORMATION
+    ==================================== -->
+
+    <section class="profile-card">
+
+      <div class="profile-card-title">
+        Referral Information
+      </div>
+
+
+      <div class="profile-info-row">
+
+        <span class="profile-info-label">
+          Referral Code:
+        </span>
+
+        <span class="profile-info-value">
+          ${escapeHtml(
+            profile.referralCode || "—"
+          )}
+        </span>
+
+      </div>
+
+
+      <div class="profile-info-row">
+
+        <span class="profile-info-label">
+          Referrals:
+        </span>
+
+        <span class="profile-info-value">
+          ${formatNumber(
+            profile.referralCount ||
+            profile.referralsCount ||
+            0
+          )}
+        </span>
+
+      </div>
+
+
+      ${
+        isOwnProfile
+
+          ? `
+
+            <button
+              id="referEarnBtn"
+              class="profile-earn-btn"
+              type="button"
+            >
+              Refer & Earn
+            </button>
+
+          `
+
+          : ""
+      }
+
+    </section>
+
+
+    <!-- ====================================
+         STORIES
+    ==================================== -->
+
+    <section class="profile-card profile-stories-card">
+
+      <div class="profile-card-title">
         Stories
       </div>
+
 
       <div class="profile-empty">
         No stories available yet.
@@ -441,11 +780,51 @@ function renderProfile(profile) {
 
 
   /* ========================================
-     CHAT
+     PHOTO UPLOAD EVENTS
+  ======================================== */
+
+  if (isOwnProfile) {
+
+    const uploadButton =
+      $("profilePhotoUploadBtn");
+
+
+    const photoInput =
+      $("profilePhotoInput");
+
+
+    if (
+      uploadButton &&
+      photoInput
+    ) {
+
+      uploadButton.addEventListener(
+        "click",
+        () => {
+
+          photoInput.click();
+
+        }
+      );
+
+
+      photoInput.addEventListener(
+        "change",
+        handleProfilePhotoUpload
+      );
+
+    }
+
+  }
+
+
+  /* ========================================
+     CHAT BUTTON
   ======================================== */
 
   const chatButton =
     $("chatProfileBtn");
+
 
   if (chatButton) {
 
@@ -454,7 +833,9 @@ function renderProfile(profile) {
       () => {
 
         location.href =
-          `chat.html?uid=${encodeURIComponent(profile.uid)}`;
+          `chat.html?uid=${encodeURIComponent(
+            profile.uid
+          )}`;
 
       }
     );
@@ -463,38 +844,12 @@ function renderProfile(profile) {
 
 
   /* ========================================
-     EDIT PROFILE
-  ======================================== */
-
-  const editButton =
-    $("editProfileBtn");
-
-  if (editButton) {
-
-    editButton.addEventListener(
-      "click",
-      () => {
-
-        /*
-         * Profile editing will be connected
-         * to the photo/bio editor next.
-         */
-        alert(
-          "Profile editing will be available here."
-        );
-
-      }
-    );
-
-  }
-
-
-  /* ========================================
-     VERIFY ACCOUNT
+     VERIFY BUTTON
   ======================================== */
 
   const verifyButton =
     $("verifyAccountBtn");
+
 
   if (verifyButton) {
 
@@ -504,6 +859,245 @@ function renderProfile(profile) {
     );
 
   }
+
+
+  /* ========================================
+     REFER & EARN
+  ======================================== */
+
+  const referEarnButton =
+    $("referEarnBtn");
+
+
+  if (referEarnButton) {
+
+    referEarnButton.addEventListener(
+      "click",
+      () => {
+
+        location.href =
+          "referrals.html";
+
+      }
+    );
+
+  }
+
+}
+
+
+/* ========================================
+   PROFILE PHOTO UPLOAD
+======================================== */
+
+async function handleProfilePhotoUpload(
+  event
+) {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  const file =
+    event.target.files?.[0];
+
+
+  if (!file) {
+    return;
+  }
+
+
+  const status =
+    $("profileUploadStatus");
+
+
+  /*
+   * Basic file validation.
+   */
+
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp"
+  ];
+
+
+  if (!allowedTypes.includes(file.type)) {
+
+    if (status) {
+
+      status.textContent =
+        "Please choose a JPG, PNG or WebP image.";
+
+      status.className =
+        "profile-upload-status error";
+
+    }
+
+
+    event.target.value = "";
+
+    return;
+
+  }
+
+
+  /*
+   * Keep profile images reasonably small.
+   */
+
+  if (file.size > 5 * 1024 * 1024) {
+
+    if (status) {
+
+      status.textContent =
+        "Photo must be smaller than 5MB.";
+
+      status.className =
+        "profile-upload-status error";
+
+    }
+
+
+    event.target.value = "";
+
+    return;
+
+  }
+
+
+  if (status) {
+
+    status.textContent =
+      "Uploading photo...";
+
+    status.className =
+      "profile-upload-status";
+
+  }
+
+
+  try {
+
+    /*
+     * Store the image under the authenticated
+     * user's own folder.
+     */
+
+    const extension =
+      file.name
+        .split(".")
+        .pop()
+        .toLowerCase();
+
+
+    const photoRef =
+      ref(
+        storage,
+        `profilePhotos/${currentUser.uid}/profile.${extension}`
+      );
+
+
+    const snapshot =
+      await uploadBytes(
+        photoRef,
+        file,
+        {
+          contentType: file.type
+        }
+      );
+
+
+    const photoURL =
+      await getDownloadURL(
+        snapshot.ref
+      );
+
+
+    /*
+     * Update Firebase Authentication profile.
+     */
+
+    await updateProfile(
+      currentUser,
+      {
+        photoURL
+      }
+    );
+
+
+    /*
+     * Update Firestore profile.
+     */
+
+    await updateDoc(
+      doc(
+        db,
+        "users",
+        currentUser.uid
+      ),
+      {
+        photoURL
+      }
+    );
+
+
+    /*
+     * Update local profile immediately.
+     */
+
+    if (viewedUser) {
+
+      viewedUser.photoURL =
+        photoURL;
+
+    }
+
+
+    if (status) {
+
+      status.textContent =
+        "Profile photo updated successfully.";
+
+      status.className =
+        "profile-upload-status success";
+
+    }
+
+
+    /*
+     * Reload profile so the new image
+     * appears immediately.
+     */
+
+    await loadProfile(
+      currentUser.uid
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Profile photo upload error:",
+      error
+    );
+
+
+    if (status) {
+
+      status.textContent =
+        "Unable to upload photo. Please try again.";
+
+      status.className =
+        "profile-upload-status error";
+
+    }
+
+  }
+
+
+  event.target.value = "";
 
 }
 
@@ -516,6 +1110,7 @@ async function loadProfile(uid) {
 
   const container =
     $("profileContainer");
+
 
   if (!container) {
     return;
@@ -534,11 +1129,17 @@ async function loadProfile(uid) {
   try {
 
     const profileRef =
-      doc(db, "users", uid);
+      doc(
+        db,
+        "users",
+        uid
+      );
 
 
     const snapshot =
-      await getDoc(profileRef);
+      await getDoc(
+        profileRef
+      );
 
 
     if (!snapshot.exists()) {
@@ -552,12 +1153,16 @@ async function loadProfile(uid) {
       `;
 
       return;
+
     }
 
 
     renderProfile({
+
       uid,
+
       ...snapshot.data()
+
     });
 
 
@@ -596,14 +1201,17 @@ function openVerificationModal() {
     );
 
     return;
+
   }
 
 
   const modal =
     $("verificationModal");
 
+
   const phoneInput =
     $("verificationPhone");
+
 
   const message =
     $("verificationMessage");
@@ -614,14 +1222,18 @@ function openVerificationModal() {
   }
 
 
-  message.textContent = "";
-  message.className =
-    "verification-message";
+  if (message) {
+
+    message.textContent = "";
+
+    message.className =
+      "verification-message";
+
+  }
 
 
   /*
-   * Use the phone saved in the user's
-   * CONNECTA profile as the default.
+   * Use the phone stored in the profile.
    */
 
   if (
@@ -638,19 +1250,23 @@ function openVerificationModal() {
 
   modal.classList.add("show");
 
+
   modal.setAttribute(
     "aria-hidden",
     "false"
   );
 
 
-  setTimeout(() => {
+  setTimeout(
+    () => {
 
-    if (phoneInput) {
-      phoneInput.focus();
-    }
+      if (phoneInput) {
+        phoneInput.focus();
+      }
 
-  }, 100);
+    },
+    100
+  );
 
 }
 
@@ -664,12 +1280,14 @@ function closeVerificationModal() {
   const modal =
     $("verificationModal");
 
+
   if (!modal) {
     return;
   }
 
 
   modal.classList.remove("show");
+
 
   modal.setAttribute(
     "aria-hidden",
@@ -712,6 +1330,7 @@ function normalizePhone(phone) {
 
 
   return value;
+
 }
 
 
@@ -738,6 +1357,7 @@ function setVerificationMessage(
   const element =
     $("verificationMessage");
 
+
   if (!element) {
     return;
   }
@@ -754,7 +1374,7 @@ function setVerificationMessage(
 
 
 /* ========================================
-   VERIFY ACCOUNT
+   START VERIFICATION
 ======================================== */
 
 async function startVerification() {
@@ -779,8 +1399,13 @@ async function startVerification() {
     $("verificationSubmit");
 
 
-  if (!phoneInput || !submitButton) {
+  if (
+    !phoneInput ||
+    !submitButton
+  ) {
+
     return;
+
   }
 
 
@@ -797,13 +1422,17 @@ async function startVerification() {
       "error"
     );
 
+
     phoneInput.focus();
 
     return;
+
   }
 
 
-  submitButton.disabled = true;
+  submitButton.disabled =
+    true;
+
 
   submitButton.textContent =
     "Starting payment...";
@@ -832,8 +1461,11 @@ async function startVerification() {
           method: "POST",
 
           headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
+            "Content-Type":
+              "application/json",
+
+            "Authorization":
+              `Bearer ${token}`
           },
 
           body: JSON.stringify({
@@ -844,8 +1476,11 @@ async function startVerification() {
 
 
     const data =
-      await response.json()
-        .catch(() => ({}));
+      await response
+        .json()
+        .catch(
+          () => ({})
+        );
 
 
     if (!response.ok) {
@@ -880,7 +1515,8 @@ async function startVerification() {
 
 
     /*
-     * Begin checking payment status.
+     * The backend normally returns
+     * the verification reference.
      */
 
     if (data.reference) {
@@ -889,13 +1525,19 @@ async function startVerification() {
         data.reference
       );
 
-    } else if (data.checkout_request_id) {
+    }
+
+    else if (
+      data.checkout_request_id
+    ) {
 
       startVerificationPolling(
         data.checkout_request_id
       );
 
-    } else {
+    }
+
+    else {
 
       throw new Error(
         "Payment started but no payment reference was returned."
@@ -919,7 +1561,9 @@ async function startVerification() {
     );
 
 
-    submitButton.disabled = false;
+    submitButton.disabled =
+      false;
+
 
     submitButton.textContent =
       `Pay KSh ${VERIFICATION_AMOUNT} & Verify`;
@@ -942,12 +1586,15 @@ function startVerificationPolling(
   }
 
 
-  verificationPolling = true;
+  verificationPolling =
+    true;
 
 
   let attempts = 0;
 
-  const maxAttempts = 40;
+
+  const maxAttempts =
+    40;
 
 
   clearInterval(
@@ -976,47 +1623,55 @@ function startVerificationPolling(
               verificationPollTimer
             );
 
+
             verificationPollTimer =
               null;
 
+
             verificationPolling =
               false;
+
 
             return;
 
           }
 
 
-          if (attempts >= maxAttempts) {
+          if (
+            attempts >= maxAttempts
+          ) {
 
             clearInterval(
               verificationPollTimer
             );
 
+
             verificationPollTimer =
               null;
+
 
             verificationPolling =
               false;
 
 
-            const submitButton =
+            const button =
               $("verificationSubmit");
 
 
-            if (submitButton) {
+            if (button) {
 
-              submitButton.disabled =
+              button.disabled =
                 false;
 
-              submitButton.textContent =
+
+              button.textContent =
                 `Pay KSh ${VERIFICATION_AMOUNT} & Verify`;
 
             }
 
 
             setVerificationMessage(
-              "We are still waiting for payment confirmation. If you completed the payment, please wait a little and check your profile again.",
+              "Payment confirmation is taking longer than expected. Please check your profile again shortly.",
               "pending"
             );
 
@@ -1031,35 +1686,34 @@ function startVerificationPolling(
           );
 
 
-          /*
-           * Do not immediately fail the payment
-           * because a temporary network error
-           * may occur.
-           */
-
-          if (attempts >= maxAttempts) {
+          if (
+            attempts >= maxAttempts
+          ) {
 
             clearInterval(
               verificationPollTimer
             );
 
+
             verificationPollTimer =
               null;
+
 
             verificationPolling =
               false;
 
 
-            const submitButton =
+            const button =
               $("verificationSubmit");
 
 
-            if (submitButton) {
+            if (button) {
 
-              submitButton.disabled =
+              button.disabled =
                 false;
 
-              submitButton.textContent =
+
+              button.textContent =
                 `Pay KSh ${VERIFICATION_AMOUNT} & Verify`;
 
             }
@@ -1075,6 +1729,7 @@ function startVerificationPolling(
         }
 
       },
+
       3000
     );
 
@@ -1100,8 +1755,11 @@ async function checkVerificationStatus(
         method: "POST",
 
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          "Content-Type":
+            "application/json",
+
+          "Authorization":
+            `Bearer ${token}`
         },
 
         body: JSON.stringify({
@@ -1112,8 +1770,11 @@ async function checkVerificationStatus(
 
 
   const data =
-    await response.json()
-      .catch(() => ({}));
+    await response
+      .json()
+      .catch(
+        () => ({})
+      );
 
 
   if (!response.ok) {
@@ -1128,7 +1789,7 @@ async function checkVerificationStatus(
 
 
   /*
-   * PAYMENT COMPLETED
+   * COMPLETED
    */
 
   if (
@@ -1145,37 +1806,34 @@ async function checkVerificationStatus(
     );
 
 
-    const submitButton =
+    const button =
       $("verificationSubmit");
 
 
-    if (submitButton) {
+    if (button) {
 
-      submitButton.disabled =
+      button.disabled =
         true;
 
-      submitButton.textContent =
+
+      button.textContent =
         "✓ Account Verified";
 
     }
 
-
-    /*
-     * Reload the profile from Firestore.
-     * The backend is responsible for setting
-     * isVerified = true.
-     */
 
     setTimeout(
       async () => {
 
         closeVerificationModal();
 
+
         await loadProfile(
           currentUser.uid
         );
 
       },
+
       1200
     );
 
@@ -1186,7 +1844,7 @@ async function checkVerificationStatus(
 
 
   /*
-   * PAYMENT FAILED
+   * FAILED
    */
 
   if (
@@ -1200,16 +1858,17 @@ async function checkVerificationStatus(
     );
 
 
-    const submitButton =
+    const button =
       $("verificationSubmit");
 
 
-    if (submitButton) {
+    if (button) {
 
-      submitButton.disabled =
+      button.disabled =
         false;
 
-      submitButton.textContent =
+
+      button.textContent =
         `Pay KSh ${VERIFICATION_AMOUNT} & Verify`;
 
     }
@@ -1221,7 +1880,7 @@ async function checkVerificationStatus(
 
 
   /*
-   * STILL PENDING
+   * PENDING
    */
 
   setVerificationMessage(
@@ -1270,7 +1929,7 @@ if (backButton) {
 
 
 /* ========================================
-   MODAL EVENTS
+   VERIFICATION CLOSE
 ======================================== */
 
 const verificationClose =
@@ -1286,6 +1945,10 @@ if (verificationClose) {
 
 }
 
+
+/* ========================================
+   CLOSE MODAL BY BACKDROP
+======================================== */
 
 const verificationModal =
   $("verificationModal");
@@ -1312,7 +1975,7 @@ if (verificationModal) {
 
 
 /* ========================================
-   VERIFY SUBMIT
+   VERIFICATION SUBMIT
 ======================================== */
 
 const verificationSubmit =
@@ -1337,7 +2000,8 @@ onAuthStateChanged(
   auth,
   async user => {
 
-    currentUser = user;
+    currentUser =
+      user;
 
 
     if (!user) {
@@ -1352,8 +2016,18 @@ onAuthStateChanged(
 
 
     /*
-     * If ?uid= is present, show that user's
-     * profile. Otherwise show own profile.
+     * Mark the authenticated user online.
+     *
+     * This fixes the situation where the
+     * profile was showing Offline even though
+     * the user is currently logged in.
+     */
+
+    await markCurrentUserOnline();
+
+
+    /*
+     * Determine which profile to display.
      */
 
     const requestedUid =
