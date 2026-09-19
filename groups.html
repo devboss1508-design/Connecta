@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  >
+
+  <meta
+    name="theme-color"
+    content="#22C55E"
+  >
+
+  <meta
+    name="description"
+    content="CONNECTA Groups — Discover, create and join communities."
+  >
+
+  <title>Groups — CONNECTA</title>
+
+  <link
+    rel="stylesheet"
+    href="css/main.css"
+  >
+
+  <link
+    rel="stylesheet"
+    href="css/dashboard.css"
+  >
+
+  <style>
+
+/* =========================================================
+   CONNECTA GROUPS PAGE
+========================================================= */
+
+.groups-page {
+  padding-bottom: 95px;
+}
+
+
+/* =========================================================
+   GROUP HERO
+========================================================= */
+
+.groups-hero {
+  margin: 16px;
+  padding: 22px;
+  border-radius: 22px;
+  background: linear-gradient(
+    135deg,
+    #ecfdf5,
+    #ffffff
+  );
+  border: 1px solid #d1fae5;
+}
+
+.groups-hero .eyebrow {
+  display: block;
+  color: #16a34a;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+}
+
+.groups-hero h1 {
+  margin: 0;
+  color: #166534;
+  font-size: 26px;
+}
+
+.groups-hero p {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   CREATE GROUP BUTTON
+========================================================= */
+
+.create-group-btn {
+  width: calc(100% - 32px);
+  margin: 0 16px 16px;
+  min-height: 52px;
+  border: 0;
+  border-radius: 16px;
+  background: #22c55e;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.20);
+}
+
+.create-group-btn:active {
+  transform: scale(0.98);
+}
+
+
+/* =========================================================
+   TABS
+========================================================= */
+
+.groups-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 16px 16px;
+  padding: 5px;
+  border-radius: 15px;
+  background: #f0fdf4;
+}
+
+.groups-tab {
+  flex: 1;
+  min-height: 42px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.groups-tab.active {
+  background: #ffffff;
+  color: #16a34a;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+
+/* =========================================================
+   SEARCH
+========================================================= */
+
+.groups-search {
+  margin: 0 16px 16px;
+}
+
+.groups-search input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 14px;
+  outline: none;
+}
+
+.groups-search input:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.10);
+}
+
+
+/* =========================================================
+   SECTION
+========================================================= */
+
+.groups-section {
+  margin: 0 16px 18px;
+}
+
+.groups-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.groups-section-header h2 {
+  margin: 0;
+  color: #166534;
+  font-size: 19px;
+}
+
+.groups-section-header span {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   GROUP CARD
+========================================================= */
+
+.group-card {
+  display: flex;
+  gap: 13px;
+  padding: 15px;
+  margin-bottom: 11px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+}
+
+.group-avatar {
+  width: 58px;
+  height: 58px;
+  min-width: 58px;
+  border-radius: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 21px;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.group-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.group-content {
+  min-width: 0;
+  flex: 1;
+}
+
+.group-name-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.group-name {
+  margin: 0;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-description {
+  margin: 5px 0;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.group-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.group-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.group-badge.private {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.group-badge.paid {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.group-members {
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   GROUP ACTION
+========================================================= */
+
+.group-action {
+  display: flex;
+  align-items: center;
+}
+
+.group-action button {
+  min-width: 72px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: #22c55e;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.group-action button.secondary {
+  background: #ecfdf5;
+  color: #15803d;
+}
+
+.group-action button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+.groups-empty {
+  padding: 35px 20px;
+  text-align: center;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px dashed #d1d5db;
+}
+
+.groups-empty-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.groups-empty strong {
+  display: block;
+  color: #374151;
+  font-size: 14px;
+}
+
+.groups-empty p {
+  margin: 6px 0 0;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+
+/* =========================================================
+   CREATE GROUP MODAL
+========================================================= */
+
+.group-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0,0,0,0.48);
+}
+
+.group-modal.open {
+  display: flex;
+}
+
+.group-modal-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 22px;
+  border-radius: 25px 25px 0 0;
+  background: #ffffff;
+}
+
+.group-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.group-modal-header h2 {
+  margin: 0;
+  color: #166534;
+  font-size: 20px;
+}
+
+.group-close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+
+/* =========================================================
+   FORM
+========================================================= */
+
+.group-form-group {
+  margin-bottom: 15px;
+}
+
+.group-form-group label {
+  display: block;
+  margin-bottom: 7px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.group-form-group input,
+.group-form-group textarea,
+.group-form-group select {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 13px;
+  padding: 12px 13px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 14px;
+  outline: none;
+}
+
+.group-form-group textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.group-form-group input:focus,
+.group-form-group textarea:focus,
+.group-form-group select:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.10);
+}
+
+
+/* =========================================================
+   GROUP TYPE CARDS
+========================================================= */
+
+.group-type-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.group-type-option {
+  position: relative;
+}
+
+.group-type-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.group-type-label {
+  display: block;
+  padding: 14px;
+  border: 2px solid #e5e7eb;
+  border-radius: 15px;
+  cursor: pointer;
+}
+
+.group-type-option input:checked + .group-type-label {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+
+.group-type-label strong {
+  display: block;
+  color: #166534;
+  font-size: 14px;
+}
+
+.group-type-label small {
+  display: block;
+  margin-top: 5px;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+
+/* =========================================================
+   PAYMENT SECTION
+========================================================= */
+
+.subscription-box {
+  display: none;
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 15px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.subscription-box.show {
+  display: block;
+}
+
+.subscription-box p {
+  margin: 0 0 10px;
+  color: #1e40af;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+
+/* =========================================================
+   VERIFICATION NOTICE
+========================================================= */
+
+.creator-verification-notice {
+  display: flex;
+  gap: 10px;
+  padding: 13px;
+  margin-bottom: 17px;
+  border-radius: 15px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.creator-verification-notice .notice-icon {
+  font-size: 19px;
+}
+
+.creator-verification-notice strong {
+  display: block;
+  color: #1e40af;
+  font-size: 13px;
+}
+
+.creator-verification-notice p {
+  margin: 4px 0 0;
+  color: #3b82f6;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+
+/* =========================================================
+   MODAL ACTIONS
+========================================================= */
+
+.group-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.group-form-actions button {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 13px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.group-cancel-btn {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+}
+
+.group-submit-btn {
+  border: 0;
+  background: #22c55e;
+  color: #ffffff;
+}
+
+
+/* =========================================================
+   PENDING REVIEW CARD
+========================================================= */
+
+.pending-group {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.pending-badge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+
+/* =========================================================
+   ACCESS NOTICE
+========================================================= */
+
+.access-notice {
+  display: none;
+  padding: 12px 14px;
+  margin-bottom: 15px;
+  border-radius: 14px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.access-notice.show {
+  display: block;
+}
+
+
+/* =========================================================
+   TOAST
+========================================================= */
+
+.groups-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 90px;
+  z-index: 7000;
+  max-width: calc(100% - 32px);
+  padding: 12px 17px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  transform: translate(-50%, 20px);
+  opacity: 0;
+  pointer-events: none;
+  transition: 0.25s ease;
+}
+
+.groups-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (min-width: 700px) {
+
+  .group-modal {
+    align-items: center;
+    padding: 20px;
+  }
+
+  .group-modal-card {
+    border-radius: 25px;
+  }
+
+}
+
+  </style>
+
+</head>
+
+
+<body class="app-page">
+
+
+<!-- =======================================================
+     HEADER
+======================================================== -->
+
+<header class="app-header">
+
+  <button
+    class="icon-btn"
+    id="menuBtn"
+    aria-label="Open menu"
+  >
+    ☰
+  </button>
+
+
+  <a
+    class="header-brand"
+    href="dashboard.html"
+  >
+    CONNECTA
+  </a>
+
+
+  <div class="header-right">
+
+    <div
+      class="balance"
+      id="balancePill"
+    >
+      KSh.
+      <span id="balanceAmount">
+        0.00
+      </span>
+    </div>
+
+
+    <button
+      class="connection-btn"
+      id="connectionBtn"
+    >
+      Get Connection
+    </button>
+
+
+    <button
+      class="profile-btn"
+      id="profileBtn"
+      aria-label="Open profile"
+    >
+      U
+    </button>
+
+  </div>
+
+</header>
+
+
+<!-- =======================================================
+     SIDE MENU
+======================================================== -->
+
+<aside
+  class="side-menu"
+  id="sideMenu"
+  aria-hidden="true"
+>
+
+  <div class="menu-brand">
+    <span class="brand-mark">C</span>
+    CONNECTA
+  </div>
+
+
+  <div class="menu-user">
+
+    <div
+      class="avatar"
+      id="menuAvatar"
+    >
+      U
+    </div>
+
+    <div>
+
+      <strong id="menuName">
+        CONNECTA User
+      </strong>
+
+      <small id="menuUsername">
+        @username
+      </small>
+
+    </div>
+
+  </div>
+
+
+  <a href="dashboard.html">
+    💬
+    <span>Chats</span>
+  </a>
+
+
+  <a
+    class="active"
+    href="groups.html"
+  >
+    👥
+    <span>Groups</span>
+  </a>
+
+
+  <a
+    href="#"
+    data-coming="Stories"
+  >
+    ◉
+    <span>Stories</span>
+  </a>
+
+
+  <a
+    href="#"
+    data-coming="Friends"
+  >
+    👤
+    <span>Friends</span>
+  </a>
+
+
+  <a
+    href="#"
+    data-coming="Online Users"
+  >
+    🟢
+    <span>Online Users</span>
+  </a>
+
+
+  <a
+    href="verification.html"
+  >
+    ✓
+    <span>Verification</span>
+  </a>
+
+
+  <a
+    href="referrals.html"
+  >
+    🎁
+    <span>Refer & Earn</span>
+  </a>
+
+
+  <a
+    href="#"
+    data-coming="Settings"
+  >
+    ⚙
+    <span>Settings</span>
+  </a>
+
+
+  <button
+    id="logoutBtn"
+    class="logout-link"
+  >
+    ↪
+    <span>Logout</span>
+  </button>
+
+</aside>
+
+
+<div
+  class="menu-overlay"
+  id="menuOverlay"
+></div>
+
+
+<!-- =======================================================
+     MAIN
+======================================================== -->
+
+<main class="groups-page">
+
+
+  <!-- =====================================================
+       HERO
+  ====================================================== -->
+
+  <section class="groups-hero">
+
+    <span class="eyebrow">
+      CONNECTA COMMUNITY
+    </span>
+
+    <h1>
+      Discover Groups
+    </h1>
+
+    <p>
+      Join communities, meet people and share
+      conversations around topics you care about.
+    </p>
+
+  </section>
+
+
+  <!-- =====================================================
+       CREATE GROUP
+  ====================================================== -->
+
+  <button
+    class="create-group-btn"
+    id="createGroupBtn"
+  >
+    + Create a Group
+  </button>
+
+
+  <!-- =====================================================
+       TABS
+  ====================================================== -->
+
+  <div
+    class="groups-tabs"
+    role="tablist"
+  >
+
+    <button
+      class="groups-tab active"
+      id="discoverTab"
+      data-tab="discover"
+      role="tab"
+    >
+      Discover
+    </button>
+
+
+    <button
+      class="groups-tab"
+      id="myGroupsTab"
+      data-tab="mine"
+      role="tab"
+    >
+      My Groups
+    </button>
+
+  </div>
+
+
+  <!-- =====================================================
+       SEARCH
+  ====================================================== -->
+
+  <div class="groups-search">
+
+    <input
+      type="search"
+      id="groupSearch"
+      placeholder="Search groups..."
+      autocomplete="off"
+    >
+
+  </div>
+
+
+  <!-- =====================================================
+       DISCOVER GROUPS
+  ====================================================== -->
+
+  <section
+    class="groups-section"
+    id="discoverSection"
+  >
+
+    <div class="groups-section-header">
+
+      <h2>
+        Public Groups
+      </h2>
+
+      <span id="publicGroupCount">
+        0 groups
+      </span>
+
+    </div>
+
+
+    <div id="publicGroups">
+
+      <div class="groups-empty">
+
+        <div class="groups-empty-icon">
+          👥
+        </div>
+
+        <strong>
+          Loading groups...
+        </strong>
+
+        <p>
+          Finding approved CONNECTA communities.
+        </p>
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       MY GROUPS
+  ====================================================== -->
+
+  <section
+    class="groups-section"
+    id="mineSection"
+    hidden
+  >
+
+    <div class="groups-section-header">
+
+      <h2>
+        My Groups
+      </h2>
+
+      <span id="myGroupCount">
+        0 groups
+      </span>
+
+    </div>
+
+
+    <div id="myGroups">
+
+      <div class="groups-empty">
+
+        <div class="groups-empty-icon">
+          👥
+        </div>
+
+        <strong>
+          You haven't joined any groups yet.
+        </strong>
+
+        <p>
+          Groups you join or create will appear here.
+        </p>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</main>
+
+
+<!-- =======================================================
+     BOTTOM NAV
+======================================================== -->
+
+<nav
+  class="bottom-nav"
+  aria-label="Main navigation"
+>
+
+  <a href="dashboard.html">
+
+    <span>▢</span>
+
+    <small>
+      Chats
+    </small>
+
+  </a>
+
+
+  <a
+    class="active"
+    href="groups.html"
+  >
+
+    <span>♧</span>
+
+    <small>
+      Groups
+    </small>
+
+    <b
+      id="groupBadge"
+      hidden
+    >
+      0
+    </b>
+
+  </a>
+
+
+  <a
+    href="#"
+    data-coming="Stories"
+  >
+
+    <span>◉</span>
+
+    <small>
+      Stories
+    </small>
+
+  </a>
+
+
+  <a
+    href="#"
+    data-coming="Friends"
+  >
+
+    <span>♙</span>
+
+    <small>
+      Friends
+    </small>
+
+  </a>
+
+
+  <a
+    href="referrals.html"
+  >
+
+    <span>🎁</span>
+
+    <small>
+      Earn
+    </small>
+
+  </a>
+
+</nav>
+
+
+<!-- =======================================================
+     CREATE GROUP MODAL
+======================================================== -->
+
+<div
+  class="group-modal"
+  id="groupModal"
+  aria-hidden="true"
+>
+
+  <div
+    class="group-modal-card"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="createGroupTitle"
+  >
+
+
+    <div class="group-modal-header">
+
+      <h2 id="createGroupTitle">
+        Create Group
+      </h2>
+
+
+      <button
+        class="group-close"
+        id="closeGroupModal"
+        type="button"
+        aria-label="Close"
+      >
+        ×
+      </button>
+
+    </div>
+
+
+    <!-- =================================================
+         CREATOR VERIFICATION NOTICE
+    ================================================== -->
+
+    <div class="creator-verification-notice">
+
+      <div class="notice-icon">
+        ✓
+      </div>
+
+      <div>
+
+        <strong>
+          Verified accounts only
+        </strong>
+
+        <p>
+          Only verified CONNECTA users can create
+          groups. Every new group must be reviewed
+          and approved by an administrator before
+          it becomes publicly available.
+        </p>
+
+      </div>
+
+    </div>
+
+
+    <!-- =================================================
+         ACCESS NOTICE
+    ================================================== -->
+
+    <div
+      class="access-notice"
+      id="groupAccessNotice"
+    ></div>
+
+
+    <!-- =================================================
+         CREATE FORM
+    ================================================== -->
+
+    <form
+      id="createGroupForm"
+      novalidate
+    >
+
+
+      <!-- GROUP NAME -->
+
+      <div class="group-form-group">
+
+        <label for="groupName">
+          Group Name
+        </label>
+
+        <input
+          id="groupName"
+          name="groupName"
+          type="text"
+          maxlength="80"
+          placeholder="e.g. CONNECTA Business Hub"
+          autocomplete="off"
+          required
+        >
+
+      </div>
+
+
+      <!-- DESCRIPTION -->
+
+      <div class="group-form-group">
+
+        <label for="groupDescription">
+          Description
+        </label>
+
+        <textarea
+          id="groupDescription"
+          name="groupDescription"
+          maxlength="500"
+          placeholder="Tell people what this group is about..."
+          required
+        ></textarea>
+
+      </div>
+
+
+      <!-- GROUP TYPE -->
+
+      <div class="group-form-group">
+
+        <label>
+          Group Type
+        </label>
+
+
+        <div class="group-type-options">
+
+
+          <!-- PUBLIC -->
+
+          <div class="group-type-option">
+
+            <input
+              type="radio"
+              id="publicGroup"
+              name="groupType"
+              value="public"
+              checked
+            >
+
+            <label
+              class="group-type-label"
+              for="publicGroup"
+            >
+
+              <strong>
+                🌍 Public
+              </strong>
+
+              <small>
+                All CONNECTA users can join
+                after the group is approved.
+              </small>
+
+            </label>
+
+          </div>
+
+
+          <!-- PRIVATE -->
+
+          <div class="group-type-option">
+
+            <input
+              type="radio"
+              id="privateGroup"
+              name="groupType"
+              value="private"
+            >
+
+            <label
+              class="group-type-label"
+              for="privateGroup"
+            >
+
+              <strong>
+                🔒 Private
+              </strong>
+
+              <small>
+                Only verified CONNECTA users
+                can join.
+              </small>
+
+            </label>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- SUBSCRIPTION -->
+
+      <div class="group-form-group">
+
+        <label for="subscriptionEnabled">
+          Subscription
+        </label>
+
+
+        <select
+          id="subscriptionEnabled"
+          name="subscriptionEnabled"
+        >
+
+          <option value="false">
+            Free — No subscription fee
+          </option>
+
+          <option value="true">
+            Paid — Require subscription
+          </option>
+
+        </select>
+
+
+        <div
+          class="subscription-box"
+          id="subscriptionBox"
+        >
+
+          <p>
+            Users will be required to complete
+            payment before joining this group.
+            Paid private groups are restricted
+            to verified users.
+          </p>
+
+
+          <label
+            for="subscriptionFee"
+            style="
+              display:block;
+              margin-bottom:7px;
+              color:#1e40af;
+              font-size:12px;
+              font-weight:800;
+            "
+          >
+            Subscription Fee (KSh)
+          </label>
+
+
+          <input
+            id="subscriptionFee"
+            name="subscriptionFee"
+            type="number"
+            min="1"
+            max="100000"
+            step="1"
+            placeholder="e.g. 100"
+          >
+
+        </div>
+
+      </div>
+
+
+      <!-- SUBMISSION NOTICE -->
+
+      <div
+        style="
+          padding:12px 14px;
+          border-radius:14px;
+          background:#f0fdf4;
+          border:1px solid #bbf7d0;
+          color:#166534;
+          font-size:11px;
+          line-height:1.5;
+        "
+      >
+
+        <strong>
+          Admin review required.
+        </strong>
+
+        Your group will initially be marked
+        <strong>Pending Review</strong>.
+        It will not be published to the public
+        Groups directory until an administrator
+        approves it.
+
+      </div>
+
+
+      <!-- ACTIONS -->
+
+      <div class="group-form-actions">
+
+        <button
+          type="button"
+          class="group-cancel-btn"
+          id="cancelGroupBtn"
+        >
+          Cancel
+        </button>
+
+
+        <button
+          type="submit"
+          class="group-submit-btn"
+          id="submitGroupBtn"
+        >
+          Submit for Review
+        </button>
+
+      </div>
+
+
+    </form>
+
+  </div>
+
+</div>
+
+
+<!-- =======================================================
+     TOAST
+======================================================== -->
+
+<div
+  class="groups-toast"
+  id="groupsToast"
+  role="status"
+  aria-live="polite"
+></div>
+
+
+<!-- =======================================================
+     JAVASCRIPT
+======================================================== -->
+
+<script
+  type="module"
+  src="js/groups.js"
+></script>
+
+
+</body>
+</html>
