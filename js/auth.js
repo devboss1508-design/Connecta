@@ -775,14 +775,22 @@ if (loginForm) {
         );
 
 
-      submit.disabled =
-        true;
+      if (submit) {
 
-      submit.textContent =
-        "Logging in...";
+        submit.disabled =
+          true;
+
+        submit.textContent =
+          "Logging in...";
+
+      }
 
 
       try {
+
+        /* ======================================
+           GET LOGIN VALUES
+        ====================================== */
 
         const email =
           $("loginIdentifier")
@@ -796,6 +804,10 @@ if (loginForm) {
             .value;
 
 
+        /* ======================================
+           VALIDATE EMAIL
+        ====================================== */
+
         if (!email.includes("@")) {
 
           throw new Error(
@@ -805,6 +817,10 @@ if (loginForm) {
         }
 
 
+        /* ======================================
+           FIREBASE LOGIN
+        ====================================== */
+
         const credential =
           await signInWithEmailAndPassword(
             auth,
@@ -813,57 +829,108 @@ if (loginForm) {
           );
 
 
+        /*
+        =================================================
+        LOGIN SUCCESSFUL
+        =================================================
+
+        Firebase Authentication has already
+        authenticated the user.
+
+        We DO NOT wait for Firestore here.
+
+        The dashboard can load immediately.
+        =================================================
+        */
+
+        const uid =
+          credential.user.uid;
+
+
+        /* ======================================
+           UPDATE ONLINE STATUS IN BACKGROUND
+        ====================================== */
+
         const userRef =
           doc(
             db,
             "users",
-            credential.user.uid
+            uid
           );
 
 
-        const profile =
-          await getDoc(
-            userRef
+        /*
+        IMPORTANT:
+
+        Do not await this.
+
+        It must not delay dashboard loading.
+        */
+
+        setDoc(
+          userRef,
+          {
+
+            isOnline:
+              true,
+
+            lastSeen:
+              serverTimestamp()
+
+          },
+          {
+            merge: true
+          }
+        ).catch(
+          error => {
+
+            console.warn(
+              "Background presence update failed:",
+              error
+            );
+
+          }
+        );
+
+
+        /* ======================================
+           SAVE BASIC SESSION DATA
+        ====================================== */
+
+        try {
+
+          localStorage.setItem(
+            "connectaLastUser",
+            JSON.stringify({
+
+              uid:
+                credential.user.uid,
+
+              email:
+                credential.user.email || "",
+
+              displayName:
+                credential.user.displayName || ""
+
+            })
           );
 
+        } catch (storageError) {
 
-        if (profile.exists()) {
-
-          await setDoc(
-            userRef,
-            {
-
-              isOnline:
-                true,
-
-              lastSeen:
-                serverTimestamp()
-
-            },
-            {
-              merge: true
-            }
+          console.warn(
+            "Session cache unavailable:",
+            storageError
           );
 
         }
 
 
-        showMessage(
-          "loginMessage",
-          "Login successful. Opening CONNECTA...",
-          true
-        );
+        /* ======================================
+           OPEN DASHBOARD IMMEDIATELY
+        ====================================== */
 
-
-        setTimeout(
-          () => {
-
-            location.replace(
-              "dashboard.html"
-            );
-
-          },
-          500
+        location.replace(
+          "dashboard.html"
         );
 
 
@@ -935,11 +1002,15 @@ if (loginForm) {
         );
 
 
-        submit.disabled =
-          false;
+        if (submit) {
 
-        submit.textContent =
-          "Login";
+          submit.disabled =
+            false;
+
+          submit.textContent =
+            "Login";
+
+        }
 
       }
 
