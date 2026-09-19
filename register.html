@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#22C55E">
+  <title>Create Account — CONNECTA</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/auth.css">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <a class="brand auth-brand" href="index.html"><span class="brand-mark">C</span> CONNECTA</a>
+    <section class="auth-card register-card">
+      <div class="auth-icon">C</div>
+      <h1>Create your account</h1>
+      <p>Join CONNECTA and start connecting.</p>
+      <form id="registerForm">
+        <div class="two-inputs">
+          <div><label>First name</label><input id="firstName" type="text" placeholder="First name" required></div>
+          <div><label>Last name</label><input id="lastName" type="text" placeholder="Last name" required></div>
+        </div>
+        <label>Username</label>
+        <input id="username" type="text" placeholder="@username" required>
+        <label>Email</label>
+        <input id="email" type="email" placeholder="you@example.com" required>
+        <label>Phone number</label>
+        <input id="phone" type="tel" placeholder="07XXXXXXXX" required>
+        <label>Password</label>
+        <div class="password-field"><input id="registerPassword" type="password" placeholder="Create a password" required minlength="6"><button type="button" class="show-password" data-target="registerPassword">Show</button></div>
+        <label class="check terms"><input type="checkbox" required> I agree to the CONNECTA terms and privacy policy.</label>
+        <button class="btn btn-primary full" type="submit">Create Account</button>
+        <div id="registerMessage" class="form-message"></div>
+      </form>
+      <p class="switch-text">Already have an account? <a href="login.html">Login</a></p>
+    </section>
+  </main>
+  <script src="js/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#22C55E">
+  <title>Login — CONNECTA</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/auth.css">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <a class="brand auth-brand" href="index.html"><span class="brand-mark">C</span> CONNECTA</a>
+    <section class="auth-card">
+      <div class="auth-icon">C</div>
+      <h1>Welcome back</h1>
+      <p>Login to continue to CONNECTA.</p>
+      <form id="loginForm">
+        <label>Email or phone</label>
+        <input id="loginIdentifier" type="text" placeholder="Enter email or phone" required>
+        <label>Password</label>
+        <div class="password-field"><input id="loginPassword" type="password" placeholder="Enter password" required><button type="button" class="show-password" data-target="loginPassword">Show</button></div>
+        <div class="form-row"><label class="check"><input type="checkbox"> Remember me</label><a href="#">Forgot password?</a></div>
+        <button class="btn btn-primary full" type="submit">Login</button>
+        <div id="loginMessage" class="form-message"></div>
+      </form>
+      <div class="divider"><span>or</span></div>
+      <p class="switch-text">Don't have an account? <a href="register.html">Create one</a></p>
+    </section>
+  </main>
+  <script src="js/auth.js"></script>
+</body>
+</html>
