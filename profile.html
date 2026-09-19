@@ -450,9 +450,15 @@
       }
 
       .profile-avatar-wrap {
-        width: 96px;
-        height: 96px;
-        margin-top: -48px;
+        position: relative;
+
+        width: 106px;
+        min-height: 106px;
+        height: 106px;
+
+        margin: -53px auto 0;
+
+        z-index: 3;
       }
 
       .profile-avatar {
@@ -471,6 +477,30 @@
       }
 
     }
+
+   @media (max-width: 600px) {
+
+  .profile-avatar-edit {
+    width: 96px;
+    height: 96px;
+  }
+
+  .profile-initials {
+    font-size: 28px;
+  }
+
+  .profile-photo-camera {
+    width: 31px;
+    height: 31px;
+    font-size: 14px;
+  }
+
+  .photo-upload-message {
+    top: 102px;
+    width: 200px;
+  }
+
+  }
 
   </style>
 
