@@ -198,21 +198,32 @@
       color: #17201b;
     }
 
+    /* ========================================
+       BLUE VERIFIED BADGE
+    ======================================== */
+
     .verified-badge {
-      width: 19px;
-      height: 19px;
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
 
       border-radius: 50%;
 
-      background: #2196f3;
+      background: #1d9bf0;
 
       color: #fff;
 
-      display: inline-grid;
-      place-items: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
 
       font-size: 12px;
       font-weight: 900;
+
+      line-height: 1;
+
+      box-shadow:
+        0 1px 3px rgba(0,0,0,.15);
     }
 
     .profile-username {
@@ -325,23 +336,25 @@
     }
 
     /* ========================================
-       CHAT BUTTON
+       ACTIONS
     ======================================== */
 
     .profile-actions {
       padding: 17px 18px 4px;
+
+      display: grid;
+      gap: 9px;
     }
 
     .profile-chat-btn,
-    .profile-edit-btn {
+    .profile-edit-btn,
+    .profile-verify-btn {
       width: 100%;
 
-      height: 46px;
+      min-height: 46px;
 
       border: 0;
       border-radius: 24px;
-
-      background: var(--primary);
 
       color: #fff;
 
@@ -353,14 +366,46 @@
       transition: .15s;
     }
 
-    .profile-chat-btn:active,
-    .profile-edit-btn:active {
-      transform: scale(.98);
+    .profile-chat-btn {
+      background: var(--primary);
     }
 
     .profile-edit-btn {
       background: #eefbf1;
       color: var(--primary-dark);
+    }
+
+    .profile-verify-btn {
+      background: #1d9bf0;
+    }
+
+    .profile-chat-btn:active,
+    .profile-edit-btn:active,
+    .profile-verify-btn:active {
+      transform: scale(.98);
+    }
+
+    .profile-verify-btn:disabled {
+      opacity: .65;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .profile-verified-message {
+      margin-top: 8px;
+
+      padding: 9px 12px;
+
+      border-radius: 12px;
+
+      background: #eef7ff;
+
+      color: #1769aa;
+
+      font-size: 12px;
+      font-weight: 700;
+
+      text-align: center;
     }
 
     /* ========================================
@@ -435,6 +480,233 @@
     }
 
     /* ========================================
+       VERIFICATION MODAL
+    ======================================== */
+
+    .verification-modal {
+      position: fixed;
+
+      inset: 0;
+
+      z-index: 100;
+
+      display: none;
+
+      align-items: flex-end;
+      justify-content: center;
+
+      background: rgba(0,0,0,.48);
+
+      padding: 0;
+    }
+
+    .verification-modal.show {
+      display: flex;
+    }
+
+    .verification-box {
+      width: 100%;
+      max-width: 520px;
+
+      background: #fff;
+
+      border-radius: 25px 25px 0 0;
+
+      padding: 22px 18px 28px;
+
+      box-shadow:
+        0 -10px 35px rgba(0,0,0,.18);
+
+      animation: verificationUp .2s ease-out;
+    }
+
+    @keyframes verificationUp {
+      from {
+        transform: translateY(30px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .verification-close-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      margin-bottom: 12px;
+    }
+
+    .verification-title {
+      font-size: 19px;
+      font-weight: 900;
+      color: #17201b;
+    }
+
+    .verification-close {
+      width: 38px;
+      height: 38px;
+
+      border: 0;
+
+      border-radius: 50%;
+
+      background: #f1f5f2;
+
+      color: #47534c;
+
+      font-size: 22px;
+
+      cursor: pointer;
+    }
+
+    .verification-icon {
+      width: 58px;
+      height: 58px;
+
+      margin: 4px auto 12px;
+
+      border-radius: 50%;
+
+      background: #e8f5ff;
+
+      color: #1d9bf0;
+
+      display: grid;
+      place-items: center;
+
+      font-size: 27px;
+      font-weight: 900;
+    }
+
+    .verification-description {
+      color: #66706a;
+
+      font-size: 13px;
+
+      line-height: 1.55;
+
+      text-align: center;
+
+      margin-bottom: 16px;
+    }
+
+    .verification-price {
+      text-align: center;
+
+      font-size: 26px;
+      font-weight: 900;
+
+      color: #17201b;
+
+      margin-bottom: 17px;
+    }
+
+    .verification-price span {
+      display: block;
+
+      margin-top: 2px;
+
+      color: #7b847f;
+
+      font-size: 11px;
+
+      font-weight: 600;
+    }
+
+    .verification-label {
+      display: block;
+
+      margin-bottom: 6px;
+
+      color: #344139;
+
+      font-size: 12px;
+
+      font-weight: 800;
+    }
+
+    .verification-input {
+      width: 100%;
+
+      height: 48px;
+
+      border: 1px solid #dce5df;
+
+      border-radius: 13px;
+
+      padding: 0 14px;
+
+      outline: none;
+
+      font-size: 14px;
+
+      background: #fafcfb;
+    }
+
+    .verification-input:focus {
+      border-color: #22c55e;
+
+      box-shadow:
+        0 0 0 3px rgba(34,197,94,.10);
+    }
+
+    .verification-submit {
+      width: 100%;
+
+      height: 48px;
+
+      margin-top: 14px;
+
+      border: 0;
+
+      border-radius: 25px;
+
+      background: #1d9bf0;
+
+      color: #fff;
+
+      font-size: 14px;
+
+      font-weight: 900;
+
+      cursor: pointer;
+    }
+
+    .verification-submit:disabled {
+      opacity: .6;
+
+      cursor: not-allowed;
+    }
+
+    .verification-message {
+      min-height: 20px;
+
+      margin-top: 10px;
+
+      text-align: center;
+
+      font-size: 12px;
+
+      line-height: 1.45;
+    }
+
+    .verification-message.error {
+      color: #dc2626;
+    }
+
+    .verification-message.success {
+      color: #15803d;
+    }
+
+    .verification-message.pending {
+      color: #1769aa;
+    }
+
+    /* ========================================
        MOBILE
     ======================================== */
 
@@ -450,15 +722,11 @@
       }
 
       .profile-avatar-wrap {
-        position: relative;
-
         width: 106px;
         min-height: 106px;
         height: 106px;
 
         margin: -53px auto 0;
-
-        z-index: 3;
       }
 
       .profile-avatar {
@@ -476,31 +744,15 @@
         border-radius: 20px;
       }
 
+      .verification-modal {
+        align-items: flex-end;
+      }
+
+      .verification-box {
+        border-radius: 25px 25px 0 0;
+      }
+
     }
-
-   @media (max-width: 600px) {
-
-  .profile-avatar-edit {
-    width: 96px;
-    height: 96px;
-  }
-
-  .profile-initials {
-    font-size: 28px;
-  }
-
-  .profile-photo-camera {
-    width: 31px;
-    height: 31px;
-    font-size: 14px;
-  }
-
-  .photo-upload-message {
-    top: 102px;
-    width: 200px;
-  }
-
-  }
 
   </style>
 
@@ -549,6 +801,101 @@
     </section>
 
   </main>
+
+
+  <!-- ========================================
+       VERIFY ACCOUNT MODAL
+  ======================================== -->
+
+  <div
+    id="verificationModal"
+    class="verification-modal"
+    aria-hidden="true"
+  >
+
+    <div
+      class="verification-box"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="verificationTitle"
+    >
+
+      <div class="verification-close-row">
+
+        <div
+          id="verificationTitle"
+          class="verification-title"
+        >
+          Verify Account
+        </div>
+
+        <button
+          id="verificationClose"
+          class="verification-close"
+          type="button"
+          aria-label="Close"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <div class="verification-icon">
+        ✓
+      </div>
+
+
+      <p class="verification-description">
+        Get the blue verified badge on your CONNECTA profile.
+        Verification requires a one-time payment of KSh 999.
+        Your payment will be processed securely through the CONNECTA backend.
+      </p>
+
+
+      <div class="verification-price">
+        KSh 999
+        <span>One-time account verification</span>
+      </div>
+
+
+      <label
+        class="verification-label"
+        for="verificationPhone"
+      >
+        M-PESA phone number
+      </label>
+
+
+      <input
+        id="verificationPhone"
+        class="verification-input"
+        type="tel"
+        inputmode="tel"
+        autocomplete="tel"
+        placeholder="07XXXXXXXX"
+        maxlength="15"
+      >
+
+
+      <button
+        id="verificationSubmit"
+        class="verification-submit"
+        type="button"
+      >
+        Pay KSh 999 & Verify
+      </button>
+
+
+      <div
+        id="verificationMessage"
+        class="verification-message"
+        aria-live="polite"
+      ></div>
+
+    </div>
+
+  </div>
 
 
   <script
