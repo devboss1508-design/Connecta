@@ -9,60 +9,93 @@ import {
   doc,
   getDoc,
   updateDoc,
-  serverTimestamp
+  onSnapshot,
+  serverTimestamp,
+  arrayUnion,
+  arrayRemove
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 import {
   ref,
-  uploadBytes,
+  uploadBytesResumable,
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
 
 
-/* ========================================
+/* =====================================================
    CONFIGURATION
-======================================== */
+===================================================== */
 
 const API_BASE_URL =
   "https://connecta-backend-com.onrender.com";
 
 
 /*
- * IMPORTANT:
- * Account verification costs KSh 999.
- */
-const VERIFICATION_AMOUNT = 1;
+=====================================================
+ACCOUNT VERIFICATION
+=====================================================
+*/
+
+const VERIFICATION_AMOUNT = 999;
 
 
-/* ========================================
+/* =====================================================
    STATE
-======================================== */
+===================================================== */
 
 let currentUser = null;
 
 let viewedUser = null;
 
+let stopProfileListener = null;
+
 let verificationPollTimer = null;
 
 let verificationPolling = false;
 
+let isFollowing = false;
 
-/* ========================================
+
+/* =====================================================
+   CACHE
+===================================================== */
+
+/*
+   We intentionally use TWO caches.
+
+   OWN PROFILE:
+   Can contain the user's own private UI information.
+
+   PUBLIC PROFILE:
+   Contains only information that is intended to be
+   displayed to other users.
+
+   We do NOT use the old generic profile cache here.
+*/
+
+const OWN_PROFILE_CACHE_KEY =
+  "connectaOwnProfileCache_v2";
+
+const PUBLIC_PROFILE_CACHE_KEY =
+  "connectaPublicProfileCache_v2";
+
+
+/* =====================================================
    HELPER
-======================================== */
+===================================================== */
 
 const $ = id =>
   document.getElementById(id);
 
 
-/* ========================================
+/* =====================================================
    INITIALS
-======================================== */
+===================================================== */
 
 function initials(name = "U") {
 
   const parts =
-    name
+    String(name)
       .trim()
       .split(/\s+/)
       .filter(Boolean);
@@ -90,14 +123,18 @@ function initials(name = "U") {
 }
 
 
-/* ========================================
+/* =====================================================
    FULL NAME
-======================================== */
+===================================================== */
 
 function getFullName(user = {}) {
 
-  if (user.displayName) {
+  if (
+    String(user.displayName || "").trim()
+  ) {
+
     return user.displayName.trim();
+
   }
 
 
@@ -112,7 +149,8 @@ function getFullName(user = {}) {
 
 
   if (user.username) {
-    return user.username;
+    return String(user.username)
+      .replace(/^@/, "");
   }
 
 
@@ -121,9 +159,9 @@ function getFullName(user = {}) {
 }
 
 
-/* ========================================
+/* =====================================================
    ESCAPE HTML
-======================================== */
+===================================================== */
 
 function escapeHtml(value = "") {
 
@@ -142,9 +180,9 @@ function escapeHtml(value = "") {
 }
 
 
-/* ========================================
+/* =====================================================
    PROFILE UID
-======================================== */
+===================================================== */
 
 function getProfileUid() {
 
@@ -159,9 +197,9 @@ function getProfileUid() {
 }
 
 
-/* ========================================
+/* =====================================================
    NUMBER FORMAT
-======================================== */
+===================================================== */
 
 function formatNumber(value) {
 
@@ -174,9 +212,9 @@ function formatNumber(value) {
 }
 
 
-/* ========================================
+/* =====================================================
    BALANCE FORMAT
-======================================== */
+===================================================== */
 
 function formatBalance(value) {
 
@@ -195,9 +233,405 @@ function formatBalance(value) {
 }
 
 
-/* ========================================
-   MARK USER ONLINE
-======================================== */
+/* =====================================================
+   PROFILE MODE
+===================================================== */
+
+function isOwnProfile(uid) {
+
+  return !!(
+    currentUser &&
+    uid &&
+    currentUser.uid === uid
+  );
+
+}
+
+
+/* =====================================================
+   OWN PROFILE CACHE
+===================================================== */
+
+function getOwnProfileCache() {
+
+  if (!currentUser) {
+    return null;
+  }
+
+
+  try {
+
+    const raw =
+      localStorage.getItem(
+        OWN_PROFILE_CACHE_KEY
+      );
+
+
+    if (!raw) {
+      return null;
+    }
+
+
+    const cache =
+      JSON.parse(raw);
+
+
+    if (
+      !cache ||
+      cache.uid !== currentUser.uid
+    ) {
+
+      return null;
+
+    }
+
+
+    return cache;
+
+  } catch (error) {
+
+    console.warn(
+      "Own profile cache read failed:",
+      error
+    );
+
+
+    return null;
+
+  }
+
+}
+
+
+/* =====================================================
+   SAVE OWN PROFILE CACHE
+===================================================== */
+
+function saveOwnProfileCache(profile) {
+
+  if (
+    !profile ||
+    !currentUser ||
+    profile.uid !== currentUser.uid
+  ) {
+
+    return;
+
+  }
+
+
+  try {
+
+    /*
+    Own profile is allowed to contain the information
+    required to instantly reconstruct the user's own
+    account page.
+
+    This cache is only used for the authenticated user's
+    own profile.
+    */
+
+    const cache = {
+
+      uid:
+        profile.uid,
+
+      firstName:
+        profile.firstName || "",
+
+      lastName:
+        profile.lastName || "",
+
+      displayName:
+        profile.displayName || "",
+
+      username:
+        profile.username || "",
+
+      email:
+        profile.email ||
+        currentUser.email ||
+        "",
+
+      phone:
+        profile.phone || "",
+
+      photoURL:
+        profile.photoURL || "",
+
+      photoUrl:
+        profile.photoUrl || "",
+
+      bio:
+        profile.bio || "",
+
+      isOnline:
+        profile.isOnline === true,
+
+      isVerified:
+        profile.isVerified === true,
+
+      verificationStatus:
+        profile.verificationStatus ||
+        "not_submitted",
+
+      balance:
+        Number(profile.balance || 0),
+
+      status:
+        profile.status ||
+        "active",
+
+      referralCode:
+        profile.referralCode || "",
+
+      referralCount:
+        Number(
+          profile.referralCount ||
+          profile.referralsCount ||
+          0
+        ),
+
+      followersCount:
+        Number(
+          profile.followersCount || 0
+        ),
+
+      followingCount:
+        Number(
+          profile.followingCount || 0
+        ),
+
+      following:
+        Array.isArray(profile.following)
+          ? profile.following
+          : [],
+
+      cachedAt:
+        Date.now()
+
+    };
+
+
+    localStorage.setItem(
+      OWN_PROFILE_CACHE_KEY,
+      JSON.stringify(cache)
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Own profile cache save failed:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   PUBLIC PROFILE CACHE
+===================================================== */
+
+function getPublicProfileCache(uid) {
+
+  if (!uid) {
+    return null;
+  }
+
+
+  try {
+
+    const raw =
+      localStorage.getItem(
+        `${PUBLIC_PROFILE_CACHE_KEY}_${uid}`
+      );
+
+
+    if (!raw) {
+      return null;
+    }
+
+
+    return JSON.parse(raw);
+
+  } catch (error) {
+
+    console.warn(
+      "Public profile cache read failed:",
+      error
+    );
+
+
+    return null;
+
+  }
+
+}
+
+
+/* =====================================================
+   SAVE PUBLIC PROFILE CACHE
+===================================================== */
+
+function savePublicProfileCache(profile) {
+
+  if (!profile?.uid) {
+    return;
+  }
+
+
+  try {
+
+    /*
+    IMPORTANT:
+
+    Only public information is saved here.
+
+    Private fields such as:
+    email
+    phone
+    balance
+    referralCode
+    referralCount
+    verification payment information
+    are deliberately NOT cached.
+    */
+
+    const publicProfile = {
+
+      uid:
+        profile.uid,
+
+      firstName:
+        profile.firstName || "",
+
+      lastName:
+        profile.lastName || "",
+
+      displayName:
+        profile.displayName || "",
+
+      username:
+        profile.username || "",
+
+      photoURL:
+        profile.photoURL || "",
+
+      photoUrl:
+        profile.photoUrl || "",
+
+      bio:
+        profile.bio || "",
+
+      isOnline:
+        profile.isOnline === true,
+
+      isVerified:
+        profile.isVerified === true,
+
+      followersCount:
+        Number(
+          profile.followersCount || 0
+        ),
+
+      followingCount:
+        Number(
+          profile.followingCount || 0
+        ),
+
+      cachedAt:
+        Date.now()
+
+    };
+
+
+    localStorage.setItem(
+
+      `${PUBLIC_PROFILE_CACHE_KEY}_${profile.uid}`,
+
+      JSON.stringify(publicProfile)
+
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Public profile cache save failed:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   CREATE PUBLIC PROFILE
+===================================================== */
+
+function getPublicProfile(profile) {
+
+  if (!profile) {
+    return null;
+  }
+
+
+  /*
+  This creates a safe public representation for rendering.
+  */
+
+  return {
+
+    uid:
+      profile.uid,
+
+    firstName:
+      profile.firstName || "",
+
+    lastName:
+      profile.lastName || "",
+
+    displayName:
+      profile.displayName || "",
+
+    username:
+      profile.username || "",
+
+    photoURL:
+      profile.photoURL || "",
+
+    photoUrl:
+      profile.photoUrl || "",
+
+    bio:
+      profile.bio || "",
+
+    isOnline:
+      profile.isOnline === true,
+
+    isVerified:
+      profile.isVerified === true,
+
+    followersCount:
+      Number(
+        profile.followersCount || 0
+      ),
+
+    followingCount:
+      Number(
+        profile.followingCount || 0
+      )
+
+  };
+
+}
+
+
+/* =====================================================
+   MARK CURRENT USER ONLINE
+===================================================== */
 
 async function markCurrentUserOnline() {
 
@@ -220,7 +654,9 @@ async function markCurrentUserOnline() {
       userRef,
       {
         isOnline: true,
-        lastSeen: serverTimestamp()
+
+        lastSeen:
+          serverTimestamp()
       }
     );
 
@@ -232,7 +668,7 @@ async function markCurrentUserOnline() {
 
   } catch (error) {
 
-    console.error(
+    console.warn(
       "Unable to update online status:",
       error
     );
@@ -242,13 +678,19 @@ async function markCurrentUserOnline() {
 }
 
 
-/* ========================================
+/* =====================================================
    RENDER PROFILE
-======================================== */
+===================================================== */
 
 function renderProfile(profile) {
 
-  viewedUser = profile;
+  if (!profile?.uid) {
+    return;
+  }
+
+
+  viewedUser =
+    profile;
 
 
   const container =
@@ -260,64 +702,96 @@ function renderProfile(profile) {
   }
 
 
+  const own =
+    isOwnProfile(
+      profile.uid
+    );
+
+
+  /*
+  Other users are rendered ONLY from the
+  public profile representation.
+  */
+
+  const safeProfile =
+    own
+      ? profile
+      : getPublicProfile(profile);
+
+
+  if (!safeProfile) {
+    return;
+  }
+
+
+  /*
+  Track whether current user follows this user.
+  */
+
+  if (!own) {
+
+    const following =
+      Array.isArray(
+        currentUser?.following
+      )
+        ? currentUser.following
+        : Array.isArray(
+            profile.following
+          )
+          ? profile.following
+          : [];
+
+
+    isFollowing =
+      following.includes(
+        profile.uid
+      );
+
+  }
+
+
   const name =
-    getFullName(profile);
+    getFullName(
+      safeProfile
+    );
 
 
   const username =
-    profile.username
-      ? `@${profile.username}`
+    safeProfile.username
+      ? `@${safeProfile.username}`
       : "";
 
 
   /*
-   * IMPORTANT:
-   *
-   * If this is the logged-in user's own
-   * profile, treat them as online because
-   * they are currently inside CONNECTA.
-   */
+  Own profile is always treated as online while
+  the authenticated user is actively using CONNECTA.
+  */
 
-  const isOwnProfile =
-    currentUser &&
-    currentUser.uid === profile.uid;
-
-
-  const isOnline =
-    isOwnProfile
+  const online =
+    own
       ? true
-      : profile.isOnline === true;
+      : safeProfile.isOnline === true;
 
 
-  const isVerified =
-    profile.isVerified === true;
+  const verified =
+    safeProfile.isVerified === true;
 
 
   const followers =
     Number(
-      profile.followersCount || 0
+      safeProfile.followersCount || 0
     );
 
 
   const following =
     Number(
-      profile.followingCount || 0
+      safeProfile.followingCount || 0
     );
-
-
-  const balance =
-    Number(
-      profile.balance || 0
-    );
-
-
-  const status =
-    profile.status || "active";
 
 
   const photo =
-    profile.photoURL ||
-    profile.photoUrl ||
+    safeProfile.photoURL ||
+    safeProfile.photoUrl ||
     "";
 
 
@@ -335,7 +809,7 @@ function renderProfile(profile) {
 
 
   const verifiedBadge =
-    isVerified
+    verified
 
       ? `
         <span
@@ -350,12 +824,14 @@ function renderProfile(profile) {
       : "";
 
 
-  /* ========================================
-     STATUS
-  ======================================== */
+  /*
+  =====================================================
+  STATUS
+  =====================================================
+  */
 
   const statusHtml =
-    isOnline
+    online
 
       ? `
         <div class="profile-status online">
@@ -382,32 +858,38 @@ function renderProfile(profile) {
       `;
 
 
-  /* ========================================
-     BIO
-  ======================================== */
+  /*
+  =====================================================
+  BIO
+  =====================================================
+  */
 
   const bioHtml =
-    profile.bio
+    safeProfile.bio
 
       ? `
         <div class="profile-bio">
-          ${escapeHtml(profile.bio)}
+          ${escapeHtml(
+            safeProfile.bio
+          )}
         </div>
       `
 
       : "";
 
 
-  /* ========================================
-     ACTION
-  ======================================== */
+  /*
+  =====================================================
+  ACTION BUTTONS
+  =====================================================
+  */
 
   let actionHtml = "";
 
 
-  if (isOwnProfile) {
+  if (own) {
 
-    if (isVerified) {
+    if (verified) {
 
       actionHtml = `
 
@@ -426,7 +908,7 @@ function renderProfile(profile) {
     } else {
 
       const paymentPending =
-        profile.verificationStatus ===
+        safeProfile.verificationStatus ===
         "payment_pending";
 
 
@@ -463,327 +945,457 @@ function renderProfile(profile) {
         Chat
       </button>
 
+
+      <button
+        id="followProfileBtn"
+        class="
+          profile-follow-btn
+          ${isFollowing ? "following" : ""}
+        "
+        type="button"
+      >
+        ${
+          isFollowing
+            ? "Following"
+            : "Follow"
+        }
+      </button>
+
     `;
 
   }
 
 
-  /* ========================================
-     PROFILE STRUCTURE
-  ======================================== */
+  /*
+  =====================================================
+  OWN PROFILE
+  =====================================================
+  */
 
-  container.innerHTML = `
+  if (own) {
 
-    <!-- ====================================
-         PROFILE HERO
-    ==================================== -->
+    container.innerHTML = `
 
-    <section class="profile-hero">
+      <section class="profile-hero">
 
-      <div class="profile-photo-area">
+        <div class="profile-photo-area">
 
-        <div class="profile-photo-ring">
+          <div class="profile-photo-ring">
 
-          <div class="profile-avatar">
+            <div class="profile-avatar">
 
-            ${avatar}
+              ${avatar}
+
+            </div>
 
           </div>
+
+
+          <button
+            id="profilePhotoUploadBtn"
+            class="profile-photo-upload"
+            type="button"
+            aria-label="Upload profile photo"
+          >
+            📷
+          </button>
+
+
+          <input
+            id="profilePhotoInput"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+          >
+
+        </div>
+
+
+        <div class="profile-upload-text">
+          Tap to upload photo
+        </div>
+
+
+        <div
+          id="profileUploadStatus"
+          class="profile-upload-status"
+        ></div>
+
+
+        <div class="profile-name-row">
+
+          <div class="profile-name">
+            ${escapeHtml(name)}
+          </div>
+
+          ${verifiedBadge}
 
         </div>
 
 
         ${
-          isOwnProfile
-
+          username
             ? `
-
-              <button
-                id="profilePhotoUploadBtn"
-                class="profile-photo-upload"
-                type="button"
-                aria-label="Upload profile photo"
-              >
-                📷
-              </button>
-
-              <input
-                id="profilePhotoInput"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-              >
-
+              <div class="profile-username">
+                ${escapeHtml(username)}
+              </div>
             `
-
             : ""
         }
 
-      </div>
+
+        ${statusHtml}
 
 
-      ${
-        isOwnProfile
-
-          ? `
-
-            <div class="profile-upload-text">
-              Tap to upload photo
-            </div>
-
-            <div
-              id="profileUploadStatus"
-              class="profile-upload-status"
-            ></div>
-
-          `
-
-          : ""
-      }
+        ${bioHtml}
 
 
-      <div class="profile-name-row">
+        <div class="profile-main-action">
 
-        <div class="profile-name">
-          ${escapeHtml(name)}
+          ${actionHtml}
+
         </div>
 
-        ${verifiedBadge}
-
-      </div>
+      </section>
 
 
-      ${
-        username
+      <!-- =========================================
+           ACCOUNT STATISTICS
+      ========================================= -->
 
-          ? `
-            <div class="profile-username">
-              ${escapeHtml(username)}
+      <section class="profile-card">
+
+        <div class="profile-card-title">
+          Account Statistics
+        </div>
+
+
+        <div class="profile-stat-grid">
+
+          <div class="profile-stat-box">
+
+            <div class="profile-stat-label">
+              Balance
             </div>
-          `
 
-          : ""
-      }
+            <div class="profile-stat-value">
+              ${formatBalance(
+                safeProfile.balance
+              )}
+            </div>
 
-
-      ${statusHtml}
-
-
-      ${bioHtml}
-
-
-      <div class="profile-main-action">
-
-        ${actionHtml}
-
-      </div>
-
-    </section>
-
-
-    <!-- ====================================
-         ACCOUNT STATISTICS
-    ==================================== -->
-
-    <section class="profile-card">
-
-      <div class="profile-card-title">
-        Account Statistics
-      </div>
-
-
-      <div class="profile-stat-grid">
-
-        <div class="profile-stat-box">
-
-          <div class="profile-stat-label">
-            Balance
           </div>
 
-          <div class="profile-stat-value">
-            ${formatBalance(balance)}
+
+          <div class="profile-stat-box">
+
+            <div class="profile-stat-label">
+              Status
+            </div>
+
+            <div class="profile-stat-value active">
+              ${escapeHtml(
+                String(
+                  safeProfile.status ||
+                  "active"
+                )
+                  .charAt(0)
+                  .toUpperCase() +
+                String(
+                  safeProfile.status ||
+                  "active"
+                ).slice(1)
+              )}
+            </div>
+
           </div>
 
         </div>
 
+      </section>
 
-        <div class="profile-stat-box">
 
-          <div class="profile-stat-label">
-            Status
-          </div>
+      <!-- =========================================
+           CONTACT INFORMATION
+      ========================================= -->
 
-          <div class="profile-stat-value active">
+      <section class="profile-card">
+
+        <div class="profile-card-title">
+          Contact Information
+        </div>
+
+
+        <div class="profile-info-row">
+
+          <span class="profile-info-label">
+            Email:
+          </span>
+
+          <span class="profile-info-value">
             ${escapeHtml(
-              status.charAt(0).toUpperCase() +
-              status.slice(1)
+              safeProfile.email ||
+              currentUser?.email ||
+              "Not provided"
             )}
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="profile-stat-grid">
-
-        <div class="profile-stat-box">
-
-          <div class="profile-stat-label">
-            Followers
-          </div>
-
-          <div class="profile-stat-value">
-            ${formatNumber(followers)}
-          </div>
+          </span>
 
         </div>
 
 
-        <div class="profile-stat-box">
+        <div class="profile-info-row">
 
-          <div class="profile-stat-label">
-            Following
-          </div>
+          <span class="profile-info-label">
+            Phone:
+          </span>
 
-          <div class="profile-stat-value">
-            ${formatNumber(following)}
+          <span class="profile-info-value">
+            ${escapeHtml(
+              safeProfile.phone ||
+              "Not provided"
+            )}
+          </span>
+
+        </div>
+
+      </section>
+
+
+      <!-- =========================================
+           REFERRAL INFORMATION
+      ========================================= -->
+
+      <section class="profile-card">
+
+        <div class="profile-card-title">
+          Referral Information
+        </div>
+
+
+        <div class="profile-info-row">
+
+          <span class="profile-info-label">
+            Referral Code:
+          </span>
+
+          <span class="profile-info-value">
+            ${escapeHtml(
+              safeProfile.referralCode ||
+              "—"
+            )}
+          </span>
+
+        </div>
+
+
+        <div class="profile-info-row">
+
+          <span class="profile-info-label">
+            Referrals:
+          </span>
+
+          <span class="profile-info-value">
+            ${formatNumber(
+              safeProfile.referralCount ||
+              safeProfile.referralsCount ||
+              0
+            )}
+          </span>
+
+        </div>
+
+
+        <button
+          id="referEarnBtn"
+          class="profile-earn-btn"
+          type="button"
+        >
+          Refer & Earn
+        </button>
+
+      </section>
+
+
+      <!-- =========================================
+           STORIES
+      ========================================= -->
+
+      <section
+        class="profile-card profile-stories-card"
+      >
+
+        <div class="profile-card-title">
+          Stories
+        </div>
+
+
+        <div class="profile-empty">
+          No stories available yet.
+        </div>
+
+      </section>
+
+    `;
+
+  }
+
+  /*
+  =====================================================
+  OTHER USER PROFILE
+  =====================================================
+  */
+
+  else {
+
+    container.innerHTML = `
+
+      <section class="profile-hero">
+
+        <div class="profile-photo-area">
+
+          <div class="profile-photo-ring">
+
+            <div class="profile-avatar">
+
+              ${avatar}
+
+            </div>
+
           </div>
 
         </div>
 
-      </div>
 
-    </section>
+        <div class="profile-name-row">
 
+          <div class="profile-name">
+            ${escapeHtml(name)}
+          </div>
 
-    <!-- ====================================
-         CONTACT INFORMATION
-    ==================================== -->
+          ${verifiedBadge}
 
-    <section class="profile-card">
-
-      <div class="profile-card-title">
-        Contact Information
-      </div>
+        </div>
 
 
-      <div class="profile-info-row">
-
-        <span class="profile-info-label">
-          Email:
-        </span>
-
-        <span class="profile-info-value">
-          ${escapeHtml(profile.email || "Not provided")}
-        </span>
-
-      </div>
+        ${
+          username
+            ? `
+              <div class="profile-username">
+                ${escapeHtml(username)}
+              </div>
+            `
+            : ""
+        }
 
 
-      <div class="profile-info-row">
-
-        <span class="profile-info-label">
-          Phone:
-        </span>
-
-        <span class="profile-info-value">
-          ${escapeHtml(profile.phone || "Not provided")}
-        </span>
-
-      </div>
-
-    </section>
+        ${statusHtml}
 
 
-    <!-- ====================================
-         REFERRAL INFORMATION
-    ==================================== -->
-
-    <section class="profile-card">
-
-      <div class="profile-card-title">
-        Referral Information
-      </div>
+        ${bioHtml}
 
 
-      <div class="profile-info-row">
+        <div class="profile-main-action">
 
-        <span class="profile-info-label">
-          Referral Code:
-        </span>
+          ${actionHtml}
 
-        <span class="profile-info-value">
-          ${escapeHtml(
-            profile.referralCode || "—"
-          )}
-        </span>
+        </div>
 
-      </div>
+      </section>
 
 
-      <div class="profile-info-row">
+      <!-- =========================================
+           PUBLIC PROFILE STATISTICS
+      ========================================= -->
 
-        <span class="profile-info-label">
-          Referrals:
-        </span>
+      <section class="profile-card">
 
-        <span class="profile-info-value">
-          ${formatNumber(
-            profile.referralCount ||
-            profile.referralsCount ||
-            0
-          )}
-        </span>
-
-      </div>
+        <div class="profile-card-title">
+          Profile Statistics
+        </div>
 
 
-      ${
-        isOwnProfile
+        <div class="profile-public-stats">
 
-          ? `
+          <div class="profile-public-stat">
 
-            <button
-              id="referEarnBtn"
-              class="profile-earn-btn"
-              type="button"
-            >
-              Refer & Earn
-            </button>
+            <div class="profile-public-stat-value">
+              ${formatNumber(followers)}
+            </div>
 
-          `
+            <div class="profile-public-stat-label">
+              Followers
+            </div>
 
-          : ""
-      }
-
-    </section>
+          </div>
 
 
-    <!-- ====================================
-         STORIES
-    ==================================== -->
+          <div class="profile-public-stat">
 
-    <section class="profile-card profile-stories-card">
+            <div class="profile-public-stat-value">
+              ${formatNumber(following)}
+            </div>
 
-      <div class="profile-card-title">
-        Stories
-      </div>
+            <div class="profile-public-stat-label">
+              Following
+            </div>
 
+          </div>
 
-      <div class="profile-empty">
-        No stories available yet.
-      </div>
+        </div>
 
-    </section>
-
-  `;
+      </section>
 
 
-  /* ========================================
-     PHOTO UPLOAD EVENTS
-  ======================================== */
+      <!-- =========================================
+           PUBLIC STORIES
+      ========================================= -->
 
-  if (isOwnProfile) {
+      <section
+        class="profile-card profile-stories-card"
+      >
+
+        <div class="profile-card-title">
+          Stories
+        </div>
+
+
+        <div class="profile-empty">
+          No stories available yet.
+        </div>
+
+      </section>
+
+    `;
+
+  }
+
+
+  /*
+  =====================================================
+  UPDATE HEADER TITLE
+  =====================================================
+  */
+
+  const headerTitle =
+    $("profileHeaderTitle");
+
+
+  if (headerTitle) {
+
+    headerTitle.textContent =
+      own
+        ? "My Profile"
+        : "Profile";
+
+  }
+
+
+  /*
+  =====================================================
+  OWN PROFILE PHOTO UPLOAD
+  =====================================================
+  */
+
+  if (own) {
 
     const uploadButton =
       $("profilePhotoUploadBtn");
@@ -818,9 +1430,11 @@ function renderProfile(profile) {
   }
 
 
-  /* ========================================
-     CHAT BUTTON
-  ======================================== */
+  /*
+  =====================================================
+  CHAT BUTTON
+  =====================================================
+  */
 
   const chatButton =
     $("chatProfileBtn");
@@ -831,6 +1445,11 @@ function renderProfile(profile) {
     chatButton.addEventListener(
       "click",
       () => {
+
+        if (!profile.uid) {
+          return;
+        }
+
 
         location.href =
           `chat.html?uid=${encodeURIComponent(
@@ -843,9 +1462,38 @@ function renderProfile(profile) {
   }
 
 
-  /* ========================================
-     VERIFY BUTTON
-  ======================================== */
+  /*
+  =====================================================
+  FOLLOW BUTTON
+  =====================================================
+  */
+
+  const followButton =
+    $("followProfileBtn");
+
+
+  if (followButton) {
+
+    followButton.addEventListener(
+      "click",
+      () => {
+
+        toggleFollow(
+          profile.uid,
+          followButton
+        );
+
+      }
+    );
+
+  }
+
+
+  /*
+  =====================================================
+  VERIFY BUTTON
+  =====================================================
+  */
 
   const verifyButton =
     $("verifyAccountBtn");
@@ -861,9 +1509,11 @@ function renderProfile(profile) {
   }
 
 
-  /* ========================================
-     REFER & EARN
-  ======================================== */
+  /*
+  =====================================================
+  REFER & EARN
+  =====================================================
+  */
 
   const referEarnButton =
     $("referEarnBtn");
@@ -886,9 +1536,250 @@ function renderProfile(profile) {
 }
 
 
-/* ========================================
+/* =====================================================
+   FOLLOW / UNFOLLOW
+===================================================== */
+
+async function toggleFollow(
+  targetUid,
+  button
+) {
+
+  if (
+    !currentUser ||
+    !targetUid ||
+    targetUid === currentUser.uid
+  ) {
+
+    return;
+
+  }
+
+
+  if (
+    button.dataset.busy === "true"
+  ) {
+
+    return;
+
+  }
+
+
+  button.dataset.busy =
+    "true";
+
+
+  button.disabled =
+    true;
+
+
+  const wasFollowing =
+    isFollowing;
+
+
+  try {
+
+    const currentUserRef =
+      doc(
+        db,
+        "users",
+        currentUser.uid
+      );
+
+
+    const targetUserRef =
+      doc(
+        db,
+        "users",
+        targetUid
+      );
+
+
+    if (wasFollowing) {
+
+      await updateDoc(
+        currentUserRef,
+        {
+          following:
+            arrayRemove(targetUid)
+        }
+      );
+
+
+      /*
+      Decrease the public follower count.
+
+      This is kept simple for now. Later we can
+      move follow operations to a secure backend
+      transaction.
+      */
+
+      const targetSnap =
+        await getDoc(
+          targetUserRef
+        );
+
+
+      if (targetSnap.exists()) {
+
+        const targetData =
+          targetSnap.data();
+
+
+        const currentCount =
+          Number(
+            targetData.followersCount || 0
+          );
+
+
+        await updateDoc(
+          targetUserRef,
+          {
+            followersCount:
+              Math.max(
+                0,
+                currentCount - 1
+              )
+          }
+        );
+
+      }
+
+
+      isFollowing =
+        false;
+
+
+    } else {
+
+      await updateDoc(
+        currentUserRef,
+        {
+          following:
+            arrayUnion(targetUid)
+        }
+      );
+
+
+      const targetSnap =
+        await getDoc(
+          targetUserRef
+        );
+
+
+      if (targetSnap.exists()) {
+
+        const targetData =
+          targetSnap.data();
+
+
+        const currentCount =
+          Number(
+            targetData.followersCount || 0
+          );
+
+
+        await updateDoc(
+          targetUserRef,
+          {
+            followersCount:
+              currentCount + 1
+          }
+        );
+
+      }
+
+
+      isFollowing =
+        true;
+
+    }
+
+
+    /*
+    Update local Firebase user state representation.
+    */
+
+    if (!Array.isArray(currentUser.following)) {
+
+      currentUser.following = [];
+
+    }
+
+
+    if (isFollowing) {
+
+      if (
+        !currentUser.following.includes(
+          targetUid
+        )
+      ) {
+
+        currentUser.following.push(
+          targetUid
+        );
+
+      }
+
+    } else {
+
+      currentUser.following =
+        currentUser.following.filter(
+          uid =>
+            uid !== targetUid
+        );
+
+    }
+
+
+    /*
+    Update button immediately.
+    */
+
+    button.textContent =
+      isFollowing
+        ? "Following"
+        : "Follow";
+
+
+    button.classList.toggle(
+      "following",
+      isFollowing
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Follow operation failed:",
+      error
+    );
+
+
+    alert(
+      "Unable to update follow status. Please try again."
+    );
+
+
+    isFollowing =
+      wasFollowing;
+
+  } finally {
+
+    button.disabled =
+      false;
+
+    button.dataset.busy =
+      "false";
+
+  }
+
+}
+
+
+/* =====================================================
    PROFILE PHOTO UPLOAD
-======================================== */
+===================================================== */
 
 async function handleProfilePhotoUpload(
   event
@@ -912,18 +1803,22 @@ async function handleProfilePhotoUpload(
     $("profileUploadStatus");
 
 
-  /*
-   * Basic file validation.
-   */
-
   const allowedTypes = [
+
     "image/jpeg",
+
     "image/png",
+
     "image/webp"
+
   ];
 
 
-  if (!allowedTypes.includes(file.type)) {
+  if (
+    !allowedTypes.includes(
+      file.type
+    )
+  ) {
 
     if (status) {
 
@@ -936,7 +1831,8 @@ async function handleProfilePhotoUpload(
     }
 
 
-    event.target.value = "";
+    event.target.value =
+      "";
 
     return;
 
@@ -944,10 +1840,13 @@ async function handleProfilePhotoUpload(
 
 
   /*
-   * Keep profile images reasonably small.
-   */
+  Maximum 5MB.
+  */
 
-  if (file.size > 5 * 1024 * 1024) {
+  if (
+    file.size >
+    5 * 1024 * 1024
+  ) {
 
     if (status) {
 
@@ -960,7 +1859,8 @@ async function handleProfilePhotoUpload(
     }
 
 
-    event.target.value = "";
+    event.target.value =
+      "";
 
     return;
 
@@ -970,7 +1870,7 @@ async function handleProfilePhotoUpload(
   if (status) {
 
     status.textContent =
-      "Uploading photo...";
+      "Preparing upload...";
 
     status.className =
       "profile-upload-status";
@@ -981,9 +1881,10 @@ async function handleProfilePhotoUpload(
   try {
 
     /*
-     * Store the image under the authenticated
-     * user's own folder.
-     */
+    =================================================
+    STORAGE PATH
+    =================================================
+    */
 
     const extension =
       file.name
@@ -999,15 +1900,82 @@ async function handleProfilePhotoUpload(
       );
 
 
-    const snapshot =
-      await uploadBytes(
+    /*
+    =================================================
+    RESUMABLE UPLOAD
+    =================================================
+
+    This provides progress instead of appearing to
+    hang while the browser uploads.
+    */
+
+    const uploadTask =
+      uploadBytesResumable(
         photoRef,
         file,
         {
-          contentType: file.type
+          contentType:
+            file.type
         }
       );
 
+
+    const snapshot =
+      await new Promise(
+        (
+          resolve,
+          reject
+        ) => {
+
+          uploadTask.on(
+
+            "state_changed",
+
+            uploadSnapshot => {
+
+              const progress =
+                Math.round(
+                  (
+                    uploadSnapshot.bytesTransferred /
+                    uploadSnapshot.totalBytes
+                  ) * 100
+                );
+
+
+              if (status) {
+
+                status.textContent =
+                  `Uploading photo... ${progress}%`;
+
+              }
+
+            },
+
+            error => {
+
+              reject(error);
+
+            },
+
+            () => {
+
+              resolve(
+                uploadTask.snapshot
+              );
+
+            }
+
+          );
+
+        }
+      );
+
+
+    /*
+    =================================================
+    GET DOWNLOAD URL
+    =================================================
+    */
 
     const photoURL =
       await getDownloadURL(
@@ -1016,8 +1984,10 @@ async function handleProfilePhotoUpload(
 
 
     /*
-     * Update Firebase Authentication profile.
-     */
+    =================================================
+    UPDATE FIREBASE AUTH PROFILE
+    =================================================
+    */
 
     await updateProfile(
       currentUser,
@@ -1028,8 +1998,10 @@ async function handleProfilePhotoUpload(
 
 
     /*
-     * Update Firestore profile.
-     */
+    =================================================
+    UPDATE FIRESTORE
+    =================================================
+    */
 
     await updateDoc(
       doc(
@@ -1044,8 +2016,10 @@ async function handleProfilePhotoUpload(
 
 
     /*
-     * Update local profile immediately.
-     */
+    =================================================
+    UPDATE LOCAL STATE
+    =================================================
+    */
 
     if (viewedUser) {
 
@@ -1054,6 +2028,27 @@ async function handleProfilePhotoUpload(
 
     }
 
+
+    /*
+    =================================================
+    UPDATE OWN CACHE
+    =================================================
+    */
+
+    if (viewedUser) {
+
+      saveOwnProfileCache(
+        viewedUser
+      );
+
+    }
+
+
+    /*
+    =================================================
+    SUCCESS
+    =================================================
+    */
 
     if (status) {
 
@@ -1067,14 +2062,31 @@ async function handleProfilePhotoUpload(
 
 
     /*
-     * Reload profile so the new image
-     * appears immediately.
-     */
+    =================================================
+    IMMEDIATELY UPDATE PHOTO IN UI
+    =================================================
+    */
 
-    await loadProfile(
-      currentUser.uid
-    );
+    const avatar =
+      document.querySelector(
+        ".profile-avatar"
+      );
 
+
+    if (avatar) {
+
+      avatar.innerHTML = `
+
+        <img
+          src="${escapeHtml(photoURL)}"
+          alt="${escapeHtml(
+            getFullName(viewedUser)
+          )}"
+        >
+
+      `;
+
+    }
 
   } catch (error) {
 
@@ -1086,8 +2098,34 @@ async function handleProfilePhotoUpload(
 
     if (status) {
 
-      status.textContent =
+      let message =
         "Unable to upload photo. Please try again.";
+
+
+      if (
+        error?.code ===
+        "storage/unauthorized"
+      ) {
+
+        message =
+          "Photo upload is not allowed by Firebase Storage rules.";
+
+      }
+
+
+      if (
+        error?.code ===
+        "storage/quota-exceeded"
+      ) {
+
+        message =
+          "Firebase Storage quota is unavailable.";
+
+      }
+
+
+      status.textContent =
+        message;
 
       status.className =
         "profile-upload-status error";
@@ -1097,34 +2135,118 @@ async function handleProfilePhotoUpload(
   }
 
 
-  event.target.value = "";
+  event.target.value =
+    "";
 
 }
 
 
-/* ========================================
-   LOAD PROFILE
-======================================== */
+/* =====================================================
+   LOAD CACHED PROFILE
+===================================================== */
 
-async function loadProfile(uid) {
+function loadCachedProfile(uid) {
+
+  if (!uid) {
+    return false;
+  }
+
+
+  const own =
+    isOwnProfile(uid);
+
+
+  const cached =
+    own
+      ? getOwnProfileCache()
+      : getPublicProfileCache(uid);
+
+
+  if (!cached) {
+    return false;
+  }
+
+
+  /*
+  Own profile may have stale online state.
+  The active user is always considered online.
+  */
+
+  if (own) {
+
+    cached.isOnline =
+      true;
+
+  }
+
+
+  renderProfile(
+    cached
+  );
+
+
+  return true;
+
+}
+
+
+/* =====================================================
+   LOAD PROFILE FROM FIRESTORE
+===================================================== */
+
+async function loadProfile(
+  uid,
+  showLoading = true
+) {
 
   const container =
     $("profileContainer");
 
 
-  if (!container) {
+  if (!container || !uid) {
     return;
   }
 
 
-  container.innerHTML = `
+  /*
+  =====================================================
+  CACHE FIRST
+  =====================================================
+  */
 
-    <div class="profile-loading">
-      Loading profile...
-    </div>
+  const cached =
+    loadCachedProfile(
+      uid
+    );
 
-  `;
 
+  /*
+  =====================================================
+  ONLY SHOW LOADING IF NO CACHE EXISTS
+  =====================================================
+  */
+
+  if (
+    !cached &&
+    showLoading
+  ) {
+
+    container.innerHTML = `
+
+      <div class="profile-loading">
+        Loading profile...
+      </div>
+
+    `;
+
+  }
+
+
+  /*
+  =====================================================
+  FIRESTORE REFRESH
+  =====================================================
+  */
 
   try {
 
@@ -1144,26 +2266,101 @@ async function loadProfile(uid) {
 
     if (!snapshot.exists()) {
 
-      container.innerHTML = `
+      if (!cached) {
 
-        <div class="profile-error">
-          This profile could not be found.
-        </div>
+        container.innerHTML = `
 
-      `;
+          <div class="profile-error">
+            This profile could not be found.
+          </div>
+
+        `;
+
+      }
 
       return;
 
     }
 
 
-    renderProfile({
+    const profile = {
 
       uid,
 
       ...snapshot.data()
 
-    });
+    };
+
+
+    /*
+    =====================================================
+    OWN PROFILE
+    =====================================================
+    */
+
+    if (
+      isOwnProfile(uid)
+    ) {
+
+      /*
+      Firebase Auth is the authoritative source for
+      the authenticated user's email.
+      */
+
+      profile.email =
+        profile.email ||
+        currentUser?.email ||
+        "";
+
+
+      /*
+      Never allow the user's own profile to appear
+      offline while they are actively authenticated.
+      */
+
+      profile.isOnline =
+        true;
+
+
+      viewedUser =
+        profile;
+
+
+      saveOwnProfileCache(
+        profile
+      );
+
+
+      renderProfile(
+        profile
+      );
+
+    }
+
+    /*
+    =====================================================
+    OTHER USER
+    =====================================================
+    */
+
+    else {
+
+      const publicProfile =
+        getPublicProfile(
+          profile
+        );
+
+
+      savePublicProfileCache(
+        publicProfile
+      );
+
+
+      renderProfile(
+        publicProfile
+      );
+
+    }
 
 
   } catch (error) {
@@ -1174,23 +2371,157 @@ async function loadProfile(uid) {
     );
 
 
-    container.innerHTML = `
+    /*
+    If cache exists, keep the cached profile visible.
+    */
 
-      <div class="profile-error">
-        Unable to load this profile.
-        Please check your connection and try again.
-      </div>
+    if (!cached) {
 
-    `;
+      container.innerHTML = `
+
+        <div class="profile-error">
+          Unable to load this profile.
+          Please check your connection and try again.
+        </div>
+
+      `;
+
+    }
 
   }
 
 }
 
 
-/* ========================================
+/* =====================================================
+   REALTIME PROFILE LISTENER
+===================================================== */
+
+function listenToProfile(uid) {
+
+  if (!uid) {
+    return;
+  }
+
+
+  if (stopProfileListener) {
+
+    stopProfileListener();
+
+    stopProfileListener =
+      null;
+
+  }
+
+
+  const profileRef =
+    doc(
+      db,
+      "users",
+      uid
+    );
+
+
+  stopProfileListener =
+    onSnapshot(
+
+      profileRef,
+
+      snapshot => {
+
+        if (!snapshot.exists()) {
+          return;
+        }
+
+
+        const profile = {
+
+          uid,
+
+          ...snapshot.data()
+
+        };
+
+
+        /*
+        =================================================
+        OWN PROFILE
+        =================================================
+        */
+
+        if (
+          isOwnProfile(uid)
+        ) {
+
+          profile.email =
+            profile.email ||
+            currentUser?.email ||
+            "";
+
+
+          profile.isOnline =
+            true;
+
+
+          viewedUser =
+            profile;
+
+
+          saveOwnProfileCache(
+            profile
+          );
+
+
+          renderProfile(
+            profile
+          );
+
+
+          return;
+
+        }
+
+
+        /*
+        =================================================
+        OTHER USER
+        =================================================
+        */
+
+        const publicProfile =
+          getPublicProfile(
+            profile
+          );
+
+
+        savePublicProfileCache(
+          publicProfile
+        );
+
+
+        renderProfile(
+          publicProfile
+        );
+
+      },
+
+      error => {
+
+        console.warn(
+          "Profile realtime listener:",
+          error
+        );
+
+      }
+
+    );
+
+}
+
+
+/* =====================================================
    VERIFICATION MODAL
-======================================== */
+===================================================== */
 
 function openVerificationModal() {
 
@@ -1199,6 +2530,22 @@ function openVerificationModal() {
     alert(
       "Please login before verifying your account."
     );
+
+    return;
+
+  }
+
+
+  /*
+  Verification is only available on own profile.
+  */
+
+  if (
+    !viewedUser ||
+    !isOwnProfile(
+      viewedUser.uid
+    )
+  ) {
 
     return;
 
@@ -1224,7 +2571,8 @@ function openVerificationModal() {
 
   if (message) {
 
-    message.textContent = "";
+    message.textContent =
+      "";
 
     message.className =
       "verification-message";
@@ -1233,12 +2581,11 @@ function openVerificationModal() {
 
 
   /*
-   * Use the phone stored in the profile.
-   */
+  Use phone stored in own profile.
+  */
 
   if (
     phoneInput &&
-    viewedUser &&
     viewedUser.phone
   ) {
 
@@ -1248,7 +2595,9 @@ function openVerificationModal() {
   }
 
 
-  modal.classList.add("show");
+  modal.classList.add(
+    "show"
+  );
 
 
   modal.setAttribute(
@@ -1261,7 +2610,9 @@ function openVerificationModal() {
     () => {
 
       if (phoneInput) {
+
         phoneInput.focus();
+
       }
 
     },
@@ -1271,9 +2622,9 @@ function openVerificationModal() {
 }
 
 
-/* ========================================
+/* =====================================================
    CLOSE VERIFICATION MODAL
-======================================== */
+===================================================== */
 
 function closeVerificationModal() {
 
@@ -1286,7 +2637,9 @@ function closeVerificationModal() {
   }
 
 
-  modal.classList.remove("show");
+  modal.classList.remove(
+    "show"
+  );
 
 
   modal.setAttribute(
@@ -1297,9 +2650,9 @@ function closeVerificationModal() {
 }
 
 
-/* ========================================
+/* =====================================================
    PHONE NORMALIZATION
-======================================== */
+===================================================== */
 
 function normalizePhone(phone) {
 
@@ -1310,7 +2663,9 @@ function normalizePhone(phone) {
       .replace(/-/g, "");
 
 
-  if (value.startsWith("+254")) {
+  if (
+    value.startsWith("+254")
+  ) {
 
     value =
       value.slice(1);
@@ -1324,7 +2679,8 @@ function normalizePhone(phone) {
   ) {
 
     value =
-      "254" + value.slice(1);
+      "254" +
+      value.slice(1);
 
   }
 
@@ -1334,20 +2690,22 @@ function normalizePhone(phone) {
 }
 
 
-/* ========================================
+/* =====================================================
    PHONE VALIDATION
-======================================== */
+===================================================== */
 
 function isValidKenyanPhone(phone) {
 
-  return /^254[17]\d{8}$/.test(phone);
+  return /^254[17]\d{8}$/.test(
+    phone
+  );
 
 }
 
 
-/* ========================================
+/* =====================================================
    VERIFICATION MESSAGE
-======================================== */
+===================================================== */
 
 function setVerificationMessage(
   message,
@@ -1373,9 +2731,9 @@ function setVerificationMessage(
 }
 
 
-/* ========================================
+/* =====================================================
    START VERIFICATION
-======================================== */
+===================================================== */
 
 async function startVerification() {
 
@@ -1415,7 +2773,9 @@ async function startVerification() {
     );
 
 
-  if (!isValidKenyanPhone(phone)) {
+  if (
+    !isValidKenyanPhone(phone)
+  ) {
 
     setVerificationMessage(
       "Enter a valid Kenyan M-PESA number, for example 0712345678.",
@@ -1439,19 +2799,17 @@ async function startVerification() {
 
 
   setVerificationMessage(
-    "Sending the verification payment request...",
+    `Sending the KSh ${VERIFICATION_AMOUNT} verification payment request...`,
     "pending"
   );
 
 
   try {
 
-    /*
-     * Get a fresh Firebase ID token.
-     */
-
     const token =
-      await currentUser.getIdToken(true);
+      await currentUser.getIdToken(
+        true
+      );
 
 
     const response =
@@ -1461,16 +2819,19 @@ async function startVerification() {
           method: "POST",
 
           headers: {
+
             "Content-Type":
               "application/json",
 
             "Authorization":
               `Bearer ${token}`
+
           },
 
           body: JSON.stringify({
             phone
           })
+
         }
       );
 
@@ -1505,7 +2866,7 @@ async function startVerification() {
 
 
     setVerificationMessage(
-      "STK Push sent. Check your phone and enter your M-PESA PIN to complete the KSh 999 payment.",
+      `STK Push sent. Check your phone and enter your M-PESA PIN to complete the KSh ${VERIFICATION_AMOUNT} payment.`,
       "pending"
     );
 
@@ -1514,12 +2875,9 @@ async function startVerification() {
       "Waiting for payment...";
 
 
-    /*
-     * The backend normally returns
-     * the verification reference.
-     */
-
-    if (data.reference) {
+    if (
+      data.reference
+    ) {
 
       startVerificationPolling(
         data.reference
@@ -1573,16 +2931,20 @@ async function startVerification() {
 }
 
 
-/* ========================================
+/* =====================================================
    POLL VERIFICATION STATUS
-======================================== */
+===================================================== */
 
 function startVerificationPolling(
   reference
 ) {
 
-  if (verificationPolling) {
+  if (
+    verificationPolling
+  ) {
+
     return;
+
   }
 
 
@@ -1590,7 +2952,8 @@ function startVerificationPolling(
     true;
 
 
-  let attempts = 0;
+  let attempts =
+    0;
 
 
   const maxAttempts =
@@ -1736,16 +3099,18 @@ function startVerificationPolling(
 }
 
 
-/* ========================================
+/* =====================================================
    CHECK VERIFICATION STATUS
-======================================== */
+===================================================== */
 
 async function checkVerificationStatus(
   reference
 ) {
 
   const token =
-    await currentUser.getIdToken(true);
+    await currentUser.getIdToken(
+      true
+    );
 
 
   const response =
@@ -1755,16 +3120,19 @@ async function checkVerificationStatus(
         method: "POST",
 
         headers: {
+
           "Content-Type":
             "application/json",
 
           "Authorization":
             `Bearer ${token}`
+
         },
 
         body: JSON.stringify({
           reference
         })
+
       }
     );
 
@@ -1789,8 +3157,10 @@ async function checkVerificationStatus(
 
 
   /*
-   * COMPLETED
-   */
+  =====================================================
+  COMPLETED
+  =====================================================
+  */
 
   if (
     data.success === true &&
@@ -1829,7 +3199,8 @@ async function checkVerificationStatus(
 
 
         await loadProfile(
-          currentUser.uid
+          currentUser.uid,
+          false
         );
 
       },
@@ -1844,8 +3215,10 @@ async function checkVerificationStatus(
 
 
   /*
-   * FAILED
-   */
+  =====================================================
+  FAILED
+  =====================================================
+  */
 
   if (
     data.status === "failed"
@@ -1880,8 +3253,10 @@ async function checkVerificationStatus(
 
 
   /*
-   * PENDING
-   */
+  =====================================================
+  PENDING
+  =====================================================
+  */
 
   setVerificationMessage(
     "Waiting for M-PESA payment confirmation...",
@@ -1894,9 +3269,9 @@ async function checkVerificationStatus(
 }
 
 
-/* ========================================
+/* =====================================================
    BACK BUTTON
-======================================== */
+===================================================== */
 
 const backButton =
   $("backBtn");
@@ -1928,9 +3303,9 @@ if (backButton) {
 }
 
 
-/* ========================================
+/* =====================================================
    VERIFICATION CLOSE
-======================================== */
+===================================================== */
 
 const verificationClose =
   $("verificationClose");
@@ -1946,9 +3321,9 @@ if (verificationClose) {
 }
 
 
-/* ========================================
+/* =====================================================
    CLOSE MODAL BY BACKDROP
-======================================== */
+===================================================== */
 
 const verificationModal =
   $("verificationModal");
@@ -1961,7 +3336,8 @@ if (verificationModal) {
     event => {
 
       if (
-        event.target === verificationModal
+        event.target ===
+        verificationModal
       ) {
 
         closeVerificationModal();
@@ -1974,9 +3350,9 @@ if (verificationModal) {
 }
 
 
-/* ========================================
+/* =====================================================
    VERIFICATION SUBMIT
-======================================== */
+===================================================== */
 
 const verificationSubmit =
   $("verificationSubmit");
@@ -1992,12 +3368,13 @@ if (verificationSubmit) {
 }
 
 
-/* ========================================
+/* =====================================================
    AUTH STATE
-======================================== */
+===================================================== */
 
 onAuthStateChanged(
   auth,
+
   async user => {
 
     currentUser =
@@ -2016,19 +3393,10 @@ onAuthStateChanged(
 
 
     /*
-     * Mark the authenticated user online.
-     *
-     * This fixes the situation where the
-     * profile was showing Offline even though
-     * the user is currently logged in.
-     */
-
-    await markCurrentUserOnline();
-
-
-    /*
-     * Determine which profile to display.
-     */
+    =================================================
+    DETERMINE PROFILE
+    =================================================
+    */
 
     const requestedUid =
       getProfileUid();
@@ -2039,9 +3407,122 @@ onAuthStateChanged(
       user.uid;
 
 
-    await loadProfile(
+    /*
+    =================================================
+    SHOW CACHE FIRST
+    =================================================
+
+    This happens BEFORE the Firestore request.
+
+    If this profile was previously opened, the user
+    immediately sees the cached profile.
+    */
+
+    loadCachedProfile(
       profileUid
     );
+
+
+    /*
+    =================================================
+    OWN PROFILE
+    =================================================
+
+    Do not block rendering while marking the user
+    online.
+    */
+
+    if (
+      profileUid ===
+      user.uid
+    ) {
+
+      markCurrentUserOnline()
+        .catch(
+          error => {
+
+            console.warn(
+              "Presence update failed:",
+              error
+            );
+
+          }
+        );
+
+    }
+
+
+    /*
+    =================================================
+    START REALTIME LISTENER
+    =================================================
+
+    Firestore can provide cached listener data and
+    then synchronize with the server when persistence
+    is enabled.
+    */
+
+    listenToProfile(
+      profileUid
+    );
+
+
+    /*
+    =================================================
+    FIRESTORE REFRESH
+    =================================================
+
+    This is intentionally NOT awaited before showing
+    cached data.
+    */
+
+    loadProfile(
+      profileUid,
+      !loadCachedProfile(profileUid)
+    )
+    .catch(
+      error => {
+
+        console.error(
+          "Profile startup error:",
+          error
+        );
+
+      }
+    );
+
+  }
+);
+
+
+/* =====================================================
+   PAGE CLEANUP
+===================================================== */
+
+window.addEventListener(
+  "beforeunload",
+  () => {
+
+    if (stopProfileListener) {
+
+      stopProfileListener();
+
+      stopProfileListener =
+        null;
+
+    }
+
+
+    if (verificationPollTimer) {
+
+      clearInterval(
+        verificationPollTimer
+      );
+
+      verificationPollTimer =
+        null;
+
+    }
 
   }
 );
