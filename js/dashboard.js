@@ -92,6 +92,12 @@ function renderOnline(filter = "") {
   const box = $("onlineUsers");
   const term = filter.trim().toLowerCase();
 
+  /*
+  ========================================
+  FILTER + SORT USERS
+  ========================================
+  */
+
   const list = onlineUsers
     .filter(u => {
       const fullName = getFullName(
@@ -99,42 +105,46 @@ function renderOnline(filter = "") {
         u.uid === currentUser?.uid ? currentUser : null
       );
 
-      const haystack = `${fullName} ${u.username || ""}`.toLowerCase();
+      const haystack =
+        `${fullName} ${u.username || ""}`.toLowerCase();
 
       return !term || haystack.includes(term);
     })
     .sort((a, b) => {
-      // Always put the currently logged-in user first
+
+      /*
+      Current logged-in user ALWAYS comes first
+      */
       if (a.uid === currentUser?.uid) return -1;
       if (b.uid === currentUser?.uid) return 1;
 
-      // Then put online users before offline users
+      /*
+      Online users come before offline users
+      */
       if (a.isOnline === true && b.isOnline !== true) return -1;
       if (a.isOnline !== true && b.isOnline === true) return 1;
 
       return 0;
     });
-    const fullName = getFullName(
-      u,
-      u.uid === currentUser?.uid ? currentUser : null
-    );
 
-    const haystack =
-      `${fullName} ${u.username || ""}`.toLowerCase();
-
-    return !term || haystack.includes(term);
-  })
-  .sort((a, b) => {
-    if (a.uid === currentUser?.uid) return -1;
-    if (b.uid === currentUser?.uid) return 1;
-    return 0;
-  });
+  /*
+  ========================================
+  ONLINE COUNT
+  Only count users who are actually online
+  ========================================
+  */
 
   const onlineCount = onlineUsers.filter(
-  u => u.isOnline === true
-).length;
+    u => u.isOnline === true
+  ).length;
 
-$("onlineCount").textContent = `(${onlineCount})`;
+  $("onlineCount").textContent = `(${onlineCount})`;
+
+  /*
+  ========================================
+  NO USERS
+  ========================================
+  */
 
   if (!list.length) {
     box.innerHTML = `
@@ -145,7 +155,14 @@ $("onlineCount").textContent = `(${onlineCount})`;
     return;
   }
 
+  /*
+  ========================================
+  RENDER USER CARDS
+  ========================================
+  */
+
   box.innerHTML = list.map(u => {
+
     const isMe = u.uid === currentUser?.uid;
 
     const name = getFullName(
@@ -155,11 +172,15 @@ $("onlineCount").textContent = `(${onlineCount})`;
 
     const isOnline = u.isOnline === true;
 
-    const statusClass = isOnline ? "online" : "offline";
+    const statusClass = isOnline
+      ? "online"
+      : "offline";
 
     const statusText = isMe
       ? "online • you"
-      : (isOnline ? "online" : "offline");
+      : isOnline
+        ? "online"
+        : "offline";
 
     const following =
       Array.isArray(currentProfile?.following) &&
@@ -178,7 +199,9 @@ $("onlineCount").textContent = `(${onlineCount})`;
             u.photoURL ? "" : "avatar-green"
           )}
 
-          <strong>${escapeHtml(name)}</strong>
+          <strong>
+            ${escapeHtml(name)}
+          </strong>
 
           <small class="online-text ${statusClass}">
             <span class="status-dot ${statusClass}"></span>
@@ -207,6 +230,7 @@ $("onlineCount").textContent = `(${onlineCount})`;
 
       </article>
     `;
+
   }).join("");
 
   /*
@@ -219,6 +243,11 @@ $("onlineCount").textContent = `(${onlineCount})`;
 
     btn.addEventListener("click", async event => {
 
+      /*
+      Don't open the user's profile when
+      the Follow button is clicked.
+      */
+
       event.stopPropagation();
 
       await toggleFollow(btn.dataset.follow);
@@ -229,7 +258,7 @@ $("onlineCount").textContent = `(${onlineCount})`;
 
   /*
   ========================================
-  USER PROFILE
+  OPEN USER PROFILE
   ========================================
   */
 
@@ -238,9 +267,9 @@ $("onlineCount").textContent = `(${onlineCount})`;
     card.addEventListener("click", event => {
 
       /*
-      Do not open the profile when the
-      Follow button itself was clicked.
+      Follow button has its own action.
       */
+
       if (event.target.closest("[data-follow]")) {
         return;
       }
@@ -248,6 +277,11 @@ $("onlineCount").textContent = `(${onlineCount})`;
       const uid = card.dataset.userProfile;
 
       if (!uid) return;
+
+      /*
+      User taps the card → profile
+      Profile will contain the Chat button.
+      */
 
       location.href =
         `profile.html?uid=${encodeURIComponent(uid)}`;
