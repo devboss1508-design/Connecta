@@ -1268,6 +1268,130 @@
             }
         }
 
+    /* =====================================================
+   FINAL WHATSAPP-STYLE COMPACT MESSAGE OVERRIDE
+   ===================================================== */
+
+.message-row {
+    display: flex !important;
+    width: 100% !important;
+    margin-bottom: 4px !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+.message-row.incoming {
+    justify-content: flex-start !important;
+}
+
+.message-row.outgoing {
+    justify-content: flex-end !important;
+}
+
+
+.message-bubble {
+    display: inline-block !important;
+
+    width: auto !important;
+
+    max-width: 72% !important;
+
+    min-width: 0 !important;
+    min-height: 0 !important;
+
+    height: auto !important;
+
+    padding: 6px 9px 4px !important;
+
+    margin: 0 !important;
+
+    border-radius: 14px !important;
+
+    font-size: 14px !important;
+
+    line-height: 18px !important;
+
+    box-sizing: border-box !important;
+
+    vertical-align: top !important;
+}
+
+
+.incoming .message-bubble {
+    border-top-left-radius: 4px !important;
+}
+
+
+.outgoing .message-bubble {
+    border-top-right-radius: 4px !important;
+}
+
+
+.message-text {
+    display: block !important;
+
+    width: auto !important;
+
+    height: auto !important;
+
+    min-height: 0 !important;
+
+    margin: 0 !important;
+
+    padding: 0 !important;
+
+    line-height: 18px !important;
+
+    white-space: pre-wrap !important;
+}
+
+
+.message-meta {
+    display: flex !important;
+
+    width: 100% !important;
+
+    height: auto !important;
+
+    min-height: 10px !important;
+
+    margin: 1px 0 0 !important;
+
+    padding: 0 !important;
+
+    align-items: center !important;
+
+    justify-content: flex-end !important;
+
+    gap: 3px !important;
+
+    font-size: 9px !important;
+
+    line-height: 10px !important;
+}
+
+
+.message-checks {
+    display: inline-flex !important;
+
+    width: auto !important;
+
+    height: auto !important;
+
+    min-height: 0 !important;
+
+    margin: 0 !important;
+
+    padding: 0 2px 0 0 !important;
+
+    font-size: 11px !important;
+
+    line-height: 10px !important;
+
+    letter-spacing: -3px !important;
+}
+
     </style>
 
 </head>
