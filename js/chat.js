@@ -10,7 +10,6 @@ import {
     setDoc,
     updateDoc,
     collection,
-    addDoc,
     onSnapshot,
     query,
     orderBy,
@@ -50,14 +49,29 @@ let lastTypingWrite = 0;
 
 let isMarkingMessages = false;
 
+
 /* =====================================================
-   CHAT PROFILE CACHE
-   Uses the same profile cache created by dashboard.js.
+   PROFILE CACHE
+=====================================================
+
+   Supports both the older dashboard cache and the
+   newer profile caches.
+
 ===================================================== */
 
 const PROFILE_CACHE_KEY =
     "connectaProfileCache";
 
+const OWN_PROFILE_CACHE_KEY =
+    "connectaOwnProfileCache_v2";
+
+const PUBLIC_PROFILE_CACHE_KEY =
+    "connectaPublicProfileCache_v2";
+
+
+/* =====================================================
+   GET OLD PROFILE CACHE
+===================================================== */
 
 function getProfileCache() {
 
@@ -78,7 +92,11 @@ function getProfileCache() {
 }
 
 
-function getCachedProfile(uid) {
+/* =====================================================
+   GET NEW PUBLIC PROFILE CACHE
+===================================================== */
+
+function getNewPublicProfileCache(uid) {
 
     if (!uid) {
         return null;
@@ -87,11 +105,18 @@ function getCachedProfile(uid) {
 
     try {
 
-        const cache =
-            getProfileCache();
+        const raw =
+            localStorage.getItem(
+                `${PUBLIC_PROFILE_CACHE_KEY}_${uid}`
+            );
 
 
-        return cache[uid] || null;
+        if (!raw) {
+            return null;
+        }
+
+
+        return JSON.parse(raw);
 
     } catch {
 
@@ -103,25 +128,179 @@ function getCachedProfile(uid) {
 
 
 /* =====================================================
-   SAVE CHAT PROFILE CACHE
+   GET OWN PROFILE CACHE
 ===================================================== */
 
-function saveChatProfile(uid, profile) {
+function getOwnProfileCache() {
 
-    if (!uid || !profile) {
-        return;
+    if (!currentUser) {
+        return null;
     }
 
 
     try {
 
+        const raw =
+            localStorage.getItem(
+                OWN_PROFILE_CACHE_KEY
+            );
+
+
+        if (!raw) {
+            return null;
+        }
+
+
         const cache =
+            JSON.parse(raw);
+
+
+        if (
+            !cache ||
+            cache.uid !== currentUser.uid
+        ) {
+
+            return null;
+
+        }
+
+
+        return cache;
+
+    } catch {
+
+        return null;
+
+    }
+
+}
+
+
+/* =====================================================
+   GET CACHED PROFILE
+===================================================== */
+
+function getCachedProfile(uid) {
+
+    if (!uid) {
+        return null;
+    }
+
+
+    /*
+    =================================================
+    NEW PUBLIC PROFILE CACHE
+    =================================================
+    */
+
+    const publicCache =
+        getNewPublicProfileCache(
+            uid
+        );
+
+
+    if (publicCache) {
+
+        return publicCache;
+
+    }
+
+
+    /*
+    =================================================
+    OWN PROFILE CACHE
+    =================================================
+    */
+
+    if (
+        currentUser &&
+        uid === currentUser.uid
+    ) {
+
+        const ownCache =
+            getOwnProfileCache();
+
+
+        if (ownCache) {
+
+            return ownCache;
+
+        }
+
+    }
+
+
+    /*
+    =================================================
+    OLD DASHBOARD CACHE
+    =================================================
+    */
+
+    try {
+
+        const oldCache =
             getProfileCache();
 
 
-        cache[uid] = {
+        if (
+            oldCache &&
+            oldCache[uid]
+        ) {
 
-            ...cache[uid],
+            return oldCache[uid];
+
+        }
+
+    } catch {
+
+        // Ignore old cache errors.
+
+    }
+
+
+    return null;
+
+}
+
+
+/* =====================================================
+   SAVE CHAT PROFILE CACHE
+===================================================== */
+
+function saveChatProfile(
+    uid,
+    profile
+) {
+
+    if (
+        !uid ||
+        !profile
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        /*
+        IMPORTANT:
+
+        Only public profile information is saved
+        for another user.
+
+        We deliberately do NOT cache:
+
+        email
+        phone
+        balance
+        referralCode
+        referral information
+        KYC/payment information
+        */
+
+        const publicProfile = {
 
             uid,
 
@@ -140,11 +319,27 @@ function saveChatProfile(uid, profile) {
             photoURL:
                 profile.photoURL || "",
 
+            photoUrl:
+                profile.photoUrl || "",
+
+            bio:
+                profile.bio || "",
+
             isOnline:
                 profile.isOnline === true,
 
             isVerified:
                 profile.isVerified === true,
+
+            followersCount:
+                Number(
+                    profile.followersCount || 0
+                ),
+
+            followingCount:
+                Number(
+                    profile.followingCount || 0
+                ),
 
             lastSeen:
                 profile.lastSeen || null,
@@ -155,10 +350,46 @@ function saveChatProfile(uid, profile) {
         };
 
 
+        /*
+        New public profile cache.
+        */
+
+        localStorage.setItem(
+
+            `${PUBLIC_PROFILE_CACHE_KEY}_${uid}`,
+
+            JSON.stringify(
+                publicProfile
+            )
+
+        );
+
+
+        /*
+        Keep old dashboard cache updated too,
+        because dashboard.js may still use it.
+        */
+
+        const oldCache =
+            getProfileCache();
+
+
+        oldCache[uid] = {
+
+            ...oldCache[uid],
+
+            ...publicProfile
+
+        };
+
+
         localStorage.setItem(
             PROFILE_CACHE_KEY,
-            JSON.stringify(cache)
+            JSON.stringify(
+                oldCache
+            )
         );
+
 
     } catch (error) {
 
@@ -176,15 +407,37 @@ function saveChatProfile(uid, profile) {
    INITIALS
 ===================================================== */
 
-function initials(name = "U") {
+function initials(
+    name = "U"
+) {
 
-    return name
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map(x => x[0])
-        .join("")
-        .toUpperCase() || "U";
+    const parts =
+        String(name)
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean);
+
+
+    if (!parts.length) {
+        return "U";
+    }
+
+
+    if (
+        parts.length === 1
+    ) {
+
+        return parts[0]
+            .slice(0, 2)
+            .toUpperCase();
+
+    }
+
+
+    return (
+        parts[0][0] +
+        parts[parts.length - 1][0]
+    ).toUpperCase();
 
 }
 
@@ -193,23 +446,52 @@ function initials(name = "U") {
    FULL NAME
 ===================================================== */
 
-function getFullName(user = {}) {
+function getFullName(
+    user = {}
+) {
+
+    /*
+    =================================================
+    DISPLAY NAME
+    =================================================
+    */
 
     const displayName =
-        String(user.displayName || "").trim();
+        String(
+            user.displayName || ""
+        ).trim();
 
 
-    if (displayName) {
+    /*
+    Do NOT accept the placeholder as a real name.
+    */
+
+    if (
+        displayName &&
+        displayName !== "CONNECTA User"
+    ) {
+
         return displayName;
+
     }
 
 
+    /*
+    =================================================
+    FIRST + LAST NAME
+    =================================================
+    */
+
     const firstName =
-        String(user.firstName || "").trim();
+        String(
+            user.firstName || ""
+        ).trim();
 
 
     const lastName =
-        String(user.lastName || "").trim();
+        String(
+            user.lastName || ""
+        ).trim();
 
 
     const fullName =
@@ -217,16 +499,31 @@ function getFullName(user = {}) {
 
 
     if (fullName) {
+
         return fullName;
+
     }
 
 
+    /*
+    =================================================
+    USERNAME
+    =================================================
+    */
+
     const username =
-        String(user.username || "").trim();
+        String(
+            user.username || ""
+        ).trim();
 
 
     if (username) {
-        return username.replace(/^@/, "");
+
+        return username.replace(
+            /^@/,
+            ""
+        );
+
     }
 
 
@@ -239,16 +536,24 @@ function getFullName(user = {}) {
    ESCAPE HTML
 ===================================================== */
 
-function escapeHtml(value) {
+function escapeHtml(
+    value
+) {
 
-    return String(value ?? "")
-        .replace(/[&<>"']/g, c => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#039;"
-        }[c]));
+    return String(
+        value ?? ""
+    )
+
+        .replace(
+            /[&<>"']/g,
+            c => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;"
+            }[c])
+        );
 
 }
 
@@ -264,6 +569,7 @@ function getOtherUid() {
             location.search
         );
 
+
     return params.get("uid");
 
 }
@@ -273,9 +579,15 @@ function getOtherUid() {
    CREATE CHAT ID
 ===================================================== */
 
-function createChatId(uid1, uid2) {
+function createChatId(
+    uid1,
+    uid2
+) {
 
-    return [uid1, uid2]
+    return [
+        uid1,
+        uid2
+    ]
         .sort()
         .join("_");
 
@@ -286,7 +598,9 @@ function createChatId(uid1, uid2) {
    FORMAT TIME
 ===================================================== */
 
-function formatTime(timestamp) {
+function formatTime(
+    timestamp
+) {
 
     let date = null;
 
@@ -310,7 +624,9 @@ function formatTime(timestamp) {
 
     if (
         !date ||
-        Number.isNaN(date.getTime())
+        Number.isNaN(
+            date.getTime()
+        )
     ) {
 
         return "";
@@ -333,7 +649,9 @@ function formatTime(timestamp) {
    FORMAT DATE
 ===================================================== */
 
-function formatDate(timestamp) {
+function formatDate(
+    timestamp
+) {
 
     let date = null;
 
@@ -357,7 +675,9 @@ function formatDate(timestamp) {
 
     if (
         !date ||
-        Number.isNaN(date.getTime())
+        Number.isNaN(
+            date.getTime()
+        )
     ) {
 
         return "Today";
@@ -418,7 +738,9 @@ function formatDate(timestamp) {
    RENDER CHAT HEADER
 ===================================================== */
 
-function renderChatHeader(user) {
+function renderChatHeader(
+    user
+) {
 
     if (!user) {
         return;
@@ -426,7 +748,9 @@ function renderChatHeader(user) {
 
 
     const name =
-        getFullName(user);
+        getFullName(
+            user
+        );
 
 
     const photo =
@@ -443,32 +767,60 @@ function renderChatHeader(user) {
         $("chatAvatar");
 
 
-    if (!nameElement || !avatarElement) {
+    if (
+        !nameElement ||
+        !avatarElement
+    ) {
+
         return;
+
     }
 
 
-    /* NAME */
+    /*
+    =================================================
+    VERIFIED BADGE
+    =================================================
+    */
+
+    const verifiedBadge =
+        user.isVerified === true
+
+            ? `
+                <span
+                    class="verified-badge"
+                    title="Verified account"
+                    aria-label="Verified account"
+                >
+                    ✓
+                </span>
+              `
+
+            : "";
+
+
+    /*
+    =================================================
+    NAME
+    =================================================
+    */
 
     nameElement.innerHTML = `
 
-        ${escapeHtml(name)}
+        <span class="chat-user-name-text">
+            ${escapeHtml(name)}
+        </span>
 
-        ${
-            user.isVerified === true
-                ? `
-                    <span
-                        class="verified-badge"
-                        title="Verified account"
-                    >✓</span>
-                `
-                : ""
-        }
+        ${verifiedBadge}
 
     `;
 
 
-    /* PHOTO */
+    /*
+    =================================================
+    PHOTO
+    =================================================
+    */
 
     if (photo) {
 
@@ -488,6 +840,12 @@ function renderChatHeader(user) {
 
     }
 
+
+    /*
+    =================================================
+    STATUS
+    =================================================
+    */
 
     updateStatusDisplay();
 
@@ -519,10 +877,14 @@ function updateStatusDisplay() {
 
 
     /*
-    TYPING TAKES PRIORITY
+    =================================================
+    TYPING
+    =================================================
     */
 
-    if (isOtherUserTyping) {
+    if (
+        isOtherUserTyping
+    ) {
 
         statusText.innerHTML = `
 
@@ -540,10 +902,14 @@ function updateStatusDisplay() {
 
         `;
 
+
         if (statusDot) {
+
             statusDot.style.display =
                 "none";
+
         }
+
 
         return;
 
@@ -551,10 +917,14 @@ function updateStatusDisplay() {
 
 
     /*
+    =================================================
     ONLINE
+    =================================================
     */
 
-    if (otherUser.isOnline === true) {
+    if (
+        otherUser.isOnline === true
+    ) {
 
         statusText.textContent =
             "Online";
@@ -567,13 +937,16 @@ function updateStatusDisplay() {
 
         }
 
+
         return;
 
     }
 
 
     /*
+    =================================================
     OFFLINE
+    =================================================
     */
 
     statusText.textContent =
@@ -596,10 +969,16 @@ function updateStatusDisplay() {
    LAST SEEN
 ===================================================== */
 
-function getLastSeenText(user) {
+function getLastSeenText(
+    user
+) {
 
-    if (!user?.lastSeen?.toDate) {
+    if (
+        !user?.lastSeen?.toDate
+    ) {
+
         return "Offline";
+
     }
 
 
@@ -643,7 +1022,9 @@ function getLastSeenText(user) {
    CACHE FIRST → FIRESTORE SECOND
 ===================================================== */
 
-async function loadOtherUser(uid) {
+async function loadOtherUser(
+    uid
+) {
 
     /*
     =====================================================
@@ -652,7 +1033,9 @@ async function loadOtherUser(uid) {
     */
 
     const cached =
-        getCachedProfile(uid);
+        getCachedProfile(
+            uid
+        );
 
 
     if (cached) {
@@ -665,10 +1048,6 @@ async function loadOtherUser(uid) {
 
         };
 
-
-        /*
-        Show cached header immediately.
-        */
 
         renderChatHeader(
             otherUser
@@ -695,11 +1074,9 @@ async function loadOtherUser(uid) {
             );
 
 
-        if (!snap.exists()) {
-
-            /*
-            If cache exists, keep using it.
-            */
+        if (
+            !snap.exists()
+        ) {
 
             if (cached) {
                 return;
@@ -723,7 +1100,9 @@ async function loadOtherUser(uid) {
 
 
         /*
-        Save latest profile.
+        =================================================
+        CACHE PUBLIC PROFILE
+        =================================================
         */
 
         saveChatProfile(
@@ -733,7 +1112,9 @@ async function loadOtherUser(uid) {
 
 
         /*
-        Update header with fresh data.
+        =================================================
+        RENDER FRESH PROFILE
+        =================================================
         */
 
         renderChatHeader(
@@ -743,17 +1124,13 @@ async function loadOtherUser(uid) {
 
     } catch (error) {
 
-        /*
-        Cached profile can continue
-        working if network is unavailable.
-        */
-
         if (cached) {
 
             console.warn(
                 "Using cached chat profile:",
                 error
             );
+
 
             return;
 
@@ -775,7 +1152,9 @@ const MESSAGE_CACHE_PREFIX =
     "connectaMessages_v1_";
 
 
-function getMessageCache(chatId) {
+function getMessageCache(
+    chatId
+) {
 
     if (!chatId) {
         return [];
@@ -796,19 +1175,21 @@ function getMessageCache(chatId) {
 
 
         const cached =
-            JSON.parse(raw);
+            JSON.parse(
+                raw
+            );
 
 
-        if (!Array.isArray(cached)) {
+        if (
+            !Array.isArray(
+                cached
+            )
+        ) {
+
             return [];
+
         }
 
-
-        /*
-        Convert cached numeric timestamps
-        back into objects compatible with
-        formatTime() and formatDate().
-        */
 
         return cached.map(
             message => {
@@ -823,11 +1204,17 @@ function getMessageCache(chatId) {
                     "number"
                 ) {
 
+                    const timestamp =
+                        restored.createdAt;
+
+
                     restored.createdAt = {
+
                         toDate: () =>
                             new Date(
-                                restored.createdAt
+                                timestamp
                             )
+
                     };
 
                 }
@@ -865,7 +1252,9 @@ function saveMessageCache(
 
     if (
         !chatId ||
-        !Array.isArray(messages)
+        !Array.isArray(
+            messages
+        )
     ) {
 
         return;
@@ -875,12 +1264,10 @@ function saveMessageCache(
 
     try {
 
-        /*
-        Keep only the latest 100 messages.
-        */
-
         const latest =
-            messages.slice(-100);
+            messages.slice(
+                -100
+            );
 
 
         const serializable =
@@ -945,29 +1332,52 @@ function saveMessageCache(
 
 }
 
+
 /* =====================================================
-   LISTEN TO USER
+   LISTEN TO OTHER USER
 ===================================================== */
 
-function listenToOtherUser(uid) {
+function listenToOtherUser(
+    uid
+) {
 
-    if (stopOtherUser) {
+    if (
+        stopOtherUser
+    ) {
 
         stopOtherUser();
+
+        stopOtherUser =
+            null;
 
     }
 
 
     stopOtherUser =
         onSnapshot(
-            doc(db, "users", uid),
+
+            doc(
+                db,
+                "users",
+                uid
+            ),
 
             snapshot => {
 
-                if (!snapshot.exists()) {
+                if (
+                    !snapshot.exists()
+                ) {
+
                     return;
+
                 }
 
+
+                /*
+                =================================================
+                ALWAYS REPLACE THE PROFILE WITH FRESH DATA
+                =================================================
+                */
 
                 otherUser = {
 
@@ -978,12 +1388,42 @@ function listenToOtherUser(uid) {
                 };
 
 
-                updateStatusDisplay();
+                /*
+                =================================================
+                SAVE PUBLIC CACHE
+                =================================================
+                */
+
+                saveChatProfile(
+                    uid,
+                    otherUser
+                );
 
 
                 /*
-                If recipient becomes online,
-                mark our sent messages as delivered.
+                =================================================
+                CRITICAL:
+                RENDER HEADER AGAIN
+                =================================================
+
+                This makes these changes appear immediately:
+
+                - real name
+                - profile photo
+                - verified badge
+                - online status
+                =================================================
+                */
+
+                renderChatHeader(
+                    otherUser
+                );
+
+
+                /*
+                =================================================
+                IF RECIPIENT BECOMES ONLINE
+                =================================================
                 */
 
                 if (
@@ -1004,6 +1444,7 @@ function listenToOtherUser(uid) {
                 );
 
             }
+
         );
 
 }
@@ -1014,6 +1455,18 @@ function listenToOtherUser(uid) {
 ===================================================== */
 
 async function ensureChat() {
+
+    if (
+        !currentUser ||
+        !otherUser
+    ) {
+
+        throw new Error(
+            "Chat participants are not available."
+        );
+
+    }
+
 
     chatId =
         createChatId(
@@ -1031,7 +1484,9 @@ async function ensureChat() {
 
 
     const snap =
-        await getDoc(chatRef);
+        await getDoc(
+            chatRef
+        );
 
 
     /*
@@ -1040,7 +1495,9 @@ async function ensureChat() {
     =====================================================
     */
 
-    if (!snap.exists()) {
+    if (
+        !snap.exists()
+    ) {
 
         await setDoc(
             chatRef,
@@ -1062,12 +1519,6 @@ async function ensureChat() {
 
                 lastSenderId:
                     "",
-
-                /*
-                IMPORTANT:
-                Each user gets their own
-                unread counter.
-                */
 
                 unreadCount: {
 
@@ -1118,9 +1569,7 @@ async function ensureChat() {
 
 
     /*
-    =====================================================
-    MAKE SURE PARTICIPANTS EXIST
-    =====================================================
+    PARTICIPANTS
     */
 
     if (
@@ -1147,9 +1596,7 @@ async function ensureChat() {
 
 
     /*
-    =====================================================
-    REPAIR UNREAD COUNTERS
-    =====================================================
+    UNREAD COUNTERS
     */
 
     if (
@@ -1169,10 +1616,6 @@ async function ensureChat() {
 
     } else {
 
-        /*
-        Current user's counter missing?
-        */
-
         if (
             typeof
             data.unreadCount[
@@ -1186,10 +1629,6 @@ async function ensureChat() {
 
         }
 
-
-        /*
-        Other user's counter missing?
-        */
 
         if (
             typeof
@@ -1208,9 +1647,7 @@ async function ensureChat() {
 
 
     /*
-    =====================================================
-    REPAIR TYPING
-    =====================================================
+    TYPING
     */
 
     if (
@@ -1261,13 +1698,13 @@ async function ensureChat() {
 
 
     /*
-    =====================================================
     APPLY REPAIRS
-    =====================================================
     */
 
     if (
-        Object.keys(updates).length > 0
+        Object.keys(
+            updates
+        ).length > 0
     ) {
 
         await updateDoc(
@@ -1295,11 +1732,15 @@ function listenToChat() {
 
         stopChat();
 
+        stopChat =
+            null;
+
     }
 
 
     stopChat =
         onSnapshot(
+
             doc(
                 db,
                 "chats",
@@ -1308,8 +1749,12 @@ function listenToChat() {
 
             snapshot => {
 
-                if (!snapshot.exists()) {
+                if (
+                    !snapshot.exists()
+                ) {
+
                     return;
+
                 }
 
 
@@ -1339,6 +1784,7 @@ function listenToChat() {
                 );
 
             }
+
         );
 
 }
@@ -1376,6 +1822,7 @@ function listenToMessages() {
 
     stopMessages =
         onSnapshot(
+
             messagesQuery,
 
             async snapshot => {
@@ -1384,7 +1831,8 @@ function listenToMessages() {
                     snapshot.docs.map(
                         message => ({
 
-                            id: message.id,
+                            id:
+                                message.id,
 
                             ...message.data()
 
@@ -1393,36 +1841,30 @@ function listenToMessages() {
 
 
                 latestMessages =
-    messages;
-
-
-/*
-=====================================================
-SAVE LATEST MESSAGES FOR INSTANT NEXT OPEN
-=====================================================
-*/
-
-saveMessageCache(
-    chatId,
-    messages
-);
-
-
-/*
-=====================================================
-RENDER IMMEDIATELY
-=====================================================
-*/
-
-renderMessages(
-    messages
-);
+                    messages;
 
 
                 /*
-                Messages received while this
-                conversation is open become
-                delivered + read.
+                SAVE FOR NEXT OPEN
+                */
+
+                saveMessageCache(
+                    chatId,
+                    messages
+                );
+
+
+                /*
+                RENDER
+                */
+
+                renderMessages(
+                    messages
+                );
+
+
+                /*
+                MARK INCOMING READ
                 */
 
                 await markIncomingMessages(
@@ -1439,11 +1881,23 @@ renderMessages(
                 );
 
 
-                showChatError(
-                    "Could not load messages. Please check your Firestore rules."
-                );
+                /*
+                Don't destroy cached messages
+                if they are already visible.
+                */
+
+                if (
+                    !latestMessages.length
+                ) {
+
+                    showChatError(
+                        "Could not load messages. Please check your Firestore rules."
+                    );
+
+                }
 
             }
+
         );
 
 }
@@ -1547,11 +2001,13 @@ function renderMessages(
     }
 
 
-    /* =================================================
-       EMPTY CHAT
-    ================================================= */
+    /*
+    EMPTY CHAT
+    */
 
-    if (!messages.length) {
+    if (
+        !messages.length
+    ) {
 
         box.innerHTML = `
 
@@ -1592,10 +2048,6 @@ function renderMessages(
     let previousDate = "";
 
 
-    /* =================================================
-       RENDER EACH MESSAGE
-    ================================================= */
-
     messages.forEach(
         message => {
 
@@ -1610,9 +2062,9 @@ function renderMessages(
                 );
 
 
-            /* =========================================
-               DATE SEPARATOR
-            ========================================= */
+            /*
+            DATE SEPARATOR
+            */
 
             if (
                 dateLabel !==
@@ -1642,9 +2094,9 @@ function renderMessages(
             }
 
 
-            /* =========================================
-               MESSAGE TICK
-            ========================================= */
+            /*
+            TICK
+            */
 
             const tick =
                 mine
@@ -1653,14 +2105,6 @@ function renderMessages(
                     )
                     : "";
 
-
-            /* =========================================
-               MESSAGE
-               
-               IMPORTANT:
-               TEXT + TIME + CHECKS ARE NOW
-               IN ONE INLINE FLOW.
-            ========================================= */
 
             html += `
 
@@ -1712,17 +2156,9 @@ function renderMessages(
     );
 
 
-    /* =================================================
-       INSERT
-    ================================================= */
-
     box.innerHTML =
         html;
 
-
-    /* =================================================
-       SCROLL TO BOTTOM
-    ================================================= */
 
     if (scrollToBottom) {
 
@@ -1738,6 +2174,7 @@ function renderMessages(
     }
 
 }
+
 
 /* =====================================================
    MARK INCOMING AS READ
@@ -1772,8 +2209,12 @@ async function markIncomingMessages(
         );
 
 
-    if (!incoming.length) {
+    if (
+        !incoming.length
+    ) {
+
         return;
+
     }
 
 
@@ -1784,7 +2225,9 @@ async function markIncomingMessages(
     try {
 
         const batch =
-            writeBatch(db);
+            writeBatch(
+                db
+            );
 
 
         incoming.forEach(
@@ -1804,12 +2247,14 @@ async function markIncomingMessages(
                     messageRef,
                     {
 
-                        delivered: true,
+                        delivered:
+                            true,
 
                         deliveredAt:
                             serverTimestamp(),
 
-                        read: true,
+                        read:
+                            true,
 
                         readAt:
                             serverTimestamp()
@@ -1820,10 +2265,6 @@ async function markIncomingMessages(
             }
         );
 
-
-        /*
-        RESET UNREAD COUNT
-        */
 
         const chatRef =
             doc(
@@ -1836,7 +2277,10 @@ async function markIncomingMessages(
         batch.update(
             chatRef,
             {
-                [`unreadCount.${currentUser.uid}`]: 0
+
+                [`unreadCount.${currentUser.uid}`]:
+                    0
+
             }
         );
 
@@ -1889,15 +2333,21 @@ async function markMessagesDelivered() {
         );
 
 
-    if (!messages.length) {
+    if (
+        !messages.length
+    ) {
+
         return;
+
     }
 
 
     try {
 
         const batch =
-            writeBatch(db);
+            writeBatch(
+                db
+            );
 
 
         messages.forEach(
@@ -1917,7 +2367,8 @@ async function markMessagesDelivered() {
                     messageRef,
                     {
 
-                        delivered: true,
+                        delivered:
+                            true,
 
                         deliveredAt:
                             serverTimestamp()
@@ -1992,12 +2443,6 @@ async function sendMessage() {
 
     try {
 
-        /*
-        =================================================
-        STOP TYPING
-        =================================================
-        */
-
         clearTimeout(
             typingTimer
         );
@@ -2008,12 +2453,6 @@ async function sendMessage() {
         );
 
 
-        /*
-        =================================================
-        CHAT DOCUMENT
-        =================================================
-        */
-
         const chatRef =
             doc(
                 db,
@@ -2021,12 +2460,6 @@ async function sendMessage() {
                 chatId
             );
 
-
-        /*
-        =================================================
-        MESSAGE COLLECTION
-        =================================================
-        */
 
         const messagesRef =
             collection(
@@ -2037,30 +2470,20 @@ async function sendMessage() {
             );
 
 
-        /*
-        =================================================
-        NEW MESSAGE DOCUMENT
-        =================================================
-        */
-
         const messageRef =
-            doc(messagesRef);
+            doc(
+                messagesRef
+            );
 
-
-        /*
-        =================================================
-        ATOMIC BATCH
-        =================================================
-        */
 
         const batch =
-            writeBatch(db);
+            writeBatch(
+                db
+            );
 
 
         /*
-        =================================================
-        1. CREATE MESSAGE
-        =================================================
+        CREATE MESSAGE
         */
 
         batch.set(
@@ -2096,9 +2519,7 @@ async function sendMessage() {
 
 
         /*
-        =================================================
-        2. UPDATE LAST MESSAGE
-        =================================================
+        UPDATE LAST MESSAGE
         */
 
         batch.update(
@@ -2119,14 +2540,7 @@ async function sendMessage() {
 
 
         /*
-        =================================================
-        3. INCREASE RECEIVER UNREAD COUNT
-        =================================================
-
-        VERY IMPORTANT:
-
-        We increase the OTHER USER'S counter,
-        NOT our own counter.
+        INCREASE RECEIVER UNREAD COUNT
         */
 
         batch.update(
@@ -2140,31 +2554,8 @@ async function sendMessage() {
         );
 
 
-        /*
-        =================================================
-        COMMIT
-        =================================================
-        */
-
         await batch.commit();
 
-
-        console.log(
-            "Message sent successfully."
-        );
-
-
-        console.log(
-            "Unread count increased for UID:",
-            otherUser.uid
-        );
-
-
-        /*
-        =================================================
-        CLEAR INPUT
-        =================================================
-        */
 
         input.value = "";
 
@@ -2211,6 +2602,7 @@ async function sendMessage() {
     }
 
 }
+
 
 /* =====================================================
    TYPING
@@ -2277,26 +2669,22 @@ function handleTyping() {
         input.value.trim();
 
 
-    /*
-    Empty input = stop typing.
-    */
-
     if (!text) {
 
         clearTimeout(
             typingTimer
         );
 
-        setTyping(false);
+
+        setTyping(
+            false
+        );
+
 
         return;
 
     }
 
-
-    /*
-    Don't hammer Firestore with writes.
-    */
 
     const now =
         Date.now();
@@ -2310,15 +2698,12 @@ function handleTyping() {
         lastTypingWrite =
             now;
 
-        setTyping(true);
+        setTyping(
+            true
+        );
 
     }
 
-
-    /*
-    Automatically stop typing after
-    1.8 seconds without input.
-    */
 
     clearTimeout(
         typingTimer
@@ -2329,7 +2714,9 @@ function handleTyping() {
         setTimeout(
             () => {
 
-                setTyping(false);
+                setTyping(
+                    false
+                );
 
             },
             1800
@@ -2394,7 +2781,9 @@ function showChatError(
             "
         >
 
-            ${escapeHtml(message)}
+            ${escapeHtml(
+                message
+            )}
 
         </div>
 
@@ -2422,11 +2811,6 @@ function setupAttachmentButton() {
         "click",
         () => {
 
-            /*
-            Attachments will be implemented
-            after the core chat system.
-            */
-
             alert(
                 "Photo and file sharing will be added soon."
             );
@@ -2443,10 +2827,11 @@ function setupAttachmentButton() {
 
 function setupUI() {
 
-
-    /* =================================================
-       BACK
-    ================================================= */
+    /*
+    =================================================
+    BACK
+    =================================================
+    */
 
     const back =
         $("backBtn");
@@ -2477,9 +2862,11 @@ function setupUI() {
     }
 
 
-    /* =================================================
-       PROFILE
-    ================================================= */
+    /*
+    =================================================
+    PROFILE
+    =================================================
+    */
 
     const profile =
         $("profileBtn");
@@ -2491,8 +2878,12 @@ function setupUI() {
             "click",
             () => {
 
-                if (!otherUser?.uid) {
+                if (
+                    !otherUser?.uid
+                ) {
+
                     return;
+
                 }
 
 
@@ -2507,9 +2898,11 @@ function setupUI() {
     }
 
 
-    /* =================================================
-       USER HEADER
-    ================================================= */
+    /*
+    =================================================
+    USER HEADER
+    =================================================
+    */
 
     const userArea =
         $("chatUserArea");
@@ -2521,8 +2914,12 @@ function setupUI() {
             "click",
             () => {
 
-                if (!otherUser?.uid) {
+                if (
+                    !otherUser?.uid
+                ) {
+
                     return;
+
                 }
 
 
@@ -2537,9 +2934,11 @@ function setupUI() {
     }
 
 
-    /* =================================================
-       SEND
-    ================================================= */
+    /*
+    =================================================
+    SEND
+    =================================================
+    */
 
     const form =
         $("messageForm");
@@ -2561,9 +2960,11 @@ function setupUI() {
     }
 
 
-    /* =================================================
-       INPUT
-    ================================================= */
+    /*
+    =================================================
+    INPUT
+    =================================================
+    */
 
     const input =
         $("messageInput");
@@ -2653,12 +3054,14 @@ onAuthStateChanged(
             const form =
                 $("messageForm");
 
+
             if (form) {
 
                 form.style.display =
                     "none";
 
             }
+
 
             return;
 
@@ -2684,12 +3087,14 @@ onAuthStateChanged(
             const form =
                 $("messageForm");
 
+
             if (form) {
 
                 form.style.display =
                     "none";
 
             }
+
 
             return;
 
@@ -2708,9 +3113,6 @@ onAuthStateChanged(
             =================================================
             1. CREATE CHAT ID IMMEDIATELY
             =================================================
-
-            We already know both UIDs, so there is no
-            reason to wait for Firestore.
             */
 
             chatId =
@@ -2780,19 +3182,16 @@ onAuthStateChanged(
 
             /*
             =================================================
-            4. START REALTIME LISTENERS
+            4. START REALTIME PROFILE LISTENER
             =================================================
 
-            These start immediately.
+            This is started immediately so a change to
+            isVerified, displayName, photoURL or isOnline
+            can appear without refreshing.
 
-            Firestore can return cached/local data first
-            when persistence is enabled, then synchronize
-            with the server.
+            Firestore onSnapshot provides the initial
+            snapshot and subsequent changes.
             */
-
-            listenToMessages();
-
-            listenToChat();
 
             listenToOtherUser(
                 otherUid
@@ -2801,7 +3200,25 @@ onAuthStateChanged(
 
             /*
             =================================================
-            5. REFRESH PROFILE FROM FIRESTORE
+            5. MESSAGE LISTENER
+            =================================================
+            */
+
+            listenToMessages();
+
+
+            /*
+            =================================================
+            6. CHAT METADATA LISTENER
+            =================================================
+            */
+
+            listenToChat();
+
+
+            /*
+            =================================================
+            7. REFRESH PROFILE FROM FIRESTORE
             =================================================
             */
 
@@ -2812,7 +3229,7 @@ onAuthStateChanged(
 
             /*
             =================================================
-            6. CREATE / REPAIR CHAT DOCUMENT
+            8. CREATE / REPAIR CHAT
             =================================================
             */
 
@@ -2828,12 +3245,7 @@ onAuthStateChanged(
 
 
             /*
-            =================================================
-            CACHED CHAT FALLBACK
-            =================================================
-
-            If cached messages already exist, don't replace
-            them with an error screen.
+            Keep cached conversation visible.
             */
 
             if (
@@ -2866,9 +3278,7 @@ window.addEventListener(
 
 
         /*
-        =================================================
         BEST-EFFORT TYPING CLEANUP
-        =================================================
         */
 
         if (
@@ -2883,8 +3293,10 @@ window.addEventListener(
                     chatId
                 ),
                 {
+
                     [`typing.${currentUser.uid}`]:
                         false
+
                 }
             ).catch(
                 () => {}
@@ -2894,40 +3306,49 @@ window.addEventListener(
 
 
         /*
-        =================================================
         STOP MESSAGE LISTENER
-        =================================================
         */
 
-        if (stopMessages) {
+        if (
+            stopMessages
+        ) {
 
             stopMessages();
 
+            stopMessages =
+                null;
+
         }
 
 
         /*
-        =================================================
         STOP USER LISTENER
-        =================================================
         */
 
-        if (stopOtherUser) {
+        if (
+            stopOtherUser
+        ) {
 
             stopOtherUser();
 
+            stopOtherUser =
+                null;
+
         }
 
 
         /*
-        =================================================
         STOP CHAT LISTENER
-        =================================================
         */
 
-        if (stopChat) {
+        if (
+            stopChat
+        ) {
 
             stopChat();
+
+            stopChat =
+                null;
 
         }
 
@@ -2937,10 +3358,6 @@ window.addEventListener(
 
 /* =====================================================
    START UI
-=====================================================
-
-   UI listeners are attached once when the page loads.
-   They do not need to wait for Firebase authentication.
 ===================================================== */
 
 setupUI();
