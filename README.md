@@ -1,26 +1,32 @@
-# CONNECTA Frontend — Batch 1/2
+# CONNECTA Frontend
 
 Mobile-first social platform frontend.
 
-## Current dashboard functionality
-- Responsive mobile/desktop layout
-- CONNECTA green/white app UI
-- Firebase Auth guard
-- Reads current user's Firestore profile
-- Real-time online-user list from `users`
+## Current functionality
+- CONNECTA landing page
+- Responsive login/register UI
+- Firebase Email/Password Authentication
+- Firestore user profile creation
+- Referral code generation during registration
+- Optional referral link capture using `?ref=CODE`
+- Firebase-authenticated dashboard
+- Real-time online users from Firestore
+- Online presence (`isOnline`, `lastSeen`)
+- Follow/unfollow support
 - Search online users
-- Follow/unfollow field on the current user's document
-- Presence heartbeat (`isOnline`, `lastSeen`)
-- Real-time `chats` listener prepared for the chat module
-- Side navigation and mobile bottom navigation
-- Logout
+- Responsive side menu and bottom navigation
+- Dashboard chat listener prepared for the chat module
 
-## Firebase
-The Firebase Web SDK configuration is in `js/firebase.js`.
+## Firebase project
+Configured for the CONNECTA Firebase Web App supplied in the project setup.
 
-Do not put a Firebase Admin SDK service-account private key in the frontend.
+## Before testing
+1. Firebase Console → Authentication → Sign-in method → enable Email/Password.
+2. Firestore Database → create the database.
+3. Deploy/serve the frontend over HTTP/HTTPS; do not open module pages with `file://`.
+4. Review Firestore rules before production.
 
-## Important
-The dashboard expects an authenticated Firebase user. Registration/login still need to be switched from the temporary demo flow to Firebase Authentication in the next step.
+## Security
+The Firebase Web configuration belongs in frontend code. Never place a Firebase Admin SDK private service-account key in the frontend.
 
-Firestore rules are provided as a starting development ruleset. Review and tighten them before production.
+The current phone field is stored in Firestore but is not yet used for phone authentication. Phone verification can be added later.
