@@ -98,7 +98,8 @@ function renderOnline(filter = "") {
       u.uid === currentUser?.uid ? currentUser : null
     );
 
-    const haystack = `${fullName} ${u.username || ""}`.toLowerCase();
+    const haystack =
+      `${fullName} ${u.username || ""}`.toLowerCase();
 
     return !term || haystack.includes(term);
   });
@@ -130,20 +131,31 @@ function renderOnline(filter = "") {
       ? "online • you"
       : (isOnline ? "online" : "offline");
 
+    const following =
+      Array.isArray(currentProfile?.following) &&
+      currentProfile.following.includes(u.uid);
+
     return `
-      <article class="user-card">
+      <article
+        class="user-card"
+        data-user-profile="${escapeHtml(u.uid)}"
+      >
 
-        ${avatarMarkup(
-          u,
-          u.photoURL ? "" : "avatar-green"
-        )}
+        <div class="user-card-profile">
 
-        <strong>${escapeHtml(name)}</strong>
+          ${avatarMarkup(
+            u,
+            u.photoURL ? "" : "avatar-green"
+          )}
 
-        <small class="online-text ${statusClass}">
-          <span class="status-dot ${statusClass}"></span>
-          ${escapeHtml(statusText)}
-        </small>
+          <strong>${escapeHtml(name)}</strong>
+
+          <small class="online-text ${statusClass}">
+            <span class="status-dot ${statusClass}"></span>
+            ${escapeHtml(statusText)}
+          </small>
+
+        </div>
 
         ${
           isMe
@@ -156,9 +168,9 @@ function renderOnline(filter = "") {
             `
             : `
               <button
-                class="chat-user-btn"
-                data-chat-user="${escapeHtml(u.uid)}">
-                Chat
+                class="${following ? "following" : ""}"
+                data-follow="${escapeHtml(u.uid)}">
+                ${following ? "Following" : "Follow"}
               </button>
             `
         }
@@ -169,20 +181,46 @@ function renderOnline(filter = "") {
 
   /*
   ========================================
-  OPEN PRIVATE CHAT
+  FOLLOW BUTTONS
   ========================================
   */
 
-  box.querySelectorAll("[data-chat-user]").forEach(btn => {
+  box.querySelectorAll("[data-follow]").forEach(btn => {
 
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async event => {
 
-      const targetUid = btn.dataset.chatUser;
+      event.stopPropagation();
 
-      if (!targetUid) return;
+      await toggleFollow(btn.dataset.follow);
+
+    });
+
+  });
+
+  /*
+  ========================================
+  USER PROFILE
+  ========================================
+  */
+
+  box.querySelectorAll("[data-user-profile]").forEach(card => {
+
+    card.addEventListener("click", event => {
+
+      /*
+      Do not open the profile when the
+      Follow button itself was clicked.
+      */
+      if (event.target.closest("[data-follow]")) {
+        return;
+      }
+
+      const uid = card.dataset.userProfile;
+
+      if (!uid) return;
 
       location.href =
-        `chat.html?uid=${encodeURIComponent(targetUid)}`;
+        `profile.html?uid=${encodeURIComponent(uid)}`;
 
     });
 
