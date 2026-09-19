@@ -117,3 +117,57 @@
 .online-text.offline {
   color: #9ca3af !important;
 }
+
+/* ========================================
+   MOBILE VIEWPORT FIX
+======================================== */
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.app-page {
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.app-header {
+  width: 100%;
+  max-width: 100vw;
+}
+
+.dashboard {
+  width: 100%;
+  max-width: 1050px;
+  box-sizing: border-box;
+}
+
+.card {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.online-section {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.online-users {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
