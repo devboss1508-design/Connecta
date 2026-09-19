@@ -7,7 +7,7 @@
 
   <meta
     name="viewport"
-    content="width=device-width, initial-scale=1.0"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
   <meta
@@ -21,54 +21,44 @@
 
   <style>
 
-    /* ========================================
+    /* =====================================================
        CONNECTA PROFILE
-       REFERENCE STRUCTURE + CONNECTA COLORS
-    ======================================== */
+       OWN PROFILE + PUBLIC USER PROFILE
+    ===================================================== */
 
     .profile-page {
       min-height: 100vh;
-
       background: #f7faf7;
-
       padding-bottom: 35px;
     }
 
 
     .profile-container {
       width: 100%;
-
       max-width: 620px;
-
       margin: 0 auto;
-
       padding: 0 12px;
     }
 
 
-    /* ========================================
+    /* =====================================================
        HEADER
-    ======================================== */
+    ===================================================== */
 
     .profile-header {
       height: 64px;
 
       background: var(--primary);
-
       color: #fff;
 
       display: flex;
-
       align-items: center;
 
       padding: 0 14px;
-
       gap: 10px;
 
       position: sticky;
-
       top: 0;
-
       z-index: 50;
 
       box-shadow:
@@ -81,13 +71,11 @@
       height: 42px;
 
       border: 0;
-
       background: transparent;
 
       color: #fff;
 
       display: grid;
-
       place-items: center;
 
       font-size: 27px;
@@ -105,31 +93,28 @@
 
     .profile-header-title {
       font-size: 19px;
-
       font-weight: 900;
     }
 
 
-    /* ========================================
+    /* =====================================================
        PROFILE HERO
-    ======================================== */
+    ===================================================== */
 
     .profile-hero {
       text-align: center;
-
       padding: 25px 10px 10px;
     }
 
 
-    /* ========================================
+    /* =====================================================
        PROFILE PHOTO
-    ======================================== */
+    ===================================================== */
 
     .profile-photo-area {
       position: relative;
 
       width: 150px;
-
       height: 150px;
 
       margin: 0 auto;
@@ -138,7 +123,6 @@
 
     .profile-photo-ring {
       width: 145px;
-
       height: 145px;
 
       padding: 5px;
@@ -156,14 +140,12 @@
         0 5px 18px rgba(21,128,61,.18);
 
       display: grid;
-
       place-items: center;
     }
 
 
     .profile-avatar {
       width: 135px;
-
       height: 135px;
 
       border-radius: 50%;
@@ -171,41 +153,38 @@
       overflow: hidden;
 
       background: #baf0ca;
-
       color: #08752f;
 
       display: grid;
-
       place-items: center;
 
       font-size: 42px;
-
       font-weight: 900;
     }
 
 
     .profile-avatar img {
       width: 100%;
-
       height: 100%;
 
       object-fit: cover;
+
+      display: block;
     }
 
 
-    /* ========================================
-       CAMERA / PHOTO UPLOAD
-    ======================================== */
+    /* =====================================================
+       PHOTO UPLOAD
+       Only shown for OWN profile.
+    ===================================================== */
 
     .profile-photo-upload {
       position: absolute;
 
       right: -2px;
-
       bottom: 4px;
 
       width: 48px;
-
       height: 48px;
 
       border-radius: 50%;
@@ -213,11 +192,9 @@
       border: 4px solid #fff;
 
       background: #fff;
-
       color: #15803D;
 
       display: grid;
-
       place-items: center;
 
       font-size: 20px;
@@ -269,15 +246,14 @@
     }
 
 
-    /* ========================================
+    /* =====================================================
        NAME
-    ======================================== */
+    ===================================================== */
 
     .profile-name-row {
       display: flex;
 
       align-items: center;
-
       justify-content: center;
 
       gap: 6px;
@@ -294,16 +270,17 @@
       font-weight: 900;
 
       color: #17201b;
+
+      overflow-wrap: anywhere;
     }
 
 
-    /* ========================================
+    /* =====================================================
        VERIFIED BADGE
-    ======================================== */
+    ===================================================== */
 
     .verified-badge {
       width: 21px;
-
       height: 21px;
 
       min-width: 21px;
@@ -317,11 +294,9 @@
       display: inline-flex;
 
       align-items: center;
-
       justify-content: center;
 
       font-size: 12px;
-
       font-weight: 900;
 
       line-height: 1;
@@ -340,15 +315,14 @@
     }
 
 
-    /* ========================================
+    /* =====================================================
        STATUS
-    ======================================== */
+    ===================================================== */
 
     .profile-status {
       display: flex;
 
       justify-content: center;
-
       align-items: center;
 
       gap: 6px;
@@ -356,7 +330,6 @@
       margin-top: 8px;
 
       font-size: 12px;
-
       font-weight: 700;
     }
 
@@ -373,7 +346,6 @@
 
     .profile-status-dot {
       width: 8px;
-
       height: 8px;
 
       border-radius: 50%;
@@ -395,9 +367,9 @@
     }
 
 
-    /* ========================================
+    /* =====================================================
        BIO
-    ======================================== */
+    ===================================================== */
 
     .profile-bio {
       max-width: 420px;
@@ -412,20 +384,29 @@
     }
 
 
-    /* ========================================
-       MAIN ACTION
-    ======================================== */
+    /* =====================================================
+       FOLLOW / CHAT / VERIFY / EDIT ACTIONS
+    ===================================================== */
 
     .profile-main-action {
       padding: 8px 0 18px;
 
       text-align: center;
+
+      display: flex;
+
+      flex-wrap: wrap;
+
+      justify-content: center;
+
+      gap: 9px;
     }
 
 
     .profile-verify-btn,
     .profile-chat-btn,
-    .profile-edit-btn {
+    .profile-edit-btn,
+    .profile-follow-btn {
       width: 240px;
 
       min-height: 48px;
@@ -446,7 +427,6 @@
 
     .profile-verify-btn {
       background: var(--primary);
-
       color: #fff;
 
       box-shadow:
@@ -456,8 +436,23 @@
 
     .profile-chat-btn {
       background: var(--primary);
-
       color: #fff;
+    }
+
+
+    .profile-follow-btn {
+      background: #fff;
+      color: var(--primary);
+
+      border: 1px solid #bde5c8;
+    }
+
+
+    .profile-follow-btn.following {
+      background: #eaf9ee;
+      color: var(--primary-dark);
+
+      border-color: #d4eedb;
     }
 
 
@@ -472,12 +467,15 @@
 
     .profile-verify-btn:active,
     .profile-chat-btn:active,
-    .profile-edit-btn:active {
+    .profile-edit-btn:active,
+    .profile-follow-btn:active {
       transform: scale(.97);
     }
 
 
-    .profile-verify-btn:disabled {
+    .profile-verify-btn:disabled,
+    .profile-chat-btn:disabled,
+    .profile-follow-btn:disabled {
       opacity: .6;
 
       cursor: not-allowed;
@@ -488,6 +486,7 @@
       display: inline-flex;
 
       align-items: center;
+      justify-content: center;
 
       gap: 6px;
 
@@ -500,14 +499,59 @@
       color: #1769aa;
 
       font-size: 13px;
-
       font-weight: 800;
     }
 
 
-    /* ========================================
+    /* =====================================================
+       PUBLIC PROFILE STATS
+    ===================================================== */
+
+    .profile-public-stats {
+      display: grid;
+
+      grid-template-columns:
+        1fr 1fr;
+
+      margin-top: 14px;
+
+      border-top: 1px solid #e5ebe7;
+    }
+
+
+    .profile-public-stat {
+      text-align: center;
+
+      padding: 14px 8px 4px;
+    }
+
+
+    .profile-public-stat + .profile-public-stat {
+      border-left: 1px solid #e5ebe7;
+    }
+
+
+    .profile-public-stat-value {
+      color: #17201b;
+
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+
+    .profile-public-stat-label {
+      margin-top: 3px;
+
+      color: #727b75;
+
+      font-size: 12px;
+    }
+
+
+    /* =====================================================
        INFORMATION CARDS
-    ======================================== */
+       OWN PROFILE ONLY
+    ===================================================== */
 
     .profile-card {
       background: #fff;
@@ -529,18 +573,18 @@
       color: var(--primary-dark);
 
       font-size: 19px;
-
       font-weight: 900;
 
       padding-bottom: 12px;
 
-      border-bottom: 1px solid #e5ebe7;
+      border-bottom:
+        1px solid #e5ebe7;
     }
 
 
-    /* ========================================
+    /* =====================================================
        ACCOUNT STATISTICS
-    ======================================== */
+    ===================================================== */
 
     .profile-stat-grid {
       display: grid;
@@ -584,9 +628,9 @@
     }
 
 
-    /* ========================================
+    /* =====================================================
        INFO ROWS
-    ======================================== */
+    ===================================================== */
 
     .profile-info-row {
       display: flex;
@@ -619,9 +663,9 @@
     }
 
 
-    /* ========================================
-       EARN / REFER BUTTON
-    ======================================== */
+    /* =====================================================
+       REFER & EARN
+    ===================================================== */
 
     .profile-earn-btn {
       width: 100%;
@@ -651,9 +695,9 @@
     }
 
 
-    /* ========================================
+    /* =====================================================
        STORIES
-    ======================================== */
+    ===================================================== */
 
     .profile-stories-card {
       margin-top: 13px;
@@ -671,12 +715,12 @@
     }
 
 
-    /* ========================================
-       LOADING
-    ======================================== */
+    /* =====================================================
+       FAST PROFILE LOADING
+    ===================================================== */
 
     .profile-loading {
-      min-height: 350px;
+      min-height: 250px;
 
       display: grid;
 
@@ -688,9 +732,41 @@
     }
 
 
-    /* ========================================
+    /*
+    Small loading indicator.
+    profile.js can replace this immediately
+    when cached profile data exists.
+    */
+
+    .profile-loading::before {
+      content: "";
+
+      width: 24px;
+      height: 24px;
+
+      border: 3px solid #dcefe1;
+
+      border-top-color: #22C55E;
+
+      border-radius: 50%;
+
+      animation:
+        connectaProfileSpin .7s linear infinite;
+    }
+
+
+    @keyframes connectaProfileSpin {
+
+      to {
+        transform: rotate(360deg);
+      }
+
+    }
+
+
+    /* =====================================================
        ERROR
-    ======================================== */
+    ===================================================== */
 
     .profile-error {
       background: #fff;
@@ -703,15 +779,18 @@
 
       padding: 20px;
 
+      margin-top: 20px;
+
       text-align: center;
 
       font-size: 13px;
     }
 
 
-    /* ========================================
+    /* =====================================================
        VERIFICATION MODAL
-    ======================================== */
+       OWN PROFILE ONLY
+    ===================================================== */
 
     .verification-modal {
       position: fixed;
@@ -773,7 +852,6 @@
 
     .verification-close {
       width: 38px;
-
       height: 38px;
 
       border: 0;
@@ -792,7 +870,6 @@
 
     .verification-icon {
       width: 58px;
-
       height: 58px;
 
       margin: 4px auto 12px;
@@ -804,11 +881,9 @@
       color: var(--primary);
 
       display: grid;
-
       place-items: center;
 
       font-size: 27px;
-
       font-weight: 900;
     }
 
@@ -950,9 +1025,9 @@
     }
 
 
-    /* ========================================
+    /* =====================================================
        MOBILE
-    ======================================== */
+    ===================================================== */
 
     @media (max-width: 600px) {
 
@@ -1005,6 +1080,21 @@
         padding: 17px;
       }
 
+
+      .profile-main-action {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+
+
+      .profile-verify-btn,
+      .profile-chat-btn,
+      .profile-edit-btn,
+      .profile-follow-btn {
+        width: 100%;
+        max-width: 280px;
+      }
+
     }
 
   </style>
@@ -1016,9 +1106,9 @@
 
   <main class="profile-page">
 
-    <!-- ========================================
+    <!-- =================================================
          HEADER
-    ======================================== -->
+    ================================================= -->
 
     <header class="profile-header">
 
@@ -1031,16 +1121,28 @@
         ←
       </button>
 
-      <div class="profile-header-title">
+
+      <div
+        id="profileHeaderTitle"
+        class="profile-header-title"
+      >
         Profile
       </div>
 
     </header>
 
 
-    <!-- ========================================
+    <!-- =================================================
          PROFILE CONTENT
-    ======================================== -->
+         
+         profile.js controls whether this becomes:
+         
+         1. OWN PROFILE
+            Full private account information.
+         
+         2. OTHER USER PROFILE
+            Public information only.
+    ================================================= -->
 
     <section
       id="profileContainer"
@@ -1056,9 +1158,13 @@
   </main>
 
 
-  <!-- ========================================
+  <!-- =====================================================
        VERIFY ACCOUNT MODAL
-  ======================================== -->
+
+       This is only usable from the OWN profile.
+       profile.js will not expose it when viewing another
+       user's profile.
+  ===================================================== -->
 
   <div
     id="verificationModal"
@@ -1082,6 +1188,7 @@
           Verify Account
         </div>
 
+
         <button
           id="verificationClose"
           class="verification-close"
@@ -1100,9 +1207,12 @@
 
 
       <p class="verification-description">
-        Get the blue verified badge on your CONNECTA profile.
-        Verification requires a one-time payment of KSh 999.
-        Your payment will be processed securely through CONNECTA.
+
+        Get the blue verified badge on your CONNECTA
+        profile. Verification requires a one-time payment
+        of KSh 999. Your payment will be processed
+        securely through CONNECTA.
+
       </p>
 
 
@@ -1141,7 +1251,7 @@
         class="verification-submit"
         type="button"
       >
-        Pay KSh 999 & Verify
+        Pay KSh 999 &amp; Verify
       </button>
 
 
@@ -1155,6 +1265,10 @@
 
   </div>
 
+
+  <!-- =====================================================
+       PROFILE ENGINE
+  ===================================================== -->
 
   <script
     type="module"
