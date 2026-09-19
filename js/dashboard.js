@@ -28,6 +28,38 @@ function initials(name = "U") {
   return name.trim().split(/\s+/).slice(0,2).map(x => x[0]).join("").toUpperCase() || "U";
 }
 
+function getFullName(user = {}, fallbackUser = null) {
+  const displayName = String(user.displayName || "").trim();
+
+  if (displayName) {
+    return displayName;
+  }
+
+  const firstName = String(user.firstName || "").trim();
+  const lastName = String(user.lastName || "").trim();
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  if (fullName) {
+    return fullName;
+  }
+
+  const authName = String(fallbackUser?.displayName || "").trim();
+
+  if (authName) {
+    return authName;
+  }
+
+  const username = String(user.username || "").trim();
+
+  if (username) {
+    return username.replace(/^@/, "");
+  }
+
+  const emailName = String(fallbackUser?.email || "").split("@")[0].trim();
+
+  return emailName || "CONNECTA User";
+}
+
 function showToast(message) {
   const toast = $("toast");
   toast.textContent = message;
@@ -44,7 +76,7 @@ function avatarMarkup(user, extra = "") {
 
 function renderProfile(profile) {
   currentProfile = profile || {};
-  const name = profile?.displayName || profile?.username || currentUser?.email?.split("@")[0] || "there";
+  const name = getFullName(currentProfile, currentUser);
   const username = profile?.username ? `@${profile.username.replace(/^@/,"")}` : "@username";
   const init = initials(name);
 
@@ -61,7 +93,7 @@ function renderOnline(filter = "") {
   const term = filter.trim().toLowerCase();
   const list = onlineUsers.filter(u => {
     if (u.uid === currentUser?.uid) return true;
-    const haystack = `${u.displayName || ""} ${u.username || ""}`.toLowerCase();
+    const haystack = `${getFullName(u, u.uid === currentUser?.uid ? currentUser : null)} ${u.username || ""}`.toLowerCase();
     return !term || haystack.includes(term);
   });
 
@@ -74,7 +106,7 @@ function renderOnline(filter = "") {
 
   box.innerHTML = list.map(u => {
     const isMe = u.uid === currentUser?.uid;
-    const name = u.displayName || `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.username || "CONNECTA User";
+    const name = getFullName(u, u.uid === currentUser?.uid ? currentUser : null);
     const following = Array.isArray(currentProfile?.following) && currentProfile.following.includes(u.uid);
 
     return `
@@ -249,11 +281,55 @@ onAuthStateChanged(auth, async user => {
   currentUser = user;
 
   try {
-    const snap = await getDoc(doc(db, "users", user.uid));
-    renderProfile(snap.exists() ? snap.data() : { displayName: user.displayName || "" });
-  } catch (e) {
-    console.warn("Profile read failed:", e);
-    renderProfile({ displayName: user.displayName || "" });
+  const userRef = doc(db, "users", user.uid);
+  const snap = await getDoc(userRef);
+
+  let profile = snap.exists() ? snap.data() : {};
+
+  /*
+  ========================================
+  REPAIR / SYNC USER PROFILE
+  ========================================
+  */
+
+  const authDisplayName = String(user.displayName || "").trim();
+
+  if (!profile.displayName && authDisplayName) {
+    profile.displayName = authDisplayName;
+  }
+
+  if (!profile.firstName && authDisplayName) {
+    const parts = authDisplayName.split(/\s+/);
+
+    profile.firstName = parts.shift() || "";
+    profile.lastName = parts.join(" ") || "";
+  }
+
+  /*
+  Save missing name information back to
+  Firestore without replacing existing data.
+  */
+  if (
+    authDisplayName &&
+    (!snap.exists() ||
+     !snap.data()?.displayName ||
+     !snap.data()?.firstName ||
+     !snap.data()?.lastName)
+  ) {
+    await setDoc(userRef, {
+      displayName: profile.displayName,
+      firstName: profile.firstName,
+      lastName: profile.lastName
+    }, { merge: true });
+  }
+
+  renderProfile(profile);
+
+} catch (e) {
+  console.warn("Profile read/repair failed:", e);
+  renderProfile({
+    displayName: user.displayName || "" 
+   });
   }
 
   await setPresence(true);
