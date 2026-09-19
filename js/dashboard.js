@@ -598,6 +598,7 @@ function avatarMarkup(
 
 /* =========================================================
    VERIFIED BADGE
+   Blue verified badge — same visual style as Profile
 ========================================================= */
 
 function verifiedBadge(user = {}) {
@@ -614,11 +615,26 @@ function verifiedBadge(user = {}) {
       class="verified-badge"
       aria-label="Verified account"
       title="Verified account"
+      style="
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:18px;
+        height:18px;
+        margin-left:5px;
+        border-radius:50%;
+        background:#2196F3;
+        color:#ffffff;
+        font-size:11px;
+        font-weight:800;
+        line-height:1;
+        vertical-align:middle;
+        flex-shrink:0;
+      "
     >✓</span>
   `;
 
 }
-
 
 /* =========================================================
    CURRENT USER PROFILE
