@@ -1379,7 +1379,6 @@ async function sendMessage() {
     ) {
 
         return;
-
     }
 
 
@@ -1398,8 +1397,15 @@ async function sendMessage() {
     try {
 
         /*
+        ==============================================
         STOP TYPING
+        ==============================================
         */
+
+        clearTimeout(
+            typingTimer
+        );
+
 
         await setTyping(
             false
@@ -1407,20 +1413,49 @@ async function sendMessage() {
 
 
         /*
-        CREATE MESSAGE
+        ==============================================
+        REFERENCES
+        ==============================================
         */
 
-        const messagesRef =
-            collection(
+        const chatRef =
+            doc(
                 db,
                 "chats",
-                chatId,
-                "messages"
+                chatId
             );
 
 
-        await addDoc(
-            messagesRef,
+        const messageRef =
+            doc(
+                collection(
+                    db,
+                    "chats",
+                    chatId,
+                    "messages"
+                )
+            );
+
+
+        /*
+        ==============================================
+        ATOMIC BATCH
+        ==============================================
+
+        Message creation and unread counter
+        are committed together.
+        */
+
+        const batch =
+            writeBatch(db);
+
+
+        /*
+        CREATE MESSAGE
+        */
+
+        batch.set(
+            messageRef,
             {
 
                 senderId:
@@ -1433,6 +1468,11 @@ async function sendMessage() {
 
                 createdAt:
                     serverTimestamp(),
+
+                /*
+                Initial state:
+                one gray tick.
+                */
 
                 delivered:
                     false,
@@ -1454,13 +1494,17 @@ async function sendMessage() {
         UPDATE CHAT
         */
 
-        await updateDoc(
-            doc(
-                db,
-                "chats",
-                chatId
-            ),
+        batch.set(
+            chatRef,
             {
+
+                participants: [
+
+                    currentUser.uid,
+
+                    otherUser.uid
+
+                ],
 
                 lastMessage:
                     text,
@@ -1471,11 +1515,25 @@ async function sendMessage() {
                 updatedAt:
                     serverTimestamp(),
 
+                /*
+                THIS IS THE UNREAD COUNTER.
+                */
+
                 [`unreadCount.${otherUser.uid}`]:
                     increment(1)
 
+            },
+            {
+                merge: true
             }
         );
+
+
+        /*
+        COMMIT BOTH TOGETHER
+        */
+
+        await batch.commit();
 
 
         /*
@@ -1514,7 +1572,6 @@ async function sendMessage() {
     }
 
 }
-
 
 /* =====================================================
    TYPING
