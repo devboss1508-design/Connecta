@@ -92,7 +92,8 @@ function renderOnline(filter = "") {
   const box = $("onlineUsers");
   const term = filter.trim().toLowerCase();
 
-  const list = onlineUsers.filter(u => {
+  const list = onlineUsers
+  .filter(u => {
     const fullName = getFullName(
       u,
       u.uid === currentUser?.uid ? currentUser : null
@@ -102,6 +103,11 @@ function renderOnline(filter = "") {
       `${fullName} ${u.username || ""}`.toLowerCase();
 
     return !term || haystack.includes(term);
+  })
+  .sort((a, b) => {
+    if (a.uid === currentUser?.uid) return -1;
+    if (b.uid === currentUser?.uid) return 1;
+    return 0;
   });
 
   $("onlineCount").textContent = `(${onlineUsers.length})`;
