@@ -93,7 +93,27 @@ function renderOnline(filter = "") {
   const term = filter.trim().toLowerCase();
 
   const list = onlineUsers
-  .filter(u => {
+    .filter(u => {
+      const fullName = getFullName(
+        u,
+        u.uid === currentUser?.uid ? currentUser : null
+      );
+
+      const haystack = `${fullName} ${u.username || ""}`.toLowerCase();
+
+      return !term || haystack.includes(term);
+    })
+    .sort((a, b) => {
+      // Always put the currently logged-in user first
+      if (a.uid === currentUser?.uid) return -1;
+      if (b.uid === currentUser?.uid) return 1;
+
+      // Then put online users before offline users
+      if (a.isOnline === true && b.isOnline !== true) return -1;
+      if (a.isOnline !== true && b.isOnline === true) return 1;
+
+      return 0;
+    });
     const fullName = getFullName(
       u,
       u.uid === currentUser?.uid ? currentUser : null
