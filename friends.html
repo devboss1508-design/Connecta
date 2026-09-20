@@ -15,7 +15,7 @@
     content="#22C55E"
   >
 
-  <title>Friends & Earn — CONNECTA</title>
+  <title>Friends — CONNECTA</title>
 
   <link
     rel="stylesheet"
@@ -30,7 +30,7 @@
   <style>
 
     /* =========================================================
-       CONNECTA FRIENDS + REFER & EARN
+       CONNECTA FRIENDS
     ========================================================= */
 
     :root {
@@ -45,19 +45,10 @@
     }
 
 
-    * {
-      box-sizing: border-box;
-    }
-
-
     body {
       background: var(--connecta-bg);
     }
 
-
-    /* =========================================================
-       MAIN
-    ========================================================= */
 
     .friends-page {
       width: 100%;
@@ -132,15 +123,15 @@
 
 
     /* =========================================================
-       INVITE CARD
+       SEARCH
     ========================================================= */
 
-    .invite-card {
+    .search-card {
       background: #ffffff;
 
       border-radius: 20px;
 
-      padding: 18px;
+      padding: 15px;
 
       margin-bottom: 15px;
 
@@ -151,70 +142,12 @@
     }
 
 
-    .section-title {
+    .search-box {
       display: flex;
 
       align-items: center;
 
-      gap: 10px;
-
-      margin-bottom: 5px;
-    }
-
-
-    .section-title-icon {
-      width: 38px;
-
-      height: 38px;
-
-      border-radius: 12px;
-
-      display: flex;
-
-      align-items: center;
-
-      justify-content: center;
-
-      background: var(--connecta-light);
-
-      color: var(--connecta-green);
-
-      font-size: 19px;
-
-      flex-shrink: 0;
-    }
-
-
-    .section-title h2 {
-      margin: 0;
-
-      font-size: 18px;
-
-      color: var(--connecta-text);
-    }
-
-
-    .section-subtitle {
-      margin: 0 0 15px 48px;
-
-      color: var(--connecta-muted);
-
-      font-size: 13px;
-
-      line-height: 1.4;
-    }
-
-
-    /* =========================================================
-       REFERRAL LINK
-    ========================================================= */
-
-    .invite-link-box {
-      display: flex;
-
-      align-items: center;
-
-      gap: 8px;
+      gap: 9px;
 
       background: #F8FAF9;
 
@@ -222,426 +155,183 @@
 
       border-radius: 14px;
 
-      padding: 7px;
-
-      margin-bottom: 12px;
+      padding: 0 13px;
     }
 
 
-    .invite-link-input {
-      min-width: 0;
+    .search-icon {
+      color: var(--connecta-muted);
 
-      flex: 1;
+      font-size: 18px;
+
+      flex-shrink: 0;
+    }
+
+
+    #friendSearch {
+      width: 100%;
+
+      min-width: 0;
 
       border: 0;
 
-      outline: none;
+      outline: 0;
 
       background: transparent;
 
-      padding: 9px 8px;
+      padding: 13px 0;
 
-      font-size: 13px;
+      font-size: 14px;
 
-      color: #374151;
+      color: var(--connecta-text);
 
       font-family: inherit;
-
-      white-space: nowrap;
-
-      overflow: hidden;
-
-      text-overflow: ellipsis;
     }
 
 
-    .copy-link-btn {
-      border: 0;
-
-      background: var(--connecta-green);
-
-      color: #ffffff;
-
-      border-radius: 11px;
-
-      padding: 10px 13px;
-
-      font-weight: 800;
-
-      font-size: 13px;
-
-      cursor: pointer;
-
-      white-space: nowrap;
-
-      transition: 0.2s ease;
-    }
-
-
-    .copy-link-btn:active {
-      transform: scale(0.96);
+    #friendSearch::placeholder {
+      color: #9CA3AF;
     }
 
 
     /* =========================================================
-       SHARE BUTTONS
+       TABS
     ========================================================= */
 
-    .share-title {
-      margin: 13px 0 9px;
-
-      font-size: 13px;
-
-      font-weight: 800;
-
-      color: #374151;
-    }
-
-
-    .share-grid {
+    .friends-tabs {
       display: grid;
 
       grid-template-columns:
-        repeat(4, minmax(0, 1fr));
+        repeat(3, 1fr);
 
-      gap: 9px;
+      gap: 7px;
+
+      margin-bottom: 15px;
     }
 
 
-    .share-btn {
+    .friend-tab {
       border: 0;
 
-      min-height: 68px;
+      background: #ffffff;
 
-      border-radius: 14px;
+      color: var(--connecta-muted);
 
-      background: #F8FAF9;
+      border: 1px solid var(--connecta-border);
 
-      border: 1px solid #E5E7EB;
+      border-radius: 13px;
 
-      display: flex;
-
-      flex-direction: column;
-
-      align-items: center;
-
-      justify-content: center;
-
-      gap: 5px;
-
-      cursor: pointer;
-
-      color: #374151;
+      padding: 11px 7px;
 
       font-family: inherit;
 
-      font-weight: 700;
+      font-size: 12px;
 
-      font-size: 11px;
+      font-weight: 800;
 
-      transition: 0.2s ease;
+      cursor: pointer;
     }
 
 
-    .share-btn:active {
-      transform: scale(0.95);
-    }
-
-
-    .share-icon {
-      width: 30px;
-
-      height: 30px;
-
-      border-radius: 9px;
-
-      display: flex;
-
-      align-items: center;
-
-      justify-content: center;
-
-      font-size: 15px;
-
-      font-weight: 900;
+    .friend-tab.active {
+      background: var(--connecta-green);
 
       color: #ffffff;
-    }
 
-
-    .share-whatsapp .share-icon {
-      background: #25D366;
-    }
-
-
-    .share-facebook .share-icon {
-      background: #1877F2;
-    }
-
-
-    .share-telegram .share-icon {
-      background: #229ED9;
-    }
-
-
-    .share-more .share-icon {
-      background: var(--connecta-green);
+      border-color: var(--connecta-green);
     }
 
 
     /* =========================================================
-       HOW IT WORKS
+       SECTION CARD
     ========================================================= */
 
-    .how-card {
+    .friends-section {
       background: #ffffff;
 
       border-radius: 20px;
 
-      padding: 18px;
+      padding: 17px;
 
       margin-bottom: 15px;
-
-      border: 1px solid var(--connecta-border);
-    }
-
-
-    .steps {
-      display: grid;
-
-      gap: 10px;
-
-      margin-top: 14px;
-    }
-
-
-    .step {
-      display: flex;
-
-      align-items: flex-start;
-
-      gap: 12px;
-
-      padding: 11px;
-
-      border-radius: 14px;
-
-      background: #F8FAF9;
-    }
-
-
-    .step-number {
-      width: 30px;
-
-      height: 30px;
-
-      border-radius: 50%;
-
-      display: flex;
-
-      align-items: center;
-
-      justify-content: center;
-
-      flex-shrink: 0;
-
-      background: var(--connecta-green);
-
-      color: #ffffff;
-
-      font-weight: 800;
-
-      font-size: 13px;
-    }
-
-
-    .step-content strong {
-      display: block;
-
-      color: var(--connecta-text);
-
-      font-size: 13px;
-
-      margin-bottom: 3px;
-    }
-
-
-    .step-content span {
-      display: block;
-
-      color: var(--connecta-muted);
-
-      font-size: 12px;
-
-      line-height: 1.4;
-    }
-
-
-    /* =========================================================
-       EARNINGS STATS
-    ========================================================= */
-
-    .stats-grid {
-      display: grid;
-
-      grid-template-columns:
-        repeat(3, minmax(0, 1fr));
-
-      gap: 10px;
-
-      margin-bottom: 15px;
-    }
-
-
-    .stat-card {
-      background: #ffffff;
-
-      border-radius: 17px;
-
-      padding: 15px 10px;
-
-      text-align: center;
 
       border: 1px solid var(--connecta-border);
 
       box-shadow:
-        0 4px 14px rgba(0, 0, 0, 0.035);
+        0 5px 18px rgba(0, 0, 0, 0.035);
     }
 
 
-    .stat-icon {
-      font-size: 20px;
-
-      margin-bottom: 6px;
-    }
-
-
-    .stat-value {
-      display: block;
-
-      font-size: 18px;
-
-      font-weight: 900;
-
-      color: var(--connecta-text);
-
-      line-height: 1.2;
-    }
-
-
-    .stat-label {
-      display: block;
-
-      margin-top: 4px;
-
-      font-size: 10px;
-
-      color: var(--connecta-muted);
-
-      line-height: 1.3;
-    }
-
-
-    .earnings-value {
-      color: var(--connecta-green);
-    }
-
-
-    /* =========================================================
-       REFERRAL REWARD
-    ========================================================= */
-
-    .reward-banner {
-      background: #ECFDF5;
-
-      border: 1px solid #BBF7D0;
-
-      border-radius: 17px;
-
-      padding: 14px;
-
-      margin-bottom: 15px;
-
+    .section-heading {
       display: flex;
 
       align-items: center;
 
-      gap: 12px;
+      justify-content: space-between;
+
+      gap: 10px;
+
+      margin-bottom: 13px;
     }
 
 
-    .reward-icon {
-      width: 42px;
+    .section-heading h2 {
+      margin: 0;
 
-      height: 42px;
+      color: var(--connecta-text);
 
-      border-radius: 13px;
+      font-size: 18px;
 
-      background: var(--connecta-green);
+      font-weight: 800;
+    }
 
-      color: #ffffff;
 
-      display: flex;
+    .section-heading p {
+      margin: 3px 0 0;
+
+      color: var(--connecta-muted);
+
+      font-size: 12px;
+    }
+
+
+    .count-badge {
+      min-width: 30px;
+
+      height: 27px;
+
+      padding: 0 9px;
+
+      border-radius: 999px;
+
+      background: var(--connecta-light);
+
+      color: var(--connecta-dark-green);
+
+      display: inline-flex;
 
       align-items: center;
 
       justify-content: center;
 
-      font-size: 21px;
+      font-size: 11px;
 
-      flex-shrink: 0;
-    }
-
-
-    .reward-text strong {
-      display: block;
-
-      color: #166534;
-
-      font-size: 14px;
-
-      margin-bottom: 3px;
-    }
-
-
-    .reward-text span {
-      display: block;
-
-      color: #4B6354;
-
-      font-size: 12px;
-
-      line-height: 1.4;
+      font-weight: 900;
     }
 
 
     /* =========================================================
-       REFERRAL HISTORY
+       USER LIST
     ========================================================= */
 
-    .history-card {
-      background: #ffffff;
-
-      border-radius: 20px;
-
-      padding: 18px;
-
-      border: 1px solid var(--connecta-border);
-
-      margin-bottom: 15px;
-    }
-
-
-    .history-list {
+    .users-list {
       display: grid;
 
       gap: 9px;
-
-      margin-top: 14px;
     }
 
 
-    .history-item {
+    .user-card {
       display: flex;
 
       align-items: center;
@@ -652,16 +342,20 @@
 
       background: #F8FAF9;
 
-      border-radius: 14px;
+      border: 1px solid #E8EEE9;
+
+      border-radius: 15px;
     }
 
 
-    .history-avatar {
-      width: 38px;
+    .user-avatar {
+      width: 46px;
 
-      height: 38px;
+      height: 46px;
 
       border-radius: 50%;
+
+      flex-shrink: 0;
 
       background: var(--connecta-light);
 
@@ -675,13 +369,13 @@
 
       font-weight: 900;
 
-      flex-shrink: 0;
-
       overflow: hidden;
+
+      position: relative;
     }
 
 
-    .history-avatar img {
+    .user-avatar img {
       width: 100%;
 
       height: 100%;
@@ -690,19 +384,95 @@
     }
 
 
-    .history-info {
-      min-width: 0;
+    .online-dot {
+      position: absolute;
 
-      flex: 1;
+      right: 0;
+
+      bottom: 1px;
+
+      width: 12px;
+
+      height: 12px;
+
+      border-radius: 50%;
+
+      background: #22C55E;
+
+      border: 2px solid #ffffff;
     }
 
 
-    .history-name {
+    .user-info {
+      min-width: 0;
+
+      flex: 1;
+
+      cursor: pointer;
+    }
+
+
+    .user-name {
+      display: flex;
+
+      align-items: center;
+
+      min-width: 0;
+
+      color: var(--connecta-text);
+
       font-size: 13px;
 
       font-weight: 800;
+    }
 
-      color: var(--connecta-text);
+
+    .user-name-text {
+      min-width: 0;
+
+      overflow: hidden;
+
+      text-overflow: ellipsis;
+
+      white-space: nowrap;
+    }
+
+
+    .verified-badge {
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      width: 17px;
+
+      height: 17px;
+
+      margin-left: 5px;
+
+      border-radius: 50%;
+
+      background: var(--connecta-blue);
+
+      color: #ffffff;
+
+      font-size: 10px;
+
+      font-weight: 900;
+
+      line-height: 1;
+
+      flex-shrink: 0;
+    }
+
+
+    .username {
+      margin-top: 2px;
+
+      color: var(--connecta-muted);
+
+      font-size: 11px;
 
       white-space: nowrap;
 
@@ -712,119 +482,142 @@
     }
 
 
-    .history-date {
-      font-size: 11px;
-
-      color: var(--connecta-muted);
-
+    .online-status {
       margin-top: 2px;
+
+      font-size: 10px;
+
+      font-weight: 700;
     }
 
 
-    .history-reward {
-      font-size: 12px;
-
-      font-weight: 900;
-
+    .online-status.online {
       color: var(--connecta-green);
-
-      white-space: nowrap;
     }
 
 
-    .empty-history {
-      padding: 25px 10px;
-
-      text-align: center;
-
-      color: var(--connecta-muted);
-
-      font-size: 13px;
+    .online-status.offline {
+      color: #9CA3AF;
     }
 
 
     /* =========================================================
-       REFERRAL CODE
+       ACTION BUTTON
     ========================================================= */
 
-    .code-card {
-      background: #ffffff;
-
-      border-radius: 20px;
-
-      padding: 18px;
-
-      border: 1px solid var(--connecta-border);
-    }
-
-
-    .code-box {
-      margin-top: 13px;
-
-      display: flex;
-
-      align-items: center;
-
-      justify-content: space-between;
-
-      gap: 10px;
-
-      background: var(--connecta-light);
-
-      border: 1px dashed #86EFAC;
-
-      border-radius: 14px;
-
-      padding: 13px 14px;
-    }
-
-
-    .code-label {
-      font-size: 10px;
-
-      color: #4B6354;
-
-      text-transform: uppercase;
-
-      letter-spacing: 0.8px;
-
-      font-weight: 800;
-    }
-
-
-    .code-value {
-      display: block;
-
-      margin-top: 3px;
-
-      font-size: 18px;
-
-      color: #166534;
-
-      font-weight: 900;
-
-      letter-spacing: 1px;
-    }
-
-
-    .copy-code-btn {
+    .follow-btn {
       border: 0;
 
-      background: #ffffff;
-
-      color: var(--connecta-green);
-
-      border: 1px solid #BBF7D0;
-
-      padding: 9px 11px;
-
       border-radius: 10px;
+
+      padding: 8px 12px;
+
+      min-width: 72px;
+
+      background: var(--connecta-green);
+
+      color: #ffffff;
+
+      font-family: inherit;
 
       font-size: 11px;
 
       font-weight: 800;
 
       cursor: pointer;
+
+      flex-shrink: 0;
+    }
+
+
+    .follow-btn.following {
+      background: #E8F5EC;
+
+      color: var(--connecta-dark-green);
+
+      border: 1px solid #BBF7D0;
+    }
+
+
+    .follow-btn:disabled {
+      opacity: 0.6;
+
+      cursor: wait;
+    }
+
+
+    /* =========================================================
+       EMPTY / LOADING
+    ========================================================= */
+
+    .empty-state {
+      text-align: center;
+
+      padding: 28px 15px;
+
+      color: var(--connecta-muted);
+
+      font-size: 13px;
+
+      line-height: 1.5;
+    }
+
+
+    .empty-icon {
+      font-size: 30px;
+
+      margin-bottom: 7px;
+    }
+
+
+    /* =========================================================
+       FRIEND COUNT INFO
+    ========================================================= */
+
+    .connection-summary {
+      display: grid;
+
+      grid-template-columns:
+        repeat(2, 1fr);
+
+      gap: 10px;
+
+      margin-bottom: 15px;
+    }
+
+
+    .summary-card {
+      background: #ffffff;
+
+      border: 1px solid var(--connecta-border);
+
+      border-radius: 17px;
+
+      padding: 15px;
+
+      text-align: center;
+    }
+
+
+    .summary-value {
+      display: block;
+
+      font-size: 20px;
+
+      font-weight: 900;
+
+      color: var(--connecta-green);
+    }
+
+
+    .summary-label {
+      display: block;
+
+      margin-top: 3px;
+
+      color: var(--connecta-muted);
+
+      font-size: 11px;
     }
 
 
@@ -882,40 +675,6 @@
        RESPONSIVE
     ========================================================= */
 
-    @media (max-width: 420px) {
-
-      .share-grid {
-        grid-template-columns:
-          repeat(4, minmax(0, 1fr));
-
-        gap: 6px;
-      }
-
-
-      .share-btn {
-        min-height: 64px;
-
-        font-size: 10px;
-      }
-
-
-      .stats-grid {
-        gap: 7px;
-      }
-
-
-      .stat-card {
-        padding: 13px 7px;
-      }
-
-
-      .stat-value {
-        font-size: 16px;
-      }
-
-    }
-
-
     @media (min-width: 700px) {
 
       .friends-page {
@@ -923,9 +682,9 @@
       }
 
 
-      .steps {
+      .users-list {
         grid-template-columns:
-          repeat(3, 1fr);
+          repeat(2, minmax(0, 1fr));
       }
 
     }
@@ -1005,8 +764,13 @@
   >
 
     <div class="menu-brand">
-      <span class="brand-mark">C</span>
+
+      <span class="brand-mark">
+        C
+      </span>
+
       CONNECTA
+
     </div>
 
 
@@ -1057,7 +821,7 @@
       href="friends.html"
     >
       👤
-      <span>Friends & Earn</span>
+      <span>Friends</span>
     </a>
 
 
@@ -1070,6 +834,12 @@
     <a href="verification.html">
       ✓
       <span>Verification</span>
+    </a>
+
+
+    <a href="earn.html">
+      🎁
+      <span>Refer & Earn</span>
     </a>
 
 
@@ -1111,17 +881,16 @@
     <section class="friends-hero">
 
       <span class="eyebrow">
-        CONNECTA FRIENDS
+        CONNECTA COMMUNITY
       </span>
 
       <h1>
-        Invite friends & earn 💚
+        Find your friends 👥
       </h1>
 
       <p>
-        Share your CONNECTA invite link. When someone registers
-        successfully using your link, you earn
-        <strong>KSh 5</strong>.
+        Discover people on CONNECTA, follow them,
+        and start connecting.
       </p>
 
     </section>
@@ -1129,159 +898,24 @@
 
 
     <!-- =====================================================
-         INVITE LINK
+         SEARCH
     ====================================================== -->
 
-    <section class="invite-card">
+    <section class="search-card">
 
-      <div class="section-title">
+      <div class="search-box">
 
-        <div class="section-title-icon">
-          🔗
-        </div>
-
-        <h2>
-          Your Invite Link
-        </h2>
-
-      </div>
-
-
-      <p class="section-subtitle">
-        Copy your link or share it directly with your friends.
-      </p>
-
-
-      <div class="invite-link-box">
-
-        <input
-          type="text"
-          id="inviteLink"
-          class="invite-link-input"
-          readonly
-          value="Loading your invite link..."
-          aria-label="Your CONNECTA invite link"
-        >
-
-
-        <button
-          type="button"
-          class="copy-link-btn"
-          id="copyInviteBtn"
-        >
-          Copy
-        </button>
-
-      </div>
-
-
-      <div class="share-title">
-        Share your invitation
-      </div>
-
-
-      <div class="share-grid">
-
-
-        <!-- WhatsApp -->
-
-        <button
-          type="button"
-          class="share-btn share-whatsapp"
-          id="whatsappShareBtn"
-        >
-
-          <span class="share-icon">
-            W
-          </span>
-
-          WhatsApp
-
-        </button>
-
-
-
-        <!-- Facebook -->
-
-        <button
-          type="button"
-          class="share-btn share-facebook"
-          id="facebookShareBtn"
-        >
-
-          <span class="share-icon">
-            f
-          </span>
-
-          Facebook
-
-        </button>
-
-
-
-        <!-- Telegram -->
-
-        <button
-          type="button"
-          class="share-btn share-telegram"
-          id="telegramShareBtn"
-        >
-
-          <span class="share-icon">
-            ➤
-          </span>
-
-          Telegram
-
-        </button>
-
-
-
-        <!-- More -->
-
-        <button
-          type="button"
-          class="share-btn share-more"
-          id="moreShareBtn"
-        >
-
-          <span class="share-icon">
-            ↗
-          </span>
-
-          More
-
-        </button>
-
-      </div>
-
-    </section>
-
-
-
-    <!-- =====================================================
-         REWARD BANNER
-    ====================================================== -->
-
-    <section class="reward-banner">
-
-      <div class="reward-icon">
-        💰
-      </div>
-
-
-      <div class="reward-text">
-
-        <strong>
-          Earn KSh 5 per successful referral
-        </strong>
-
-        <span>
-          Your reward is credited when the invited person
-          successfully registers on CONNECTA using your
-          referral link.
+        <span class="search-icon">
+          🔎
         </span>
 
+        <input
+          id="friendSearch"
+          type="search"
+          placeholder="Search by name or username..."
+          autocomplete="off"
+        >
+
       </div>
 
     </section>
@@ -1289,168 +923,39 @@
 
 
     <!-- =====================================================
-         STATS
+         SUMMARY
     ====================================================== -->
 
-    <section class="stats-grid">
+    <section class="connection-summary">
 
-
-      <div class="stat-card">
-
-        <div class="stat-icon">
-          👥
-        </div>
+      <div class="summary-card">
 
         <span
-          class="stat-value"
-          id="totalInvited"
+          class="summary-value"
+          id="followingCount"
         >
           0
         </span>
 
-        <span class="stat-label">
-          Successful Referrals
+        <span class="summary-label">
+          Following
         </span>
 
       </div>
 
 
-
-      <div class="stat-card">
-
-        <div class="stat-icon">
-          💵
-        </div>
+      <div class="summary-card">
 
         <span
-          class="stat-value earnings-value"
-          id="totalEarned"
+          class="summary-value"
+          id="followersCount"
         >
-          KSh 0
+          0
         </span>
 
-        <span class="stat-label">
-          Referral Earnings
+        <span class="summary-label">
+          Followers
         </span>
-
-      </div>
-
-
-
-      <div class="stat-card">
-
-        <div class="stat-icon">
-          🎁
-        </div>
-
-        <span
-          class="stat-value"
-          id="rewardAmount"
-        >
-          KSh 5
-        </span>
-
-        <span class="stat-label">
-          Per Referral
-        </span>
-
-      </div>
-
-
-    </section>
-
-
-
-    <!-- =====================================================
-         HOW IT WORKS
-    ====================================================== -->
-
-    <section class="how-card">
-
-      <div class="section-title">
-
-        <div class="section-title-icon">
-          💡
-        </div>
-
-        <h2>
-          How it works
-        </h2>
-
-      </div>
-
-
-      <div class="steps">
-
-
-        <div class="step">
-
-          <div class="step-number">
-            1
-          </div>
-
-          <div class="step-content">
-
-            <strong>
-              Share your link
-            </strong>
-
-            <span>
-              Send your unique CONNECTA invitation link
-              to friends through WhatsApp, Facebook,
-              Telegram or any other platform.
-            </span>
-
-          </div>
-
-        </div>
-
-
-
-        <div class="step">
-
-          <div class="step-number">
-            2
-          </div>
-
-          <div class="step-content">
-
-            <strong>
-              Friend registers
-            </strong>
-
-            <span>
-              Your friend creates a CONNECTA account
-              using your referral link.
-            </span>
-
-          </div>
-
-        </div>
-
-
-
-        <div class="step">
-
-          <div class="step-number">
-            3
-          </div>
-
-          <div class="step-content">
-
-            <strong>
-              You earn KSh 5
-            </strong>
-
-            <span>
-              After the referral is successfully recorded,
-              KSh 5 is added to your referral earnings.
-            </span>
-
-          </div>
-
-        </div>
-
 
       </div>
 
@@ -1459,90 +964,198 @@
 
 
     <!-- =====================================================
-         REFERRAL HISTORY
+         TABS
     ====================================================== -->
 
-    <section class="history-card">
+    <div class="friends-tabs">
 
-      <div class="section-title">
-
-        <div class="section-title-icon">
-          🧾
-        </div>
-
-        <h2>
-          Referral History
-        </h2>
-
-      </div>
-
-
-      <p class="section-subtitle">
-        People who successfully joined CONNECTA through
-        your invitation.
-      </p>
-
-
-      <div
-        class="history-list"
-        id="referralHistory"
+      <button
+        class="friend-tab active"
+        data-tab="discover"
       >
+        Discover
+      </button>
 
-        <div class="empty-history">
-          No successful referrals yet.
-          Start sharing your invite link.
-        </div>
 
-      </div>
+      <button
+        class="friend-tab"
+        data-tab="following"
+      >
+        Following
+      </button>
 
-    </section>
+
+      <button
+        class="friend-tab"
+        data-tab="followers"
+      >
+        Followers
+      </button>
+
+    </div>
 
 
 
     <!-- =====================================================
-         REFERRAL CODE
+         DISCOVER
     ====================================================== -->
 
-    <section class="code-card">
+    <section
+      class="friends-section"
+      id="discoverSection"
+    >
 
-      <div class="section-title">
-
-        <div class="section-title-icon">
-          #️⃣
-        </div>
-
-        <h2>
-          Your Referral Code
-        </h2>
-
-      </div>
-
-
-      <div class="code-box">
+      <div class="section-heading">
 
         <div>
 
-          <span class="code-label">
-            Referral Code
-          </span>
+          <h2>
+            Discover People
+          </h2>
 
-          <span
-            class="code-value"
-            id="referralCode"
-          >
-            Loading...
-          </span>
+          <p>
+            People you can connect with
+          </p>
 
         </div>
 
 
-        <button
-          type="button"
-          class="copy-code-btn"
-          id="copyCodeBtn"
+        <span
+          class="count-badge"
+          id="discoverCount"
         >
-          Copy
-        </button>
+          0
+        </span>
+
+      </div>
+
+
+      <div
+        class="users-list"
+        id="discoverList"
+      >
+
+        <div class="empty-state">
+
+          <div class="empty-icon">
+            👥
+          </div>
+
+          Loading people...
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         FOLLOWING
+    ====================================================== -->
+
+    <section
+      class="friends-section"
+      id="followingSection"
+      hidden
+    >
+
+      <div class="section-heading">
+
+        <div>
+
+          <h2>
+            Following
+          </h2>
+
+          <p>
+            People you follow
+          </p>
+
+        </div>
+
+
+        <span
+          class="count-badge"
+          id="followingListCount"
+        >
+          0
+        </span>
+
+      </div>
+
+
+      <div
+        class="users-list"
+        id="followingList"
+      >
+
+        <div class="empty-state">
+
+          <div class="empty-icon">
+            👤
+          </div>
+
+          You are not following anyone yet.
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         FOLLOWERS
+    ====================================================== -->
+
+    <section
+      class="friends-section"
+      id="followersSection"
+      hidden
+    >
+
+      <div class="section-heading">
+
+        <div>
+
+          <h2>
+            Followers
+          </h2>
+
+          <p>
+            People following you
+          </p>
+
+        </div>
+
+
+        <span
+          class="count-badge"
+          id="followersListCount"
+        >
+          0
+        </span>
+
+      </div>
+
+
+      <div
+        class="users-list"
+        id="followersList"
+      >
+
+        <div class="empty-state">
+
+          <div class="empty-icon">
+            👥
+          </div>
+
+          You don't have any followers yet.
+
+        </div>
 
       </div>
 
@@ -1564,7 +1177,9 @@
 
     <a href="dashboard.html">
 
-      <span>▢</span>
+      <span>
+        💬
+      </span>
 
       <small>
         Chats
@@ -1575,7 +1190,9 @@
 
     <a href="groups.html">
 
-      <span>♧</span>
+      <span>
+        👥
+      </span>
 
       <small>
         Groups
@@ -1586,21 +1203,12 @@
 
     <a href="stories.html">
 
-      <span>◉</span>
+      <span>
+        ◉
+      </span>
 
       <small>
         Stories
-      </small>
-
-    </a>
-
-
-    <a href="friends.html">
-
-      <span>♙</span>
-
-      <small>
-        Friends
       </small>
 
     </a>
@@ -1611,7 +1219,22 @@
       href="friends.html"
     >
 
-      <span>🎁</span>
+      <span>
+        👤
+      </span>
+
+      <small>
+        Friends
+      </small>
+
+    </a>
+
+
+    <a href="earn.html">
+
+      <span>
+        🎁
+      </span>
 
       <small>
         Earn
@@ -1639,1020 +1262,8 @@
        JAVASCRIPT
   ======================================================== -->
 
-  <script type="module">
-
-    import {
-      auth,
-      db
-    } from "./js/firebase.js";
-
-
-    import {
-      onAuthStateChanged,
-      signOut
-    } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
-
-
-    import {
-      doc,
-      getDoc,
-      collection,
-      query,
-      where,
-      orderBy,
-      limit,
-      onSnapshot
-    } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
-
-
-    /* =======================================================
-       STATE
-    ======================================================== */
-
-    let currentUser = null;
-
-    let currentProfile = null;
-
-    let referralCodeValue = "";
-
-    const REFERRAL_REWARD = 5;
-
-
-
-    /* =======================================================
-       ELEMENTS
-    ======================================================== */
-
-    const inviteLinkInput =
-      document.getElementById("inviteLink");
-
-    const referralCode =
-      document.getElementById("referralCode");
-
-    const totalInvited =
-      document.getElementById("totalInvited");
-
-    const totalEarned =
-      document.getElementById("totalEarned");
-
-    const referralHistory =
-      document.getElementById("referralHistory");
-
-    const balanceAmount =
-      document.getElementById("balanceAmount");
-
-    const menuAvatar =
-      document.getElementById("menuAvatar");
-
-    const menuName =
-      document.getElementById("menuName");
-
-    const menuUsername =
-      document.getElementById("menuUsername");
-
-    const profileBtn =
-      document.getElementById("profileBtn");
-
-    const toast =
-      document.getElementById("friendsToast");
-
-
-
-    /* =======================================================
-       TOAST
-    ======================================================== */
-
-    let toastTimer = null;
-
-
-    function showToast(message) {
-
-      clearTimeout(toastTimer);
-
-      toast.textContent = message;
-
-      toast.classList.add("show");
-
-      toastTimer = setTimeout(() => {
-
-        toast.classList.remove("show");
-
-      }, 2600);
-
-    }
-
-
-
-    /* =======================================================
-       ESCAPE HTML
-    ======================================================== */
-
-    function escapeHtml(value = "") {
-
-      return String(value)
-
-        .replaceAll("&", "&amp;")
-
-        .replaceAll("<", "&lt;")
-
-        .replaceAll(">", "&gt;")
-
-        .replaceAll('"', "&quot;")
-
-        .replaceAll("'", "&#039;");
-    }
-
-
-
-    /* =======================================================
-       FULL NAME
-    ======================================================== */
-
-    function getFullName(data = {}) {
-
-      const first =
-        String(data.firstName || "").trim();
-
-      const last =
-        String(data.lastName || "").trim();
-
-      const combined =
-        `${first} ${last}`.trim();
-
-      if (combined) {
-        return combined;
-      }
-
-      if (data.displayName) {
-        return String(data.displayName).trim();
-      }
-
-      if (data.username) {
-        return `@${String(data.username).trim()}`;
-      }
-
-      return "CONNECTA User";
-    }
-
-
-
-    /* =======================================================
-       INITIALS
-    ======================================================== */
-
-    function getInitials(data = {}) {
-
-      const name = getFullName(data);
-
-      const parts =
-        name
-          .split(/\s+/)
-          .filter(Boolean);
-
-      if (!parts.length) {
-        return "U";
-      }
-
-      if (parts.length === 1) {
-        return parts[0].slice(0, 2).toUpperCase();
-      }
-
-      return (
-        parts[0][0] +
-        parts[parts.length - 1][0]
-      ).toUpperCase();
-    }
-
-
-
-    /* =======================================================
-       REFERRAL LINK
-    ======================================================== */
-
-    function buildReferralLink(code) {
-
-      if (!code) {
-        return "";
-      }
-
-
-      /*
-       * Uses the same domain where CONNECTA is currently
-       * running.
-       *
-       * Example:
-       *
-       * https://your-connecta-domain.com/register.html?ref=JOHN123
-       */
-
-      const baseUrl =
-        `${window.location.origin}/register.html`;
-
-      return (
-        `${baseUrl}?ref=${encodeURIComponent(code)}`
-      );
-    }
-
-
-
-    /* =======================================================
-       SHARE MESSAGE
-    ======================================================== */
-
-    function getShareMessage() {
-
-      const link =
-        inviteLinkInput.value;
-
-      return (
-        `Join me on CONNECTA — Connect • Chat • Share 💚\n\n` +
-        `Create your free CONNECTA account using my invite link:\n` +
-        `${link}`
-      );
-    }
-
-
-
-    /* =======================================================
-       COPY TEXT
-    ======================================================== */
-
-    async function copyText(text, successMessage) {
-
-      try {
-
-        await navigator.clipboard.writeText(text);
-
-        showToast(successMessage);
-
-      } catch (error) {
-
-        /*
-         * Fallback for browsers where Clipboard API
-         * is unavailable.
-         */
-
-        const temp =
-          document.createElement("textarea");
-
-        temp.value = text;
-
-        temp.style.position = "fixed";
-
-        temp.style.opacity = "0";
-
-        document.body.appendChild(temp);
-
-        temp.select();
-
-        document.execCommand("copy");
-
-        temp.remove();
-
-        showToast(successMessage);
-      }
-    }
-
-
-
-    /* =======================================================
-       COPY INVITE LINK
-    ======================================================== */
-
-    document
-      .getElementById("copyInviteBtn")
-      .addEventListener("click", () => {
-
-        const link =
-          inviteLinkInput.value;
-
-        if (!link || link.includes("Loading")) {
-
-          showToast(
-            "Your invite link is still loading."
-          );
-
-          return;
-        }
-
-        copyText(
-          link,
-          "Invite link copied!"
-        );
-
-      });
-
-
-
-    /* =======================================================
-       COPY REFERRAL CODE
-    ======================================================== */
-
-    document
-      .getElementById("copyCodeBtn")
-      .addEventListener("click", () => {
-
-        if (!referralCodeValue) {
-
-          showToast(
-            "Your referral code is not available yet."
-          );
-
-          return;
-        }
-
-        copyText(
-          referralCodeValue,
-          "Referral code copied!"
-        );
-
-      });
-
-
-
-    /* =======================================================
-       WHATSAPP
-    ======================================================== */
-
-    document
-      .getElementById("whatsappShareBtn")
-      .addEventListener("click", () => {
-
-        const message =
-          encodeURIComponent(
-            getShareMessage()
-          );
-
-        const url =
-          `https://wa.me/?text=${message}`;
-
-        window.open(
-          url,
-          "_blank",
-          "noopener,noreferrer"
-        );
-
-      });
-
-
-
-    /* =======================================================
-       FACEBOOK
-    ======================================================== */
-
-    document
-      .getElementById("facebookShareBtn")
-      .addEventListener("click", () => {
-
-        const link =
-          encodeURIComponent(
-            inviteLinkInput.value
-          );
-
-        const url =
-          `https://www.facebook.com/sharer/sharer.php?u=${link}`;
-
-        window.open(
-          url,
-          "_blank",
-          "noopener,noreferrer"
-        );
-
-      });
-
-
-
-    /* =======================================================
-       TELEGRAM
-    ======================================================== */
-
-    document
-      .getElementById("telegramShareBtn")
-      .addEventListener("click", () => {
-
-        const link =
-          encodeURIComponent(
-            inviteLinkInput.value
-          );
-
-        const text =
-          encodeURIComponent(
-            "Join me on CONNECTA — Connect • Chat • Share 💚"
-          );
-
-        const url =
-          `https://t.me/share/url?url=${link}&text=${text}`;
-
-        window.open(
-          url,
-          "_blank",
-          "noopener,noreferrer"
-        );
-
-      });
-
-
-
-    /* =======================================================
-       MORE / NATIVE SHARE
-    ======================================================== */
-
-    document
-      .getElementById("moreShareBtn")
-      .addEventListener("click", async () => {
-
-        const link =
-          inviteLinkInput.value;
-
-        const text =
-          getShareMessage();
-
-
-        if (navigator.share) {
-
-          try {
-
-            await navigator.share({
-              title: "Join me on CONNECTA",
-              text,
-              url: link
-            });
-
-          } catch (error) {
-
-            /*
-             * User cancelled the native share sheet.
-             * No error message is necessary.
-             */
-
-          }
-
-          return;
-        }
-
-
-        copyText(
-          link,
-          "Invite link copied. You can share it anywhere!"
-        );
-
-      });
-
-
-
-    /* =======================================================
-       LOAD PROFILE
-    ======================================================== */
-
-    async function loadProfile(user) {
-
-      const userRef =
-        doc(
-          db,
-          "users",
-          user.uid
-        );
-
-      const snapshot =
-        await getDoc(userRef);
-
-
-      if (!snapshot.exists()) {
-
-        throw new Error(
-          "Your CONNECTA profile was not found."
-        );
-
-      }
-
-
-      currentProfile =
-        snapshot.data();
-
-
-      referralCodeValue =
-        String(
-          currentProfile.referralCode || ""
-        ).trim();
-
-
-      /* -----------------------------------------------
-         REFERRAL CODE
-      ------------------------------------------------ */
-
-      referralCode.textContent =
-        referralCodeValue || "Not assigned";
-
-
-      /* -----------------------------------------------
-         INVITE LINK
-      ------------------------------------------------ */
-
-      if (referralCodeValue) {
-
-        inviteLinkInput.value =
-          buildReferralLink(
-            referralCodeValue
-          );
-
-      } else {
-
-        inviteLinkInput.value =
-          "Referral link unavailable";
-
-      }
-
-
-      /* -----------------------------------------------
-         BALANCE
-      ------------------------------------------------ */
-
-      const balance =
-        Number(
-          currentProfile.balance || 0
-        );
-
-
-      balanceAmount.textContent =
-        balance.toFixed(2);
-
-
-      /* -----------------------------------------------
-         HEADER PROFILE
-      ------------------------------------------------ */
-
-      const name =
-        getFullName(currentProfile);
-
-
-      menuName.textContent =
-        name;
-
-
-      menuUsername.textContent =
-        currentProfile.username
-          ? `@${currentProfile.username}`
-          : "@username";
-
-
-      profileBtn.textContent =
-        getInitials(currentProfile);
-
-
-      menuAvatar.textContent =
-        getInitials(currentProfile);
-
-
-      if (currentProfile.photoURL) {
-
-        menuAvatar.innerHTML = `
-          <img
-            src="${escapeHtml(currentProfile.photoURL)}"
-            alt=""
-            style="
-              width:100%;
-              height:100%;
-              object-fit:cover;
-              border-radius:50%;
-            "
-          >
-        `;
-
-      }
-
-
-      /*
-       * Existing registration data may contain
-       * referralCount. We use it as an initial value.
-       *
-       * The live referral collection listener below
-       * can replace this when the backend/Firestore
-       * referral records are available.
-       */
-
-      const initialCount =
-        Number(
-          currentProfile.referralCount || 0
-        );
-
-
-      totalInvited.textContent =
-        initialCount;
-
-
-      totalEarned.textContent =
-        `KSh ${(initialCount * REFERRAL_REWARD).toFixed(2)}`;
-
-    }
-
-
-
-    /* =======================================================
-       LOAD REFERRAL HISTORY
-    ======================================================== */
-
-    function listenToReferrals() {
-
-      if (!currentUser) {
-        return;
-      }
-
-
-      /*
-       * Expected future referral collection:
-       *
-       * referrals/{referralId}
-       *
-       * {
-       *   referrerId,
-       *   referredUserId,
-       *   referredName,
-       *   referredUsername,
-       *   rewardAmount: 5,
-       *   status: "completed",
-       *   createdAt
-       * }
-       *
-       * This listener is intentionally prepared for
-       * that structure.
-       */
-
-
-      const referralsRef =
-        collection(
-          db,
-          "referrals"
-        );
-
-
-      const referralQuery =
-        query(
-          referralsRef,
-          where(
-            "referrerId",
-            "==",
-            currentUser.uid
-          ),
-          where(
-            "status",
-            "==",
-            "completed"
-          ),
-          orderBy(
-            "createdAt",
-            "desc"
-          ),
-          limit(50)
-        );
-
-
-      onSnapshot(
-        referralQuery,
-        (snapshot) => {
-
-          const referrals =
-            snapshot.docs.map(
-              item => ({
-                id: item.id,
-                ...item.data()
-              })
-            );
-
-
-          renderReferralHistory(
-            referrals
-          );
-
-        },
-
-        (error) => {
-
-          /*
-           * If the referral collection/index does not
-           * exist yet, keep the page usable.
-           *
-           * The registration/referral backend will be
-           * completed separately.
-           */
-
-          console.warn(
-            "Referral history listener:",
-            error
-          );
-
-          renderReferralHistory([]);
-
-        }
-      );
-
-    }
-
-
-
-    /* =======================================================
-       RENDER REFERRAL HISTORY
-    ======================================================== */
-
-    function renderReferralHistory(
-      referrals = []
-    ) {
-
-      if (!referrals.length) {
-
-        referralHistory.innerHTML = `
-          <div class="empty-history">
-            No successful referrals yet.
-            Start sharing your invite link.
-          </div>
-        `;
-
-        return;
-      }
-
-
-      let total = 0;
-
-
-      referralHistory.innerHTML =
-        referrals.map(
-          referral => {
-
-            const reward =
-              Number(
-                referral.rewardAmount ??
-                REFERRAL_REWARD
-              );
-
-
-            total += reward;
-
-
-            const name =
-              referral.referredName ||
-              referral.referredUsername ||
-              "CONNECTA User";
-
-
-            const username =
-              referral.referredUsername
-                ? `@${referral.referredUsername}`
-                : "";
-
-
-            const initials =
-              escapeHtml(
-                String(name)
-                  .trim()
-                  .slice(0, 2)
-                  .toUpperCase()
-              );
-
-
-            let dateText =
-              "Recently";
-
-
-            if (
-              referral.createdAt &&
-              typeof referral.createdAt.toDate ===
-                "function"
-            ) {
-
-              dateText =
-                referral.createdAt
-                  .toDate()
-                  .toLocaleDateString(
-                    undefined,
-                    {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric"
-                    }
-                  );
-
-            }
-
-
-            return `
-              <div class="history-item">
-
-                <div class="history-avatar">
-                  ${initials}
-                </div>
-
-                <div class="history-info">
-
-                  <div class="history-name">
-                    ${escapeHtml(name)}
-                  </div>
-
-                  <div class="history-date">
-                    ${escapeHtml(username)}
-                    ${username ? " • " : ""}
-                    ${escapeHtml(dateText)}
-                  </div>
-
-                </div>
-
-                <div class="history-reward">
-                  +KSh ${reward.toFixed(2)}
-                </div>
-
-              </div>
-            `;
-
-          }
-        ).join("");
-
-
-      totalInvited.textContent =
-        referrals.length;
-
-
-      totalEarned.textContent =
-        `KSh ${total.toFixed(2)}`;
-
-    }
-
-
-
-    /* =======================================================
-       MENU
-    ======================================================== */
-
-    const menuBtn =
-      document.getElementById("menuBtn");
-
-    const sideMenu =
-      document.getElementById("sideMenu");
-
-    const menuOverlay =
-      document.getElementById("menuOverlay");
-
-
-    function openMenu() {
-
-      sideMenu.classList.add("open");
-
-      menuOverlay.classList.add("show");
-
-      sideMenu.setAttribute(
-        "aria-hidden",
-        "false"
-      );
-
-    }
-
-
-    function closeMenu() {
-
-      sideMenu.classList.remove("open");
-
-      menuOverlay.classList.remove("show");
-
-      sideMenu.setAttribute(
-        "aria-hidden",
-        "true"
-      );
-
-    }
-
-
-    menuBtn.addEventListener(
-      "click",
-      openMenu
-    );
-
-
-    menuOverlay.addEventListener(
-      "click",
-      closeMenu
-    );
-
-
-
-    /* =======================================================
-       PROFILE BUTTON
-    ======================================================== */
-
-    profileBtn.addEventListener(
-      "click",
-      () => {
-
-        window.location.href =
-          "profile.html";
-
-      }
-    );
-
-
-
-    /* =======================================================
-       GET CONNECTION
-    ======================================================== */
-
-    document
-      .getElementById("connectionBtn")
-      .addEventListener(
-        "click",
-        () => {
-
-          showToast(
-            "Connection feature coming soon."
-          );
-
-        }
-      );
-
-
-
-    /* =======================================================
-       LOGOUT
-    ======================================================== */
-
-    document
-      .getElementById("logoutBtn")
-      .addEventListener(
-        "click",
-        async () => {
-
-          try {
-
-            await signOut(auth);
-
-            localStorage.removeItem(
-              "connectaLastUser"
-            );
-
-
-            window.location.replace(
-              "login.html"
-            );
-
-          } catch (error) {
-
-            console.error(error);
-
-            showToast(
-              "Unable to logout. Please try again."
-            );
-
-          }
-
-        }
-      );
-
-
-
-    /* =======================================================
-       AUTH STARTUP
-    ======================================================== */
-
-    onAuthStateChanged(
-      auth,
-      async (user) => {
-
-        if (!user) {
-
-          window.location.replace(
-            "login.html"
-          );
-
-          return;
-        }
-
-
-        currentUser = user;
-
-
-        try {
-
-          await loadProfile(
-            user
-          );
-
-
-          listenToReferrals();
-
-        } catch (error) {
-
-          console.error(
-            "Friends page startup:",
-            error
-          );
-
-
-          showToast(
-            "Unable to load your referral information."
-          );
-
-        }
-
-      }
-    );
-
-  </script>
+  <script type="module" src="js/friends.js"></script>
 
 </body>
 
-  </html>
+</html>
