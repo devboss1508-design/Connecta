@@ -1,8 +1,14 @@
-import { auth, db } from "./firebase.js";
+import {
+    auth,
+    db,
+    storage
+} from "./firebase.js";
+
 
 import {
     onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+
 
 import {
     doc,
@@ -17,6 +23,13 @@ import {
     writeBatch,
     increment
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+
+import {
+    ref,
+    uploadBytesResumable,
+    getDownloadURL
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
 
 
 /* =====================================================
@@ -51,12 +64,37 @@ let isMarkingMessages = false;
 
 
 /* =====================================================
+   PHOTO CONFIGURATION
+===================================================== */
+
+const MAX_PHOTO_SIZE =
+    5 * 1024 * 1024;
+
+
+const ALLOWED_PHOTO_TYPES = [
+
+    "image/jpeg",
+
+    "image/png",
+
+    "image/webp"
+
+];
+
+
+/* =====================================================
+   PHOTO STATE
+===================================================== */
+
+let selectedPhoto = null;
+
+let selectedPhotoPreviewUrl = null;
+
+let isSendingPhoto = false;
+
+
+/* =====================================================
    PROFILE CACHE
-=====================================================
-
-   Supports both the older dashboard cache and the
-   newer profile caches.
-
 ===================================================== */
 
 const PROFILE_CACHE_KEY =
@@ -187,12 +225,6 @@ function getCachedProfile(uid) {
     }
 
 
-    /*
-    =================================================
-    NEW PUBLIC PROFILE CACHE
-    =================================================
-    */
-
     const publicCache =
         getNewPublicProfileCache(
             uid
@@ -205,12 +237,6 @@ function getCachedProfile(uid) {
 
     }
 
-
-    /*
-    =================================================
-    OWN PROFILE CACHE
-    =================================================
-    */
 
     if (
         currentUser &&
@@ -229,12 +255,6 @@ function getCachedProfile(uid) {
 
     }
 
-
-    /*
-    =================================================
-    OLD DASHBOARD CACHE
-    =================================================
-    */
 
     try {
 
@@ -285,19 +305,7 @@ function saveChatProfile(
     try {
 
         /*
-        IMPORTANT:
-
-        Only public profile information is saved
-        for another user.
-
-        We deliberately do NOT cache:
-
-        email
-        phone
-        balance
-        referralCode
-        referral information
-        KYC/payment information
+        Only public information is cached.
         */
 
         const publicProfile = {
@@ -350,10 +358,6 @@ function saveChatProfile(
         };
 
 
-        /*
-        New public profile cache.
-        */
-
         localStorage.setItem(
 
             `${PUBLIC_PROFILE_CACHE_KEY}_${uid}`,
@@ -364,11 +368,6 @@ function saveChatProfile(
 
         );
 
-
-        /*
-        Keep old dashboard cache updated too,
-        because dashboard.js may still use it.
-        */
 
         const oldCache =
             getProfileCache();
@@ -450,21 +449,11 @@ function getFullName(
     user = {}
 ) {
 
-    /*
-    =================================================
-    DISPLAY NAME
-    =================================================
-    */
-
     const displayName =
         String(
             user.displayName || ""
         ).trim();
 
-
-    /*
-    Do NOT accept the placeholder as a real name.
-    */
 
     if (
         displayName &&
@@ -475,12 +464,6 @@ function getFullName(
 
     }
 
-
-    /*
-    =================================================
-    FIRST + LAST NAME
-    =================================================
-    */
 
     const firstName =
         String(
@@ -504,12 +487,6 @@ function getFullName(
 
     }
 
-
-    /*
-    =================================================
-    USERNAME
-    =================================================
-    */
 
     const username =
         String(
@@ -777,12 +754,6 @@ function renderChatHeader(
     }
 
 
-    /*
-    =================================================
-    VERIFIED BADGE
-    =================================================
-    */
-
     const verifiedBadge =
         user.isVerified === true
 
@@ -799,12 +770,6 @@ function renderChatHeader(
             : "";
 
 
-    /*
-    =================================================
-    NAME
-    =================================================
-    */
-
     nameElement.innerHTML = `
 
         <span class="chat-user-name-text">
@@ -815,12 +780,6 @@ function renderChatHeader(
 
     `;
 
-
-    /*
-    =================================================
-    PHOTO
-    =================================================
-    */
 
     if (photo) {
 
@@ -840,12 +799,6 @@ function renderChatHeader(
 
     }
 
-
-    /*
-    =================================================
-    STATUS
-    =================================================
-    */
 
     updateStatusDisplay();
 
@@ -875,12 +828,6 @@ function updateStatusDisplay() {
         return;
     }
 
-
-    /*
-    =================================================
-    TYPING
-    =================================================
-    */
 
     if (
         isOtherUserTyping
@@ -916,12 +863,6 @@ function updateStatusDisplay() {
     }
 
 
-    /*
-    =================================================
-    ONLINE
-    =================================================
-    */
-
     if (
         otherUser.isOnline === true
     ) {
@@ -942,12 +883,6 @@ function updateStatusDisplay() {
 
     }
 
-
-    /*
-    =================================================
-    OFFLINE
-    =================================================
-    */
 
     statusText.textContent =
         getLastSeenText(
@@ -1019,18 +954,11 @@ function getLastSeenText(
 
 /* =====================================================
    LOAD OTHER USER
-   CACHE FIRST → FIRESTORE SECOND
 ===================================================== */
 
 async function loadOtherUser(
     uid
 ) {
-
-    /*
-    =====================================================
-    CACHE FIRST
-    =====================================================
-    */
 
     const cached =
         getCachedProfile(
@@ -1055,12 +983,6 @@ async function loadOtherUser(
 
     }
 
-
-    /*
-    =====================================================
-    FIRESTORE REFRESH
-    =====================================================
-    */
 
     try {
 
@@ -1099,23 +1021,11 @@ async function loadOtherUser(
         };
 
 
-        /*
-        =================================================
-        CACHE PUBLIC PROFILE
-        =================================================
-        */
-
         saveChatProfile(
             uid,
             otherUser
         );
 
-
-        /*
-        =================================================
-        RENDER FRESH PROFILE
-        =================================================
-        */
 
         renderChatHeader(
             otherUser
@@ -1373,12 +1283,6 @@ function listenToOtherUser(
                 }
 
 
-                /*
-                =================================================
-                ALWAYS REPLACE THE PROFILE WITH FRESH DATA
-                =================================================
-                */
-
                 otherUser = {
 
                     uid,
@@ -1388,43 +1292,16 @@ function listenToOtherUser(
                 };
 
 
-                /*
-                =================================================
-                SAVE PUBLIC CACHE
-                =================================================
-                */
-
                 saveChatProfile(
                     uid,
                     otherUser
                 );
 
 
-                /*
-                =================================================
-                CRITICAL:
-                RENDER HEADER AGAIN
-                =================================================
-
-                This makes these changes appear immediately:
-
-                - real name
-                - profile photo
-                - verified badge
-                - online status
-                =================================================
-                */
-
                 renderChatHeader(
                     otherUser
                 );
 
-
-                /*
-                =================================================
-                IF RECIPIENT BECOMES ONLINE
-                =================================================
-                */
 
                 if (
                     otherUser.isOnline === true
@@ -1489,12 +1366,6 @@ async function ensureChat() {
         );
 
 
-    /*
-    =====================================================
-    CREATE NEW CHAT
-    =====================================================
-    */
-
     if (
         !snap.exists()
     ) {
@@ -1516,6 +1387,9 @@ async function ensureChat() {
 
                 lastMessage:
                     "",
+
+                lastMessageType:
+                    "text",
 
                 lastSenderId:
                     "",
@@ -1555,22 +1429,12 @@ async function ensureChat() {
     }
 
 
-    /*
-    =====================================================
-    EXISTING CHAT
-    =====================================================
-    */
-
     const data =
         snap.data();
 
 
     const updates = {};
 
-
-    /*
-    PARTICIPANTS
-    */
 
     if (
         !Array.isArray(
@@ -1594,10 +1458,6 @@ async function ensureChat() {
 
     }
 
-
-    /*
-    UNREAD COUNTERS
-    */
 
     if (
         !data.unreadCount ||
@@ -1646,10 +1506,6 @@ async function ensureChat() {
     }
 
 
-    /*
-    TYPING
-    */
-
     if (
         !data.typing ||
         typeof data.typing !== "object"
@@ -1696,10 +1552,6 @@ async function ensureChat() {
 
     }
 
-
-    /*
-    APPLY REPAIRS
-    */
 
     if (
         Object.keys(
@@ -1844,28 +1696,16 @@ function listenToMessages() {
                     messages;
 
 
-                /*
-                SAVE FOR NEXT OPEN
-                */
-
                 saveMessageCache(
                     chatId,
                     messages
                 );
 
 
-                /*
-                RENDER
-                */
-
                 renderMessages(
                     messages
                 );
 
-
-                /*
-                MARK INCOMING READ
-                */
 
                 await markIncomingMessages(
                     messages
@@ -1880,11 +1720,6 @@ function listenToMessages() {
                     error
                 );
 
-
-                /*
-                Don't destroy cached messages
-                if they are already visible.
-                */
 
                 if (
                     !latestMessages.length
@@ -1921,10 +1756,6 @@ function getMessageTickState(
     }
 
 
-    /*
-    READ
-    */
-
     if (
         message.read === true
     ) {
@@ -1942,10 +1773,6 @@ function getMessageTickState(
 
     }
 
-
-    /*
-    DELIVERED
-    */
 
     if (
         message.delivered === true
@@ -1965,10 +1792,6 @@ function getMessageTickState(
     }
 
 
-    /*
-    SENT
-    */
-
     return `
 
         <span
@@ -1976,6 +1799,84 @@ function getMessageTickState(
             title="Sent"
         >
             ✓
+        </span>
+
+    `;
+
+}
+
+
+/* =====================================================
+   RENDER IMAGE MESSAGE
+===================================================== */
+
+function renderImageMessage(
+    message,
+    tick
+) {
+
+    const imageUrl =
+        message.imageUrl ||
+        message.photoURL ||
+        message.photoUrl ||
+        "";
+
+
+    if (!imageUrl) {
+
+        return `
+
+            <span class="message-text">
+                Photo unavailable
+            </span>
+
+            <span class="message-meta">
+
+                <span class="message-time">
+                    ${formatTime(
+                        message.createdAt
+                    )}
+                </span>
+
+                ${tick}
+
+            </span>
+
+        `;
+
+    }
+
+
+    return `
+
+        <a
+            class="image-message-content"
+            href="${escapeHtml(imageUrl)}"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open photo"
+        >
+
+            <img
+                class="message-image"
+                src="${escapeHtml(imageUrl)}"
+                alt="Photo message"
+                loading="lazy"
+            >
+
+        </a>
+
+
+        <span class="message-meta">
+
+            <span class="message-time">
+                ${formatTime(
+                    message.createdAt
+                )}
+            </span>
+
+            ${tick}
+
         </span>
 
     `;
@@ -2000,10 +1901,6 @@ function renderMessages(
         return;
     }
 
-
-    /*
-    EMPTY CHAT
-    */
 
     if (
         !messages.length
@@ -2062,10 +1959,6 @@ function renderMessages(
                 );
 
 
-            /*
-            DATE SEPARATOR
-            */
-
             if (
                 dateLabel !==
                 previousDate
@@ -2094,16 +1987,66 @@ function renderMessages(
             }
 
 
-            /*
-            TICK
-            */
-
             const tick =
                 mine
                     ? getMessageTickState(
                         message
                     )
                     : "";
+
+
+            /*
+            =================================================
+            IMAGE MESSAGE
+            =================================================
+            */
+
+            const isImage =
+                message.type === "image" ||
+                !!message.imageUrl ||
+                !!message.photoURL;
+
+
+            let messageContent = "";
+
+
+            if (isImage) {
+
+                messageContent =
+                    renderImageMessage(
+                        message,
+                        tick
+                    );
+
+            } else {
+
+                messageContent = `
+
+                    <span
+                        class="message-text"
+                    >${escapeHtml(
+                        message.text
+                    )}</span>
+
+                    <span
+                        class="message-meta"
+                    >
+
+                        <span
+                            class="message-time"
+                        >
+                            ${formatTime(
+                                message.createdAt
+                            )}
+                        </span>
+
+                        ${tick}
+
+                    </span>
+
+                `;
+
+            }
 
 
             html += `
@@ -2121,30 +2064,13 @@ function renderMessages(
                 >
 
                     <div
-                        class="message-bubble"
+                        class="message-bubble
+                            ${isImage
+                                ? "photo-message"
+                                : ""}"
                     >
 
-                        <span
-                            class="message-text"
-                        >${escapeHtml(
-                            message.text
-                        )}</span>
-
-                        <span
-                            class="message-meta"
-                        >
-
-                            <span
-                                class="message-time"
-                            >
-                                ${formatTime(
-                                    message.createdAt
-                                )}
-                            </span>
-
-                            ${tick}
-
-                        </span>
+                        ${messageContent}
 
                     </div>
 
@@ -2395,6 +2321,771 @@ async function markMessagesDelivered() {
 
 
 /* =====================================================
+   SEND TEXT MESSAGE
+===================================================== */
+
+async function sendTextMessage(
+    text
+) {
+
+    if (
+        !text ||
+        !currentUser ||
+        !otherUser ||
+        !chatId
+    ) {
+
+        return;
+
+    }
+
+
+    const chatRef =
+        doc(
+            db,
+            "chats",
+            chatId
+        );
+
+
+    const messagesRef =
+        collection(
+            db,
+            "chats",
+            chatId,
+            "messages"
+        );
+
+
+    const messageRef =
+        doc(
+            messagesRef
+        );
+
+
+    const batch =
+        writeBatch(
+            db
+        );
+
+
+    batch.set(
+        messageRef,
+        {
+
+            senderId:
+                currentUser.uid,
+
+            receiverId:
+                otherUser.uid,
+
+            type:
+                "text",
+
+            text:
+                text,
+
+            createdAt:
+                serverTimestamp(),
+
+            delivered:
+                false,
+
+            deliveredAt:
+                null,
+
+            read:
+                false,
+
+            readAt:
+                null
+
+        }
+    );
+
+
+    batch.update(
+        chatRef,
+        {
+
+            lastMessage:
+                text,
+
+            lastMessageType:
+                "text",
+
+            lastSenderId:
+                currentUser.uid,
+
+            updatedAt:
+                serverTimestamp()
+
+        }
+    );
+
+
+    batch.update(
+        chatRef,
+        {
+
+            [`unreadCount.${otherUser.uid}`]:
+                increment(1)
+
+        }
+    );
+
+
+    await batch.commit();
+
+}
+
+
+/* =====================================================
+   VALIDATE PHOTO
+===================================================== */
+
+function validatePhoto(
+    file
+) {
+
+    if (!file) {
+
+        return {
+            valid: false,
+            message: "Please select a photo."
+        };
+
+    }
+
+
+    /*
+    =================================================
+    TYPE
+    =================================================
+    */
+
+    if (
+        !ALLOWED_PHOTO_TYPES.includes(
+            file.type
+        )
+    ) {
+
+        return {
+            valid: false,
+            message:
+                "Only JPG, PNG and WebP photos are allowed. Videos are not supported."
+        };
+
+    }
+
+
+    /*
+    =================================================
+    SIZE
+    =================================================
+    */
+
+    if (
+        file.size >
+        MAX_PHOTO_SIZE
+    ) {
+
+        return {
+            valid: false,
+            message:
+                "Photo must be 5MB or smaller."
+        };
+
+    }
+
+
+    return {
+        valid: true
+    };
+
+}
+
+
+/* =====================================================
+   PHOTO STATUS
+===================================================== */
+
+function setPhotoStatus(
+    message,
+    show = true
+) {
+
+    const element =
+        $("photoUploadStatus");
+
+
+    if (!element) {
+        return;
+    }
+
+
+    element.textContent =
+        message;
+
+
+    element.classList.toggle(
+        "show",
+        show
+    );
+
+}
+
+
+/* =====================================================
+   CLEAR PHOTO SELECTION
+===================================================== */
+
+function clearSelectedPhoto() {
+
+    selectedPhoto =
+        null;
+
+
+    if (
+        selectedPhotoPreviewUrl
+    ) {
+
+        URL.revokeObjectURL(
+            selectedPhotoPreviewUrl
+        );
+
+
+        selectedPhotoPreviewUrl =
+            null;
+
+    }
+
+
+    const input =
+        $("photoInput");
+
+
+    if (input) {
+
+        input.value =
+            "";
+
+    }
+
+
+    const preview =
+        $("photoPreview");
+
+
+    if (preview) {
+
+        preview.classList.remove(
+            "show"
+        );
+
+    }
+
+
+    const previewImage =
+        $("photoPreviewImage");
+
+
+    if (previewImage) {
+
+        previewImage.removeAttribute(
+            "src"
+        );
+
+    }
+
+
+    setPhotoStatus(
+        "",
+        false
+    );
+
+}
+
+
+/* =====================================================
+   SHOW PHOTO PREVIEW
+===================================================== */
+
+function showPhotoPreview(
+    file
+) {
+
+    const validation =
+        validatePhoto(
+            file
+        );
+
+
+    if (
+        !validation.valid
+    ) {
+
+        clearSelectedPhoto();
+
+
+        setPhotoStatus(
+            validation.message,
+            true
+        );
+
+
+        setTimeout(
+            () => {
+
+                setPhotoStatus(
+                    "",
+                    false
+                );
+
+            },
+            3500
+        );
+
+
+        return false;
+
+    }
+
+
+    clearSelectedPhoto();
+
+
+    selectedPhoto =
+        file;
+
+
+    selectedPhotoPreviewUrl =
+        URL.createObjectURL(
+            file
+        );
+
+
+    const preview =
+        $("photoPreview");
+
+
+    const previewImage =
+        $("photoPreviewImage");
+
+
+    const previewTitle =
+        $("photoPreviewTitle");
+
+
+    const previewSize =
+        $("photoPreviewSize");
+
+
+    if (
+        preview &&
+        previewImage
+    ) {
+
+        previewImage.src =
+            selectedPhotoPreviewUrl;
+
+
+        if (previewTitle) {
+
+            previewTitle.textContent =
+                file.name || "Photo";
+
+        }
+
+
+        if (previewSize) {
+
+            previewSize.textContent =
+                `${formatFileSize(
+                    file.size
+                )} • Ready to send`;
+
+        }
+
+
+        preview.classList.add(
+            "show"
+        );
+
+    }
+
+
+    setPhotoStatus(
+        "",
+        false
+    );
+
+
+    return true;
+
+}
+
+
+/* =====================================================
+   FILE SIZE
+===================================================== */
+
+function formatFileSize(
+    bytes
+) {
+
+    if (
+        !bytes
+    ) {
+
+        return "0 KB";
+
+    }
+
+
+    if (
+        bytes < 1024 * 1024
+    ) {
+
+        return `${(
+            bytes / 1024
+        ).toFixed(1)} KB`;
+
+    }
+
+
+    return `${(
+        bytes /
+        (1024 * 1024)
+    ).toFixed(2)} MB`;
+
+}
+
+
+/* =====================================================
+   UPLOAD PHOTO
+===================================================== */
+
+async function uploadPhoto(
+    file
+) {
+
+    if (
+        !currentUser ||
+        !otherUser ||
+        !chatId
+    ) {
+
+        throw new Error(
+            "Chat is not ready."
+        );
+
+    }
+
+
+    const messagesRef =
+        collection(
+            db,
+            "chats",
+            chatId,
+            "messages"
+        );
+
+
+    /*
+    Create the message ID before uploading
+    so the Storage path and Firestore message
+    use the same ID.
+    */
+
+    const messageRef =
+        doc(
+            messagesRef
+        );
+
+
+    const extension =
+        getFileExtension(
+            file
+        );
+
+
+    const storagePath =
+        `chatPhotos/${chatId}/${currentUser.uid}/${messageRef.id}.${extension}`;
+
+
+    const photoRef =
+        ref(
+            storage,
+            storagePath
+        );
+
+
+    setPhotoStatus(
+        "Uploading photo... 0%",
+        true
+    );
+
+
+    const uploadTask =
+        uploadBytesResumable(
+            photoRef,
+            file,
+            {
+
+                contentType:
+                    file.type,
+
+                cacheControl:
+                    "public,max-age=31536000"
+
+            }
+        );
+
+
+    const snapshot =
+        await new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+
+                uploadTask.on(
+
+                    "state_changed",
+
+                    uploadSnapshot => {
+
+                        const progress =
+                            Math.round(
+                                (
+                                    uploadSnapshot.bytesTransferred /
+                                    uploadSnapshot.totalBytes
+                                ) * 100
+                            );
+
+
+                        setPhotoStatus(
+                            `Uploading photo... ${progress}%`,
+                            true
+                        );
+
+                    },
+
+                    error => {
+
+                        reject(
+                            error
+                        );
+
+                    },
+
+                    () => {
+
+                        resolve(
+                            uploadTask.snapshot
+                        );
+
+                    }
+
+                );
+
+            }
+        );
+
+
+    setPhotoStatus(
+        "Finalizing photo...",
+        true
+    );
+
+
+    const imageUrl =
+        await getDownloadURL(
+            snapshot.ref
+        );
+
+
+    /*
+    =================================================
+    CREATE FIRESTORE PHOTO MESSAGE
+    =================================================
+    */
+
+    const batch =
+        writeBatch(
+            db
+        );
+
+
+    batch.set(
+        messageRef,
+        {
+
+            senderId:
+                currentUser.uid,
+
+            receiverId:
+                otherUser.uid,
+
+            type:
+                "image",
+
+            text:
+                "",
+
+            imageUrl:
+                imageUrl,
+
+            imagePath:
+                storagePath,
+
+            fileName:
+                file.name || "photo",
+
+            mimeType:
+                file.type,
+
+            fileSize:
+                file.size,
+
+            createdAt:
+                serverTimestamp(),
+
+            delivered:
+                false,
+
+            deliveredAt:
+                null,
+
+            read:
+                false,
+
+            readAt:
+                null
+
+        }
+    );
+
+
+    const chatRef =
+        doc(
+            db,
+            "chats",
+            chatId
+        );
+
+
+    batch.update(
+        chatRef,
+        {
+
+            lastMessage:
+                "📷 Photo",
+
+            lastMessageType:
+                "image",
+
+            lastSenderId:
+                currentUser.uid,
+
+            updatedAt:
+                serverTimestamp()
+
+        }
+    );
+
+
+    batch.update(
+        chatRef,
+        {
+
+            [`unreadCount.${otherUser.uid}`]:
+                increment(1)
+
+        }
+    );
+
+
+    await batch.commit();
+
+
+    setPhotoStatus(
+        "Photo sent successfully.",
+        true
+    );
+
+
+    setTimeout(
+        () => {
+
+            setPhotoStatus(
+                "",
+                false
+            );
+
+        },
+        1500
+    );
+
+}
+
+
+/* =====================================================
+   GET FILE EXTENSION
+===================================================== */
+
+function getFileExtension(
+    file
+) {
+
+    const typeMap = {
+
+        "image/jpeg":
+            "jpg",
+
+        "image/png":
+            "png",
+
+        "image/webp":
+            "webp"
+
+    };
+
+
+    if (
+        typeMap[file.type]
+    ) {
+
+        return typeMap[
+            file.type
+        ];
+
+    }
+
+
+    const extension =
+        file.name
+            ?.split(".")
+            .pop()
+            ?.toLowerCase();
+
+
+    if (
+        extension === "jpeg"
+    ) {
+
+        return "jpg";
+
+    }
+
+
+    return extension || "jpg";
+
+}
+
+
+/* =====================================================
    SEND MESSAGE
 ===================================================== */
 
@@ -2413,8 +3104,25 @@ async function sendMessage() {
         input.value.trim();
 
 
-    if (!text) {
+    const hasText =
+        Boolean(
+            text
+        );
+
+
+    const hasPhoto =
+        Boolean(
+            selectedPhoto
+        );
+
+
+    if (
+        !hasText &&
+        !hasPhoto
+    ) {
+
         return;
+
     }
 
 
@@ -2453,113 +3161,57 @@ async function sendMessage() {
         );
 
 
-        const chatRef =
-            doc(
-                db,
-                "chats",
-                chatId
+        /*
+        =================================================
+        SEND TEXT FIRST
+        =================================================
+        */
+
+        if (hasText) {
+
+            await sendTextMessage(
+                text
             );
 
 
-        const messagesRef =
-            collection(
-                db,
-                "chats",
-                chatId,
-                "messages"
-            );
+            input.value =
+                "";
 
+            resizeTextarea();
 
-        const messageRef =
-            doc(
-                messagesRef
-            );
-
-
-        const batch =
-            writeBatch(
-                db
-            );
+        }
 
 
         /*
-        CREATE MESSAGE
+        =================================================
+        SEND PHOTO
+        =================================================
         */
 
-        batch.set(
-            messageRef,
-            {
+        if (
+            hasPhoto
+        ) {
 
-                senderId:
-                    currentUser.uid,
-
-                receiverId:
-                    otherUser.uid,
-
-                text:
-                    text,
-
-                createdAt:
-                    serverTimestamp(),
-
-                delivered:
-                    false,
-
-                deliveredAt:
-                    null,
-
-                read:
-                    false,
-
-                readAt:
-                    null
-
-            }
-        );
+            isSendingPhoto =
+                true;
 
 
-        /*
-        UPDATE LAST MESSAGE
-        */
-
-        batch.update(
-            chatRef,
-            {
-
-                lastMessage:
-                    text,
-
-                lastSenderId:
-                    currentUser.uid,
-
-                updatedAt:
-                    serverTimestamp()
-
-            }
-        );
+            const photo =
+                selectedPhoto;
 
 
-        /*
-        INCREASE RECEIVER UNREAD COUNT
-        */
-
-        batch.update(
-            chatRef,
-            {
-
-                [`unreadCount.${otherUser.uid}`]:
-                    increment(1)
-
-            }
-        );
+            await uploadPhoto(
+                photo
+            );
 
 
-        await batch.commit();
+            clearSelectedPhoto();
 
 
-        input.value = "";
+            isSendingPhoto =
+                false;
 
-        resizeTextarea();
+        }
 
 
     } catch (error) {
@@ -2582,8 +3234,38 @@ async function sendMessage() {
         );
 
 
+        isSendingPhoto =
+            false;
+
+
+        let message =
+            "Message could not be sent.";
+
+
+        if (
+            error?.code ===
+            "storage/unauthorized"
+        ) {
+
+            message =
+                "Photo upload was blocked by Firebase Storage Rules.";
+
+        }
+
+
+        if (
+            error?.code ===
+            "storage/canceled"
+        ) {
+
+            message =
+                "Photo upload was cancelled.";
+
+        }
+
+
         showChatError(
-            "Message could not be sent."
+            message
         );
 
 
@@ -2793,7 +3475,7 @@ function showChatError(
 
 
 /* =====================================================
-   ATTACHMENT
+   PHOTO ATTACHMENT
 ===================================================== */
 
 function setupAttachmentButton() {
@@ -2802,21 +3484,99 @@ function setupAttachmentButton() {
         $("attachButton");
 
 
-    if (!button) {
+    const input =
+        $("photoInput");
+
+
+    if (
+        !button ||
+        !input
+    ) {
+
+        console.warn(
+            "CONNECTA: Photo input elements were not found."
+        );
+
+
         return;
+
     }
 
+
+    /*
+    =================================================
+    OPEN PHOTO PICKER
+    =================================================
+    */
 
     button.addEventListener(
         "click",
         () => {
 
-            alert(
-                "Photo and file sharing will be added soon."
+            if (
+                isSendingPhoto
+            ) {
+
+                return;
+
+            }
+
+
+            input.click();
+
+        }
+    );
+
+
+    /*
+    =================================================
+    PHOTO SELECTED
+    =================================================
+    */
+
+    input.addEventListener(
+        "change",
+        event => {
+
+            const file =
+                event.target.files?.[0];
+
+
+            if (!file) {
+                return;
+            }
+
+
+            showPhotoPreview(
+                file
             );
 
         }
     );
+
+
+    /*
+    =================================================
+    CANCEL PHOTO
+    =================================================
+    */
+
+    const cancelButton =
+        $("photoPreviewCancel");
+
+
+    if (cancelButton) {
+
+        cancelButton.addEventListener(
+            "click",
+            () => {
+
+                clearSelectedPhoto();
+
+            }
+        );
+
+    }
 
 }
 
@@ -2936,7 +3696,7 @@ function setupUI() {
 
     /*
     =================================================
-    SEND
+    SEND FORM
     =================================================
     */
 
@@ -2962,7 +3722,7 @@ function setupUI() {
 
     /*
     =================================================
-    INPUT
+    MESSAGE INPUT
     =================================================
     */
 
@@ -3110,9 +3870,7 @@ onAuthStateChanged(
         try {
 
             /*
-            =================================================
-            1. CREATE CHAT ID IMMEDIATELY
-            =================================================
+            1. CHAT ID
             */
 
             chatId =
@@ -3123,9 +3881,7 @@ onAuthStateChanged(
 
 
             /*
-            =================================================
-            2. LOAD CACHED PROFILE IMMEDIATELY
-            =================================================
+            2. CACHED PROFILE
             */
 
             const cachedProfile =
@@ -3154,9 +3910,7 @@ onAuthStateChanged(
 
 
             /*
-            =================================================
-            3. LOAD CACHED MESSAGES IMMEDIATELY
-            =================================================
+            3. CACHED MESSAGES
             */
 
             const cachedMessages =
@@ -3181,16 +3935,7 @@ onAuthStateChanged(
 
 
             /*
-            =================================================
-            4. START REALTIME PROFILE LISTENER
-            =================================================
-
-            This is started immediately so a change to
-            isVerified, displayName, photoURL or isOnline
-            can appear without refreshing.
-
-            Firestore onSnapshot provides the initial
-            snapshot and subsequent changes.
+            4. REALTIME PROFILE
             */
 
             listenToOtherUser(
@@ -3199,27 +3944,21 @@ onAuthStateChanged(
 
 
             /*
-            =================================================
-            5. MESSAGE LISTENER
-            =================================================
+            5. REALTIME MESSAGES
             */
 
             listenToMessages();
 
 
             /*
-            =================================================
-            6. CHAT METADATA LISTENER
-            =================================================
+            6. CHAT METADATA
             */
 
             listenToChat();
 
 
             /*
-            =================================================
-            7. REFRESH PROFILE FROM FIRESTORE
-            =================================================
+            7. FIRESTORE PROFILE
             */
 
             await loadOtherUser(
@@ -3228,9 +3967,7 @@ onAuthStateChanged(
 
 
             /*
-            =================================================
             8. CREATE / REPAIR CHAT
-            =================================================
             */
 
             await ensureChat();
@@ -3243,10 +3980,6 @@ onAuthStateChanged(
                 error
             );
 
-
-            /*
-            Keep cached conversation visible.
-            */
 
             if (
                 !latestMessages.length
@@ -3277,9 +4010,16 @@ window.addEventListener(
         );
 
 
-        /*
-        BEST-EFFORT TYPING CLEANUP
-        */
+        if (
+            selectedPhotoPreviewUrl
+        ) {
+
+            URL.revokeObjectURL(
+                selectedPhotoPreviewUrl
+            );
+
+        }
+
 
         if (
             currentUser &&
@@ -3305,10 +4045,6 @@ window.addEventListener(
         }
 
 
-        /*
-        STOP MESSAGE LISTENER
-        */
-
         if (
             stopMessages
         ) {
@@ -3321,10 +4057,6 @@ window.addEventListener(
         }
 
 
-        /*
-        STOP USER LISTENER
-        */
-
         if (
             stopOtherUser
         ) {
@@ -3336,10 +4068,6 @@ window.addEventListener(
 
         }
 
-
-        /*
-        STOP CHAT LISTENER
-        */
 
         if (
             stopChat
