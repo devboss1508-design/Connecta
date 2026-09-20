@@ -2265,44 +2265,35 @@ async function toggleFollow(
    PROFILE PHOTO UPLOAD
 ===================================================== */
 
-async function handleProfilePhotoUpload(
-  event
-) {
+async function handleProfilePhotoUpload(event) {
 
   if (!currentUser) {
     return;
   }
 
-
   const file =
     event.target.files?.[0];
-
 
   if (!file) {
     return;
   }
 
-
   const status =
     $("profileUploadStatus");
 
+  /*
+  =====================================================
+  ALLOWED IMAGE TYPES
+  =====================================================
+  */
 
   const allowedTypes = [
-
     "image/jpeg",
-
     "image/png",
-
     "image/webp"
-
   ];
 
-
-  if (
-    !allowedTypes.includes(
-      file.type
-    )
-  ) {
+  if (!allowedTypes.includes(file.type)) {
 
     if (status) {
 
@@ -2311,22 +2302,21 @@ async function handleProfilePhotoUpload(
 
       status.className =
         "profile-upload-status error";
-
     }
 
-
-    event.target.value =
-      "";
+    event.target.value = "";
 
     return;
-
   }
 
 
-  if (
-    file.size >
-    5 * 1024 * 1024
-  ) {
+  /*
+  =====================================================
+  MAX FILE SIZE — 5MB
+  =====================================================
+  */
+
+  if (file.size > 5 * 1024 * 1024) {
 
     if (status) {
 
@@ -2335,17 +2325,19 @@ async function handleProfilePhotoUpload(
 
       status.className =
         "profile-upload-status error";
-
     }
 
-
-    event.target.value =
-      "";
+    event.target.value = "";
 
     return;
-
   }
 
+
+  /*
+  =====================================================
+  UPLOAD STATUS
+  =====================================================
+  */
 
   if (status) {
 
@@ -2354,25 +2346,45 @@ async function handleProfilePhotoUpload(
 
     status.className =
       "profile-upload-status";
-
   }
 
 
   try {
 
+    /*
+    ===================================================
+    STORAGE PATH
+
+    MUST MATCH FIREBASE STORAGE RULES:
+
+    users/{userId}/profile/{fileName}
+    ===================================================
+    */
+
     const extension =
-      file.name
-        .split(".")
-        .pop()
-        .toLowerCase();
+      file.type === "image/png"
+        ? "png"
+        : file.type === "image/webp"
+          ? "webp"
+          : "jpg";
+
+
+    const storagePath =
+      `users/${currentUser.uid}/profile/profile.${extension}`;
 
 
     const photoRef =
       ref(
         storage,
-        `profilePhotos/${currentUser.uid}/profile.${extension}`
+        storagePath
       );
 
+
+    /*
+    ===================================================
+    UPLOAD
+    ===================================================
+    */
 
     const uploadTask =
       uploadBytesResumable(
@@ -2380,17 +2392,17 @@ async function handleProfilePhotoUpload(
         file,
         {
           contentType:
-            file.type
+            file.type,
+
+          cacheControl:
+            "public,max-age=3600"
         }
       );
 
 
     const snapshot =
       await new Promise(
-        (
-          resolve,
-          reject
-        ) => {
+        (resolve, reject) => {
 
           uploadTask.on(
 
@@ -2436,11 +2448,23 @@ async function handleProfilePhotoUpload(
       );
 
 
+    /*
+    ===================================================
+    GET DOWNLOAD URL
+    ===================================================
+    */
+
     const photoURL =
       await getDownloadURL(
         snapshot.ref
       );
 
+
+    /*
+    ===================================================
+    UPDATE FIREBASE AUTH PROFILE
+    ===================================================
+    */
 
     await updateProfile(
       currentUser,
@@ -2450,17 +2474,33 @@ async function handleProfilePhotoUpload(
     );
 
 
-    await updateDoc(
+    /*
+    ===================================================
+    UPDATE FIRESTORE USER PROFILE
+    ===================================================
+    */
+
+    const userRef =
       doc(
         db,
         "users",
         currentUser.uid
-      ),
+      );
+
+
+    await updateDoc(
+      userRef,
       {
         photoURL
       }
     );
 
+
+    /*
+    ===================================================
+    UPDATE LOCAL STATE
+    ===================================================
+    */
 
     if (viewedUser) {
 
@@ -2469,6 +2509,12 @@ async function handleProfilePhotoUpload(
 
     }
 
+
+    /*
+    ===================================================
+    UPDATE CACHE
+    ===================================================
+    */
 
     if (viewedUser) {
 
@@ -2479,16 +2525,11 @@ async function handleProfilePhotoUpload(
     }
 
 
-    if (status) {
-
-      status.textContent =
-        "Profile photo updated successfully.";
-
-      status.className =
-        "profile-upload-status success";
-
-    }
-
+    /*
+    ===================================================
+    UPDATE PROFILE IMAGE IMMEDIATELY
+    ===================================================
+    */
 
     const avatar =
       document.querySelector(
@@ -2503,13 +2544,48 @@ async function handleProfilePhotoUpload(
         <img
           src="${escapeHtml(photoURL)}"
           alt="${escapeHtml(
-            getFullName(viewedUser)
+            getFullName(
+              viewedUser || {}
+            )
           )}"
         >
 
       `;
 
     }
+
+
+    /*
+    ===================================================
+    SUCCESS
+    ===================================================
+    */
+
+    if (status) {
+
+      status.textContent =
+        "Profile photo updated successfully.";
+
+      status.className =
+        "profile-upload-status success";
+
+    }
+
+
+    /*
+    ===================================================
+    CACHE-BUST OTHER UI ELEMENTS
+
+    The realtime Firestore listener will also
+    update other CONNECTA pages that are open.
+    ===================================================
+    */
+
+    console.log(
+      "CONNECTA profile photo uploaded:",
+      storagePath
+    );
+
 
   } catch (error) {
 
@@ -2531,18 +2607,40 @@ async function handleProfilePhotoUpload(
       ) {
 
         message =
-          "Photo upload is not allowed by Firebase Storage rules.";
+          "Firebase Storage denied this upload. Check your Storage Rules.";
 
       }
 
 
-      if (
+      else if (
+        error?.code ===
+        "storage/canceled"
+      ) {
+
+        message =
+          "Photo upload was canceled.";
+
+      }
+
+
+      else if (
         error?.code ===
         "storage/quota-exceeded"
       ) {
 
         message =
           "Firebase Storage quota is unavailable.";
+
+      }
+
+
+      else if (
+        error?.code ===
+        "storage/unknown"
+      ) {
+
+        message =
+          "An unexpected Storage error occurred.";
 
       }
 
@@ -2558,10 +2656,16 @@ async function handleProfilePhotoUpload(
   }
 
 
-  event.target.value =
-    "";
+  /*
+  =====================================================
+  RESET FILE INPUT
 
-}
+  Allows the user to select the same image again.
+  =====================================================
+  */
+
+  event.target.value = "";
+  }
 
 
 /* =====================================================
