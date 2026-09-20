@@ -12,8 +12,20 @@ import {
   doc,
   setDoc,
   getDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  limit,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+
+/* =========================================================
+   CONNECTA REFERRAL SETTINGS
+========================================================= */
+
+const REFERRAL_REWARD = 5;
 
 
 /* =========================================================
@@ -49,7 +61,7 @@ function showMessage(
 
 
 /* =========================================================
-   REFERRAL CODE
+   REFERRAL CODE GENERATOR
 ========================================================= */
 
 function makeReferralCode(
@@ -99,26 +111,215 @@ function getReferralFromUrl() {
 
 
 /* =========================================================
-   NAME VALIDATION
+   FIND REFERRER BY REFERRAL CODE
+========================================================= */
+
+async function findReferrerByCode(
+  referralCode
+) {
+
+  if (!referralCode) {
+    return null;
+  }
+
+
+  const cleanCode =
+    referralCode
+      .trim()
+      .toUpperCase();
+
+
+  const usersRef =
+    collection(
+      db,
+      "users"
+    );
+
+
+  const referralQuery =
+    query(
+      usersRef,
+      where(
+        "referralCode",
+        "==",
+        cleanCode
+      ),
+      limit(1)
+    );
+
+
+  const snapshot =
+    await getDocs(
+      referralQuery
+    );
+
+
+  if (snapshot.empty) {
+    return null;
+  }
+
+
+  const referrerDoc =
+    snapshot.docs[0];
+
+
+  return {
+    uid: referrerDoc.id,
+    ...referrerDoc.data()
+  };
+
+}
+
+
+/* =========================================================
+   CREATE REFERRAL RECORD
 =========================================================
 
-   Allows:
+   IMPORTANT:
 
-   John
-   John Chumo
-   Jean-Luc
-   O'Connor
-   José
-   Éric
-   Mary Jane
+   This creates the referral event.
 
-   Does NOT allow:
+   It does NOT directly add money to the
+   user's wallet.
 
-   John123
-   John!!!
-   John 😎
-   💰John
-   John🔥
+   The actual KSh 5 financial credit should
+   be performed by a trusted backend/admin
+   transaction after verifying the referral.
+========================================================= */
+
+async function createReferralRecord({
+  referrer,
+  referredUser,
+  referredProfile
+}) {
+
+  if (!referrer) {
+    return null;
+  }
+
+
+  if (!referrer.uid) {
+    return null;
+  }
+
+
+  if (!referredUser?.uid) {
+    return null;
+  }
+
+
+  /* -----------------------------------------------
+     Prevent self referral
+  ------------------------------------------------ */
+
+  if (
+    referrer.uid ===
+    referredUser.uid
+  ) {
+
+    return null;
+
+  }
+
+
+  /* -----------------------------------------------
+     Referral document ID
+
+     Using referred UID makes the referral
+     naturally unique for this registration.
+  ------------------------------------------------ */
+
+  const referralRef =
+    doc(
+      db,
+      "referrals",
+      referredUser.uid
+    );
+
+
+  /* -----------------------------------------------
+     Check if referral already exists
+  ------------------------------------------------ */
+
+  const existingReferral =
+    await getDoc(
+      referralRef
+    );
+
+
+  if (existingReferral.exists()) {
+
+    return existingReferral.data();
+
+  }
+
+
+  /* -----------------------------------------------
+     Create referral record
+  ------------------------------------------------ */
+
+  const referralData = {
+
+    referralId:
+      referralRef.id,
+
+    referrerId:
+      referrer.uid,
+
+    referrerName:
+      referrer.displayName ||
+      `${referrer.firstName || ""} ${referrer.lastName || ""}`.trim() ||
+      referrer.username ||
+      "CONNECTA User",
+
+    referrerUsername:
+      referrer.username ||
+      "",
+
+    referredUserId:
+      referredUser.uid,
+
+    referredName:
+      referredProfile.displayName ||
+      `${referredProfile.firstName || ""} ${referredProfile.lastName || ""}`.trim() ||
+      referredProfile.username ||
+      "CONNECTA User",
+
+    referredUsername:
+      referredProfile.username ||
+      "",
+
+    rewardAmount:
+      REFERRAL_REWARD,
+
+    status:
+      "completed",
+
+    rewardCredited:
+      false,
+
+    createdAt:
+      serverTimestamp(),
+
+    rewardCreditedAt:
+      null
+
+  };
+
+
+  await setDoc(
+    referralRef,
+    referralData
+  );
+
+
+  return referralData;
+
+}
+
+
+/* =========================================================
+   NAME VALIDATION
 ========================================================= */
 
 const namePattern =
@@ -127,15 +328,6 @@ const namePattern =
 
 /* =========================================================
    USERNAME VALIDATION
-=========================================================
-
-   Allows:
-
-   john
-   john123
-   john_chumo
-
-   Does NOT allow emojis or spaces.
 ========================================================= */
 
 const usernamePattern =
@@ -209,10 +401,6 @@ function checkPasswordMatch() {
     confirmPassword.value;
 
 
-  /*
-  Nothing typed yet.
-  */
-
   if (!confirmation) {
 
     passwordMatchMessage.textContent =
@@ -222,10 +410,6 @@ function checkPasswordMatch() {
 
   }
 
-
-  /*
-  Passwords match.
-  */
 
   if (
     password === confirmation
@@ -241,10 +425,6 @@ function checkPasswordMatch() {
 
   }
 
-
-  /*
-  Passwords don't match.
-  */
 
   passwordMatchMessage.textContent =
     "Passwords do not match.";
@@ -300,11 +480,15 @@ if (registerForm) {
         );
 
 
-      submit.disabled =
-        true;
+      if (submit) {
 
-      submit.textContent =
-        "Creating account...";
+        submit.disabled =
+          true;
+
+        submit.textContent =
+          "Creating account...";
+
+      }
 
 
       try {
@@ -365,7 +549,7 @@ if (registerForm) {
 
 
         /* ======================================
-           FIRST NAME VALIDATION
+           VALIDATE FIRST NAME
         ====================================== */
 
         if (!firstName) {
@@ -377,7 +561,11 @@ if (registerForm) {
         }
 
 
-        if (!namePattern.test(firstName)) {
+        if (
+          !namePattern.test(
+            firstName
+          )
+        ) {
 
           throw new Error(
             "First name can contain letters, spaces, hyphens or apostrophes only. Emojis and symbols are not allowed."
@@ -387,7 +575,7 @@ if (registerForm) {
 
 
         /* ======================================
-           LAST NAME VALIDATION
+           VALIDATE LAST NAME
         ====================================== */
 
         if (!lastName) {
@@ -399,7 +587,11 @@ if (registerForm) {
         }
 
 
-        if (!namePattern.test(lastName)) {
+        if (
+          !namePattern.test(
+            lastName
+          )
+        ) {
 
           throw new Error(
             "Last name can contain letters, spaces, hyphens or apostrophes only. Emojis and symbols are not allowed."
@@ -409,7 +601,7 @@ if (registerForm) {
 
 
         /* ======================================
-           USERNAME VALIDATION
+           VALIDATE USERNAME
         ====================================== */
 
         if (
@@ -515,7 +707,39 @@ if (registerForm) {
 
 
         /* ======================================
-           CREATE FIREBASE ACCOUNT
+           GET REFERRAL BEFORE ACCOUNT CREATION
+        ====================================== */
+
+        const referralFromUrl =
+          getReferralFromUrl();
+
+
+        let referrer = null;
+
+
+        if (referralFromUrl) {
+
+          try {
+
+            referrer =
+              await findReferrerByCode(
+                referralFromUrl
+              );
+
+          } catch (referralLookupError) {
+
+            console.warn(
+              "Referral lookup failed:",
+              referralLookupError
+            );
+
+          }
+
+        }
+
+
+        /* ======================================
+           CREATE FIREBASE AUTH ACCOUNT
         ====================================== */
 
         const credential =
@@ -547,7 +771,7 @@ if (registerForm) {
 
 
         /* ======================================
-           REFERRAL
+           GENERATE REFERRAL CODE
         ====================================== */
 
         const referralCode =
@@ -556,12 +780,112 @@ if (registerForm) {
           );
 
 
+        /* ======================================
+           VALIDATED REFERRED BY
+        ====================================== */
+
         const referredBy =
-          getReferralFromUrl();
+          referrer
+            ? String(
+                referrer.referralCode || ""
+              )
+                .trim()
+                .toUpperCase()
+            : "";
 
 
         /* ======================================
-           CREATE FIRESTORE PROFILE
+           USER PROFILE
+        ====================================== */
+
+        const userProfile = {
+
+          uid:
+            user.uid,
+
+          firstName,
+
+          lastName,
+
+          displayName,
+
+          username,
+
+          usernameLower:
+            username.toLowerCase(),
+
+          email,
+
+          phone,
+
+          photoURL:
+            "",
+
+          bio:
+            "",
+
+          isOnline:
+            true,
+
+          lastSeen:
+            serverTimestamp(),
+
+          isVerified:
+            false,
+
+          verificationStatus:
+            "not_submitted",
+
+          verificationAmount:
+            0,
+
+          verificationTransactionCode:
+            "",
+
+          verifiedAt:
+            null,
+
+          referralCode,
+
+          referredBy,
+
+          following:
+            [],
+
+          followersCount:
+            0,
+
+          followingCount:
+            0,
+
+          balance:
+            0,
+
+          /*
+           * Referral statistics.
+           *
+           * The secure backend will eventually
+           * update these after successful referral
+           * verification.
+           */
+
+          referralCount:
+            0,
+
+          referralEarnings:
+            0,
+
+          status:
+            "active",
+
+          createdAt:
+            serverTimestamp()
+
+        };
+
+
+        /* ======================================
+           CREATE USER PROFILE
         ====================================== */
 
         await setDoc(
@@ -570,77 +894,60 @@ if (registerForm) {
             "users",
             user.uid
           ),
-          {
+          userProfile
+        );
 
-            uid:
-              user.uid,
 
-            firstName,
+        /* ======================================
+           CREATE REFERRAL RECORD
+        ====================================== */
 
-            lastName,
+        if (
+          referrer &&
+          referrer.uid !== user.uid
+        ) {
 
-            displayName,
+          try {
 
-            username,
+            await createReferralRecord({
+              referrer,
+              referredUser: user,
+              referredProfile: userProfile
+            });
 
-            usernameLower:
-              username.toLowerCase(),
 
-            email,
+            console.log(
+              "CONNECTA referral recorded:",
+              {
+                referrerId:
+                  referrer.uid,
 
-            phone,
+                referredUserId:
+                  user.uid,
 
-            photoURL:
-              "",
+                reward:
+                  REFERRAL_REWARD
+              }
+            );
 
-            bio:
-              "",
+          } catch (referralError) {
 
-            isOnline:
-              true,
+            /*
+             * Do NOT fail registration because
+             * referral-record creation failed.
 
-            lastSeen:
-              serverTimestamp(),
+             * The user's CONNECTA account has
+             * already been successfully created.
+             */
 
-            isVerified:
-              false,
-
-            verificationStatus:
-              "not_submitted",
-
-            verificationAmount:
-              0,
-
-            verificationTransactionCode:
-              "",
-
-            verifiedAt:
-              null,
-
-            referralCode,
-
-            referredBy,
-
-            following:
-              [],
-
-            followersCount:
-              0,
-
-            followingCount:
-              0,
-
-            balance:
-              0,
-
-            status:
-              "active",
-
-            createdAt:
-              serverTimestamp()
+            console.error(
+              "Referral record creation failed:",
+              referralError
+            );
 
           }
-        );
+
+        }
 
 
         /* ======================================
@@ -738,11 +1045,15 @@ if (registerForm) {
         );
 
 
-        submit.disabled =
-          false;
+        if (submit) {
 
-        submit.textContent =
-          "Create Account";
+          submit.disabled =
+            false;
+
+          submit.textContent =
+            "Create Account";
+
+        }
 
       }
 
@@ -829,26 +1140,12 @@ if (loginForm) {
           );
 
 
-        /*
-        =================================================
-        LOGIN SUCCESSFUL
-        =================================================
-
-        Firebase Authentication has already
-        authenticated the user.
-
-        We DO NOT wait for Firestore here.
-
-        The dashboard can load immediately.
-        =================================================
-        */
-
         const uid =
           credential.user.uid;
 
 
         /* ======================================
-           UPDATE ONLINE STATUS IN BACKGROUND
+           BACKGROUND ONLINE STATUS
         ====================================== */
 
         const userRef =
@@ -858,14 +1155,6 @@ if (loginForm) {
             uid
           );
 
-
-        /*
-        IMPORTANT:
-
-        Do not await this.
-
-        It must not delay dashboard loading.
-        */
 
         setDoc(
           userRef,
@@ -894,7 +1183,7 @@ if (loginForm) {
 
 
         /* ======================================
-           SAVE BASIC SESSION DATA
+           SAVE SESSION DATA
         ====================================== */
 
         try {
@@ -926,7 +1215,7 @@ if (loginForm) {
 
 
         /* ======================================
-           OPEN DASHBOARD IMMEDIATELY
+           OPEN DASHBOARD
         ====================================== */
 
         location.replace(
@@ -1033,12 +1322,6 @@ onAuthStateChanged(
         .split("/")
         .pop();
 
-
-    /*
-    Don't allow authenticated users
-    to return unnecessarily to
-    login/register.
-    */
 
     if (
       user &&
