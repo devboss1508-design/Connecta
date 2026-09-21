@@ -1,4 +1,27 @@
-import { auth, db } from "./firebase.js";
+/* =========================================================
+   CONNECTA — GROUPS
+   File: frontend/js/groups.js
+
+   FEATURES
+   - Public groups
+   - My groups
+   - Group search
+   - Create group
+   - Verified-user group creation
+   - Free group joining
+   - Paid-group preparation
+   - Group owner handling
+   - Realtime group updates
+   - Group latest-message preview
+   - GROUP UNREAD COUNTS
+   - Per-user read state
+   - New-message badge
+========================================================= */
+
+import {
+  auth,
+  db
+} from "./firebase.js";
 
 import {
   onAuthStateChanged,
@@ -9,6 +32,7 @@ import {
   collection,
   doc,
   getDoc,
+  getCountFromServer,
   onSnapshot,
   query,
   where,
@@ -22,7 +46,7 @@ import {
    BASIC HELPERS
 ========================================================= */
 
-const $ = (id) =>
+const $ = id =>
   document.getElementById(id);
 
 
@@ -35,13 +59,25 @@ let myGroups = [];
 let stopPublicGroups = null;
 let stopMyGroups = null;
 
+let unreadCounts = {};
+
+let unreadRefreshTimer = null;
+
+let unreadRefreshToken = 0;
+
 
 /* =========================================================
-   GROUP COLLECTION
+   COLLECTIONS
 ========================================================= */
 
 const GROUPS_COLLECTION =
   "groups";
+
+const GROUP_MESSAGES_COLLECTION =
+  "groupMessages";
+
+const GROUP_READS_COLLECTION =
+  "reads";
 
 
 /* =========================================================
@@ -57,20 +93,16 @@ function showToast(message) {
     return;
   }
 
-
   toast.textContent =
-    message;
-
+    String(message || "");
 
   toast.classList.add(
     "show"
   );
 
-
   clearTimeout(
     showToast.timer
   );
-
 
   showToast.timer =
     setTimeout(
@@ -83,7 +115,6 @@ function showToast(message) {
       },
       2600
     );
-
 }
 
 
@@ -104,7 +135,6 @@ function escapeHtml(value) {
         "'": "&#039;"
       }[character])
     );
-
 }
 
 
@@ -126,7 +156,6 @@ function initials(
     )
     .join("")
     .toUpperCase() || "G";
-
 }
 
 
@@ -150,7 +179,6 @@ function generateGroupSlug(
       ""
     )
     .slice(0, 60);
-
 }
 
 
@@ -167,7 +195,6 @@ function getFullName(
       profile.displayName || ""
     ).trim();
 
-
   if (
     displayName &&
     displayName.toLowerCase() !==
@@ -175,45 +202,37 @@ function getFullName(
   ) {
 
     return displayName;
-
   }
-
 
   const firstName =
     String(
       profile.firstName || ""
     ).trim();
 
-
   const lastName =
     String(
       profile.lastName || ""
     ).trim();
 
-
   const fullName =
     `${firstName} ${lastName}`.trim();
-
 
   if (fullName) {
     return fullName;
   }
 
-
   const username =
     String(
       profile.username || ""
     )
-    .trim()
-    .replace(
-      /^@/,
-      ""
-    );
-
+      .trim()
+      .replace(
+        /^@/,
+        ""
+      );
 
   return username ||
     "CONNECTA User";
-
 }
 
 
@@ -230,9 +249,7 @@ function verifiedBadge(
   ) {
 
     return "";
-
   }
-
 
   return `
     <span
@@ -254,7 +271,6 @@ function verifiedBadge(
       title="Verified account"
     >✓</span>
   `;
-
 }
 
 
@@ -272,6 +288,7 @@ function groupAvatar(
 
     return `
       <div class="group-avatar">
+
         <img
           src="${escapeHtml(
             group.photoURL
@@ -281,18 +298,16 @@ function groupAvatar(
           )}"
           loading="lazy"
         >
+
       </div>
     `;
-
   }
-
 
   return `
     <div class="group-avatar">
       ${initials(group.name)}
     </div>
   `;
-
 }
 
 
@@ -313,21 +328,18 @@ function groupTypeLabel(
         🔒 Private
       </span>
     `;
-
   }
-
 
   return `
     <span class="group-badge">
       🌍 Public
     </span>
   `;
-
 }
 
 
 /* =========================================================
-   GROUP PAYMENT LABEL
+   GROUP PAYMENT
 ========================================================= */
 
 function subscriptionLabel(
@@ -337,12 +349,10 @@ function subscriptionLabel(
   const enabled =
     group.subscriptionEnabled === true;
 
-
   const fee =
     Number(
       group.subscriptionFee || 0
     );
-
 
   if (
     !enabled ||
@@ -354,21 +364,18 @@ function subscriptionLabel(
         Free
       </span>
     `;
-
   }
-
 
   return `
     <span class="group-badge paid">
       KSh ${fee.toLocaleString("en-KE")}
     </span>
   `;
-
 }
 
 
 /* =========================================================
-   CURRENT USER GROUP MEMBERSHIP
+   MEMBERSHIP
 ========================================================= */
 
 function isMember(
@@ -381,19 +388,18 @@ function isMember(
   ) {
 
     return false;
-
   }
 
-
   /*
-  Supported membership formats.
+   * Owner is always treated as a member.
+   */
+  if (
+    String(group.ownerId || "") ===
+    String(currentUser.uid)
+  ) {
 
-  The first is recommended:
-  members: [uid1, uid2]
-
-  We also support:
-  memberIds: [uid1, uid2]
-  */
+    return true;
+  }
 
   const members =
     Array.isArray(
@@ -406,16 +412,14 @@ function isMember(
         ? group.memberIds
         : [];
 
-
   return members.includes(
     currentUser.uid
   );
-
 }
 
 
 /* =========================================================
-   CAN JOIN GROUP
+   CAN JOIN
 ========================================================= */
 
 function canJoinGroup(
@@ -429,9 +433,7 @@ function canJoinGroup(
       reason:
         "Please log in first."
     };
-
   }
-
 
   if (
     group.status !==
@@ -443,38 +445,27 @@ function canJoinGroup(
       reason:
         "This group has not been approved yet."
     };
-
   }
 
-
-  /*
-  Public groups:
-  All authenticated users may join.
-  */
-
   if (
-    group.type === "public"
+    group.type ===
+    "public"
   ) {
 
     return {
       allowed: true,
+
       requiresPayment:
         group.subscriptionEnabled === true &&
         Number(
           group.subscriptionFee || 0
         ) > 0
     };
-
   }
 
-
-  /*
-  Private groups:
-  Verified users only.
-  */
-
   if (
-    group.type === "private"
+    group.type ===
+    "private"
   ) {
 
     if (
@@ -486,28 +477,231 @@ function canJoinGroup(
         reason:
           "Only verified CONNECTA users can join private groups."
       };
-
     }
-
 
     return {
       allowed: true,
+
       requiresPayment:
         group.subscriptionEnabled === true &&
         Number(
           group.subscriptionFee || 0
         ) > 0
     };
-
   }
-
 
   return {
     allowed: false,
     reason:
       "Invalid group type."
   };
+}
 
+
+/* =========================================================
+   FORMAT LAST MESSAGE TIME
+========================================================= */
+
+function formatGroupTime(
+  value
+) {
+
+  if (!value) {
+    return "";
+  }
+
+  let date = null;
+
+  if (
+    typeof value?.toDate ===
+    "function"
+  ) {
+
+    date =
+      value.toDate();
+
+  } else if (
+    value?.seconds
+  ) {
+
+    date =
+      new Date(
+        value.seconds * 1000
+      );
+
+  } else if (
+    value?._seconds
+  ) {
+
+    date =
+      new Date(
+        value._seconds * 1000
+      );
+
+  } else {
+
+    date =
+      new Date(value);
+  }
+
+  if (
+    !date ||
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+
+    return "";
+  }
+
+  const now =
+    new Date();
+
+  const sameDay =
+    date.toDateString() ===
+    now.toDateString();
+
+  if (sameDay) {
+
+    return date.toLocaleTimeString(
+      [],
+      {
+        hour: "2-digit",
+        minute: "2-digit"
+      }
+    );
+  }
+
+  const difference =
+    now.getTime() -
+    date.getTime();
+
+  const days =
+    Math.floor(
+      difference /
+      86400000
+    );
+
+  if (
+    days < 7 &&
+    days >= 0
+  ) {
+
+    return date.toLocaleDateString(
+      [],
+      {
+        weekday: "short"
+      }
+    );
+  }
+
+  return date.toLocaleDateString(
+    [],
+    {
+      day: "numeric",
+      month: "short"
+    }
+  );
+}
+
+
+/* =========================================================
+   LATEST MESSAGE PREVIEW
+========================================================= */
+
+function groupLastMessage(
+  group
+) {
+
+  const text =
+    String(
+      group.lastMessage || ""
+    ).trim();
+
+  if (!text) {
+
+    return `
+      <span class="group-last-message-empty">
+        No messages yet
+      </span>
+    `;
+  }
+
+  return escapeHtml(
+    text
+  );
+}
+
+
+/* =========================================================
+   UNREAD COUNT
+========================================================= */
+
+function getUnreadCount(
+  groupId
+) {
+
+  return Number(
+    unreadCounts[groupId] || 0
+  );
+}
+
+
+/* =========================================================
+   UNREAD BADGE
+========================================================= */
+
+function unreadBadge(
+  group
+) {
+
+  const groupId =
+    String(
+      group.groupId ||
+      group.id ||
+      ""
+    );
+
+  const count =
+    getUnreadCount(
+      groupId
+    );
+
+  if (count <= 0) {
+    return "";
+  }
+
+  const display =
+    count > 99
+      ? "99+"
+      : String(count);
+
+  return `
+    <span
+      class="group-unread-badge"
+      aria-label="${count} unread messages"
+    >
+      ${display}
+    </span>
+  `;
+}
+
+
+/* =========================================================
+   UNREAD CLASS
+========================================================= */
+
+function unreadClass(
+  group
+) {
+
+  return getUnreadCount(
+    group.groupId ||
+    group.id ||
+    ""
+  ) > 0
+    ? "has-unread"
+    : "";
 }
 
 
@@ -523,30 +717,24 @@ function renderGroupCard(
   const mine =
     options.mine === true;
 
-
   const member =
     isMember(group);
-
 
   const access =
     canJoinGroup(group);
 
-
   let actionText =
     "Join";
-
 
   let actionClass =
     "";
 
-
   let disabled =
     false;
 
-
   /*
-  Creator.
-  */
+   * Creator.
+   */
 
   if (
     group.ownerId ===
@@ -584,19 +772,16 @@ function renderGroupCard(
     } else {
 
       actionText =
-        "Manage";
+        "Open";
 
       actionClass =
         "secondary";
-
     }
-
   }
 
-
   /*
-  Already a member.
-  */
+   * Existing member.
+   */
 
   else if (
     member
@@ -607,13 +792,11 @@ function renderGroupCard(
 
     actionClass =
       "secondary";
-
   }
 
-
   /*
-  User cannot join.
-  */
+   * Cannot join.
+   */
 
   else if (
     !access.allowed
@@ -627,13 +810,11 @@ function renderGroupCard(
 
     disabled =
       true;
-
   }
 
-
   /*
-  Paid group.
-  */
+   * Paid group.
+   */
 
   else if (
     access.requiresPayment
@@ -641,7 +822,6 @@ function renderGroupCard(
 
     actionText =
       "Join";
-
   }
 
 
@@ -672,34 +852,42 @@ function renderGroupCard(
     "CONNECTA User";
 
 
+  const groupId =
+    group.groupId ||
+    group.id ||
+    "";
+
+
   return `
     <article
-      class="group-card ${
-        group.status ===
-        "pending_review"
+      class="
+        group-card
+        ${group.status === "pending_review"
           ? "pending-group"
-          : ""
-      }"
+          : ""}
+        ${unreadClass(group)}
+      "
       data-group-id="${escapeHtml(
-        group.groupId ||
-        group.id ||
-        ""
+        groupId
       )}"
     >
 
       ${groupAvatar(group)}
-
 
       <div class="group-content">
 
         <div class="group-name-row">
 
           <h3 class="group-name">
+
             ${escapeHtml(
               group.name ||
               "CONNECTA Group"
             )}
+
           </h3>
+
+          ${unreadBadge(group)}
 
         </div>
 
@@ -712,6 +900,63 @@ function renderGroupCard(
           )}
 
         </p>
+
+
+        ${
+          group.lastMessage
+            ? `
+              <div
+                class="group-last-message"
+                style="
+                  margin-top:5px;
+                  font-size:11px;
+                  color:#6b7280;
+                  display:flex;
+                  align-items:center;
+                  gap:5px;
+                "
+              >
+
+                <span
+                  style="
+                    overflow:hidden;
+                    text-overflow:ellipsis;
+                    white-space:nowrap;
+                    max-width:75%;
+                    ${
+                      getUnreadCount(groupId) > 0
+                        ? "font-weight:700;color:#111827;"
+                        : ""
+                    }
+                  "
+                >
+                  ${groupLastMessage(group)}
+                </span>
+
+                ${
+                  group.lastMessageAt
+                    ? `
+                      <span
+                        style="
+                          flex-shrink:0;
+                          font-size:9px;
+                          color:#9ca3af;
+                        "
+                      >
+                        ${escapeHtml(
+                          formatGroupTime(
+                            group.lastMessageAt
+                          )
+                        )}
+                      </span>
+                    `
+                    : ""
+                }
+
+              </div>
+            `
+            : ""
+        }
 
 
         <div class="group-meta">
@@ -783,9 +1028,7 @@ function renderGroupCard(
           type="button"
           class="${actionClass}"
           data-group-action="${escapeHtml(
-            group.groupId ||
-            group.id ||
-            ""
+            groupId
           )}"
           ${
             disabled
@@ -800,7 +1043,6 @@ function renderGroupCard(
 
     </article>
   `;
-
 }
 
 
@@ -819,12 +1061,10 @@ function renderPublicGroups(
     return;
   }
 
-
   const term =
     String(filter || "")
       .trim()
       .toLowerCase();
-
 
   const groups =
     allGroups.filter(
@@ -836,9 +1076,7 @@ function renderPublicGroups(
         ) {
 
           return false;
-
         }
-
 
         if (
           group.type !==
@@ -846,14 +1084,11 @@ function renderPublicGroups(
         ) {
 
           return false;
-
         }
-
 
         if (!term) {
           return true;
         }
-
 
         const searchText =
           `${group.name || ""}
@@ -861,18 +1096,15 @@ function renderPublicGroups(
            ${group.ownerName || ""}`
             .toLowerCase();
 
-
         return searchText.includes(
           term
         );
-
       }
     );
 
 
   const count =
     $("publicGroupCount");
-
 
   if (count) {
 
@@ -882,7 +1114,6 @@ function renderPublicGroups(
           ? "group"
           : "groups"
       }`;
-
   }
 
 
@@ -915,7 +1146,6 @@ function renderPublicGroups(
     `;
 
     return;
-
   }
 
 
@@ -923,9 +1153,7 @@ function renderPublicGroups(
     groups
       .map(
         group =>
-          renderGroupCard(
-            group
-          )
+          renderGroupCard(group)
       )
       .join("");
 
@@ -933,7 +1161,6 @@ function renderPublicGroups(
   attachGroupActions(
     box
   );
-
 }
 
 
@@ -952,12 +1179,10 @@ function renderMyGroups(
     return;
   }
 
-
   const term =
     String(filter || "")
       .trim()
       .toLowerCase();
-
 
   const groups =
     myGroups.filter(
@@ -967,24 +1192,20 @@ function renderMyGroups(
           return true;
         }
 
-
         const searchText =
           `${group.name || ""}
            ${group.description || ""}`
             .toLowerCase();
 
-
         return searchText.includes(
           term
         );
-
       }
     );
 
 
   const count =
     $("myGroupCount");
-
 
   if (count) {
 
@@ -994,7 +1215,6 @@ function renderMyGroups(
           ? "group"
           : "groups"
       }`;
-
   }
 
 
@@ -1027,7 +1247,6 @@ function renderMyGroups(
     `;
 
     return;
-
   }
 
 
@@ -1048,7 +1267,26 @@ function renderMyGroups(
   attachGroupActions(
     box
   );
+}
 
+
+/* =========================================================
+   REFRESH ALL GROUP RENDERS
+========================================================= */
+
+function refreshGroupRenders() {
+
+  const search =
+    $("groupSearch")?.value ||
+    "";
+
+  renderPublicGroups(
+    search
+  );
+
+  renderMyGroups(
+    search
+  );
 }
 
 
@@ -1074,11 +1312,9 @@ function attachGroupActions(
             const groupId =
               button.dataset.groupAction;
 
-
             if (!groupId) {
               return;
             }
-
 
             const group =
               [...allGroups, ...myGroups]
@@ -1091,7 +1327,6 @@ function attachGroupActions(
                     groupId
                 );
 
-
             if (!group) {
 
               showToast(
@@ -1099,20 +1334,15 @@ function attachGroupActions(
               );
 
               return;
-
             }
-
 
             await handleGroupAction(
               group
             );
-
           }
         );
-
       }
     );
-
 }
 
 
@@ -1123,10 +1353,6 @@ function attachGroupActions(
 async function handleGroupAction(
   group
 ) {
-
-  /*
-  Creator.
-  */
 
   if (
     group.ownerId ===
@@ -1144,9 +1370,7 @@ async function handleGroupAction(
         )}`;
 
       return;
-
     }
-
 
     showToast(
       group.status ===
@@ -1156,13 +1380,8 @@ async function handleGroupAction(
     );
 
     return;
-
   }
 
-
-  /*
-  Already member.
-  */
 
   if (
     isMember(group)
@@ -1174,17 +1393,11 @@ async function handleGroupAction(
       )}`;
 
     return;
-
   }
 
 
-  /*
-  Check access.
-  */
-
   const access =
     canJoinGroup(group);
-
 
   if (
     !access.allowed
@@ -1195,13 +1408,8 @@ async function handleGroupAction(
     );
 
     return;
-
   }
 
-
-  /*
-  Paid group.
-  */
 
   if (
     access.requiresPayment
@@ -1212,18 +1420,12 @@ async function handleGroupAction(
     );
 
     return;
-
   }
 
-
-  /*
-  Free group.
-  */
 
   await joinFreeGroup(
     group
   );
-
 }
 
 
@@ -1239,7 +1441,6 @@ async function joinFreeGroup(
     return;
   }
 
-
   try {
 
     const groupRef =
@@ -1249,14 +1450,12 @@ async function joinFreeGroup(
         group.groupId
       );
 
-
     const userRef =
       doc(
         db,
         "users",
         currentUser.uid
       );
-
 
     await runTransaction(
       db,
@@ -1274,7 +1473,6 @@ async function joinFreeGroup(
           )
         ]);
 
-
         if (
           !groupSnap.exists()
         ) {
@@ -1282,9 +1480,7 @@ async function joinFreeGroup(
           throw new Error(
             "Group no longer exists."
           );
-
         }
-
 
         if (
           !userSnap.exists()
@@ -1293,21 +1489,13 @@ async function joinFreeGroup(
           throw new Error(
             "Your account could not be found."
           );
-
         }
-
 
         const groupData =
           groupSnap.data();
 
-
         const userData =
           userSnap.data();
-
-
-        /*
-        Re-check approval.
-        */
 
         if (
           groupData.status !==
@@ -1317,13 +1505,7 @@ async function joinFreeGroup(
           throw new Error(
             "This group is not approved."
           );
-
         }
-
-
-        /*
-        Re-check private verification.
-        */
 
         if (
           groupData.type ===
@@ -1334,14 +1516,7 @@ async function joinFreeGroup(
           throw new Error(
             "Only verified users can join private groups."
           );
-
         }
-
-
-        /*
-        Paid groups cannot use
-        this free-join function.
-        */
 
         if (
           groupData.subscriptionEnabled ===
@@ -1354,9 +1529,7 @@ async function joinFreeGroup(
           throw new Error(
             "This group requires payment."
           );
-
         }
-
 
         const members =
           Array.isArray(
@@ -1367,7 +1540,6 @@ async function joinFreeGroup(
               ]
             : [];
 
-
         if (
           members.includes(
             currentUser.uid
@@ -1375,14 +1547,11 @@ async function joinFreeGroup(
         ) {
 
           return;
-
         }
-
 
         members.push(
           currentUser.uid
         );
-
 
         transaction.update(
           groupRef,
@@ -1395,10 +1564,8 @@ async function joinFreeGroup(
 
             updatedAt:
               serverTimestamp()
-
           }
         );
-
       }
     );
 
@@ -1428,14 +1595,11 @@ async function joinFreeGroup(
       error
     );
 
-
     showToast(
       error.message ||
       "Could not join group."
     );
-
   }
-
 }
 
 
@@ -1446,16 +1610,6 @@ async function joinFreeGroup(
 async function startPaidGroupJoin(
   group
 ) {
-
-  /*
-  IMPORTANT:
-
-  We deliberately do NOT add the user
-  to the group here.
-
-  The backend/payment system must confirm
-  the subscription payment first.
-  */
 
   if (
     group.type ===
@@ -1468,7 +1622,6 @@ async function startPaidGroupJoin(
     );
 
     return;
-
   }
 
 
@@ -1487,24 +1640,432 @@ async function startPaidGroupJoin(
     );
 
     return;
-
   }
 
 
   /*
-  This is the point where we will connect
-  the secure backend payment endpoint.
-
-  DO NOT add membership directly from
-  the frontend for paid groups.
-  */
+   * Payment backend will be connected here.
+   */
 
   showToast(
     `Subscription required: KSh ${fee.toLocaleString(
       "en-KE"
     )}. Payment checkout will open next.`
   );
+}
 
+
+/* =========================================================
+   UNREAD COUNT — ONE GROUP
+========================================================= */
+
+async function getGroupUnreadCount(
+  group
+) {
+
+  if (
+    !currentUser ||
+    !group
+  ) {
+
+    return 0;
+  }
+
+
+  const groupId =
+    String(
+      group.groupId ||
+      group.id ||
+      ""
+    );
+
+
+  if (!groupId) {
+    return 0;
+  }
+
+
+  /*
+   * The group must have a newer message than
+   * the user's last-read timestamp before we
+   * perform the count query.
+   */
+
+  const lastMessageAt =
+    group.lastMessageAt;
+
+
+  if (!lastMessageAt) {
+    return 0;
+  }
+
+
+  try {
+
+    const readRef =
+      doc(
+        db,
+        GROUPS_COLLECTION,
+        groupId,
+        GROUP_READS_COLLECTION,
+        currentUser.uid
+      );
+
+
+    const readSnap =
+      await getDoc(
+        readRef
+      );
+
+
+    /*
+     * No read record means the user has never
+     * opened this group.
+     *
+     * If there is a latest message, count
+     * the messages currently in the group.
+     */
+
+    if (
+      !readSnap.exists()
+    ) {
+
+      const messagesRef =
+        collection(
+          db,
+          GROUPS_COLLECTION,
+          groupId,
+          GROUP_MESSAGES_COLLECTION
+        );
+
+      const countSnapshot =
+        await getCountFromServer(
+          messagesRef
+        );
+
+      return Number(
+        countSnapshot.data().count || 0
+      );
+    }
+
+
+    const readData =
+      readSnap.data();
+
+
+    const lastReadAt =
+      readData.lastReadAt;
+
+
+    if (!lastReadAt) {
+
+      const messagesRef =
+        collection(
+          db,
+          GROUPS_COLLECTION,
+          groupId,
+          GROUP_MESSAGES_COLLECTION
+        );
+
+      const countSnapshot =
+        await getCountFromServer(
+          messagesRef
+        );
+
+      return Number(
+        countSnapshot.data().count || 0
+      );
+    }
+
+
+    /*
+     * If the latest group message is not newer
+     * than lastReadAt, there are no unread messages.
+     *
+     * This is an optimization to avoid a count query.
+     */
+
+    const latestMillis =
+      getTimestampMillis(
+        lastMessageAt
+      );
+
+    const readMillis =
+      getTimestampMillis(
+        lastReadAt
+      );
+
+
+    if (
+      latestMillis !== null &&
+      readMillis !== null &&
+      latestMillis <= readMillis
+    ) {
+
+      return 0;
+    }
+
+
+    /*
+     * Exact unread count.
+     */
+
+    const messagesRef =
+      collection(
+        db,
+        GROUPS_COLLECTION,
+        groupId,
+        GROUP_MESSAGES_COLLECTION
+      );
+
+
+    const unreadQuery =
+      query(
+        messagesRef,
+        where(
+          "createdAt",
+          ">",
+          lastReadAt
+        )
+      );
+
+
+    const countSnapshot =
+      await getCountFromServer(
+        unreadQuery
+      );
+
+
+    return Number(
+      countSnapshot.data().count || 0
+    );
+
+
+  } catch (error) {
+
+    console.warn(
+      `Could not calculate unread count for group ${groupId}:`,
+      error
+    );
+
+    return 0;
+  }
+}
+
+
+/* =========================================================
+   TIMESTAMP TO MILLISECONDS
+========================================================= */
+
+function getTimestampMillis(
+  value
+) {
+
+  if (!value) {
+    return null;
+  }
+
+
+  try {
+
+    if (
+      typeof value.toMillis ===
+      "function"
+    ) {
+
+      return value.toMillis();
+    }
+
+
+    if (
+      typeof value.toDate ===
+      "function"
+    ) {
+
+      return value.toDate().getTime();
+    }
+
+
+    if (
+      typeof value.seconds ===
+      "number"
+    ) {
+
+      return (
+        value.seconds * 1000 +
+        Math.floor(
+          Number(
+            value.nanoseconds || 0
+          ) / 1000000
+        )
+      );
+    }
+
+
+    if (
+      typeof value._seconds ===
+      "number"
+    ) {
+
+      return (
+        value._seconds * 1000 +
+        Math.floor(
+          Number(
+            value._nanoseconds || 0
+          ) / 1000000
+        )
+      );
+    }
+
+
+    const date =
+      new Date(value);
+
+
+    if (
+      !Number.isNaN(
+        date.getTime()
+      )
+    ) {
+
+      return date.getTime();
+    }
+
+  } catch {
+    /* ignore */
+  }
+
+
+  return null;
+}
+
+
+/* =========================================================
+   REFRESH UNREAD COUNTS
+========================================================= */
+
+async function refreshUnreadCounts(
+  groups
+) {
+
+  if (
+    !currentUser ||
+    !Array.isArray(groups)
+  ) {
+
+    return;
+  }
+
+
+  const uniqueGroups =
+    Array.from(
+      new Map(
+        groups
+          .filter(
+            group =>
+              group &&
+              (
+                group.groupId ||
+                group.id
+              )
+          )
+          .map(
+            group => [
+              group.groupId ||
+              group.id,
+              group
+            ]
+          )
+      ).values()
+    );
+
+
+  if (!uniqueGroups.length) {
+    return;
+  }
+
+
+  const token =
+    ++unreadRefreshToken;
+
+
+  const results =
+    await Promise.all(
+      uniqueGroups.map(
+        async group => {
+
+          const id =
+            group.groupId ||
+            group.id;
+
+          const count =
+            await getGroupUnreadCount(
+              group
+            );
+
+          return {
+            id,
+            count
+          };
+        }
+      )
+    );
+
+
+  /*
+   * Ignore old results if another refresh
+   * started while this one was running.
+   */
+
+  if (
+    token !==
+    unreadRefreshToken
+  ) {
+
+    return;
+  }
+
+
+  results.forEach(
+    result => {
+
+      unreadCounts[
+        result.id
+      ] =
+        result.count;
+
+    }
+  );
+
+
+  refreshGroupRenders();
+}
+
+
+/* =========================================================
+   SCHEDULE UNREAD REFRESH
+========================================================= */
+
+function scheduleUnreadRefresh() {
+
+  clearTimeout(
+    unreadRefreshTimer
+  );
+
+  unreadRefreshTimer =
+    setTimeout(
+      () => {
+
+        refreshUnreadCounts(
+          [
+            ...allGroups,
+            ...myGroups
+          ]
+        );
+
+      },
+      150
+    );
 }
 
 
@@ -1520,16 +2081,8 @@ function listenToPublicGroups() {
 
     stopPublicGroups =
       null;
-
   }
 
-
-  /*
-  Only APPROVED PUBLIC groups are queried.
-
-  Pending/rejected/private groups are not
-  displayed in the public discovery list.
-  */
 
   const groupsQuery =
     query(
@@ -1574,9 +2127,7 @@ function listenToPublicGroups() {
                   snap.id,
 
                 ...snap.data()
-
               };
-
             }
           );
 
@@ -1586,10 +2137,6 @@ function listenToPublicGroups() {
           ""
         );
 
-
-        /*
-        Update group badge.
-        */
 
         const badge =
           $("groupBadge");
@@ -1602,12 +2149,12 @@ function listenToPublicGroups() {
               allGroups.length
             );
 
-
           badge.hidden =
             allGroups.length === 0;
-
         }
 
+
+        scheduleUnreadRefresh();
       },
 
       error => {
@@ -1641,13 +2188,9 @@ function listenToPublicGroups() {
 
             </div>
           `;
-
         }
-
       }
-
     );
-
 }
 
 
@@ -1663,17 +2206,8 @@ function listenToMyGroups() {
 
     stopMyGroups =
       null;
-
   }
 
-
-  /*
-  We query groups where the current user
-  appears in members.
-
-  Group creation also adds the creator
-  as the first member.
-  */
 
   const groupsQuery =
     query(
@@ -1713,17 +2247,15 @@ function listenToMyGroups() {
                   snap.id,
 
                 ...snap.data()
-
               };
-
             }
           );
 
 
         /*
-        Keep all known groups available
-        for action handling.
-        */
+         * Merge public and personal groups
+         * without duplicate group IDs.
+         */
 
         const map =
           new Map();
@@ -1740,7 +2272,6 @@ function listenToMyGroups() {
               group.id,
               group
             );
-
           }
         );
 
@@ -1756,6 +2287,8 @@ function listenToMyGroups() {
           ""
         );
 
+
+        scheduleUnreadRefresh();
       },
 
       error => {
@@ -1765,12 +2298,6 @@ function listenToMyGroups() {
           error
         );
 
-
-        /*
-        If the query needs a Firestore
-        composite index, show a useful
-        message rather than crashing.
-        */
 
         const box =
           $("myGroups");
@@ -1795,13 +2322,9 @@ function listenToMyGroups() {
 
             </div>
           `;
-
         }
-
       }
-
     );
-
 }
 
 
@@ -1814,15 +2337,10 @@ function openCreateGroupModal() {
   const modal =
     $("groupModal");
 
-
   if (!modal) {
     return;
   }
 
-
-  /*
-  Only verified users may create groups.
-  */
 
   if (
     currentProfile?.isVerified !== true
@@ -1833,7 +2351,6 @@ function openCreateGroupModal() {
     );
 
     return;
-
   }
 
 
@@ -1841,15 +2358,12 @@ function openCreateGroupModal() {
     "open"
   );
 
-
   modal.setAttribute(
     "aria-hidden",
     "false"
   );
 
-
   $("groupName")?.focus();
-
 }
 
 
@@ -1862,22 +2376,18 @@ function closeCreateGroupModal() {
   const modal =
     $("groupModal");
 
-
   if (!modal) {
     return;
   }
-
 
   modal.classList.remove(
     "open"
   );
 
-
   modal.setAttribute(
     "aria-hidden",
     "true"
   );
-
 }
 
 
@@ -1891,33 +2401,26 @@ function updateSubscriptionUI() {
     $("subscriptionEnabled")?.value ===
     "true";
 
-
   const box =
     $("subscriptionBox");
-
 
   if (!box) {
     return;
   }
-
 
   box.classList.toggle(
     "show",
     enabled
   );
 
-
   const feeInput =
     $("subscriptionFee");
-
 
   if (feeInput) {
 
     feeInput.required =
       enabled;
-
   }
-
 }
 
 
@@ -1939,15 +2442,8 @@ async function createGroup(
     );
 
     return;
-
   }
 
-
-  /*
-  IMPORTANT SECURITY CHECK #1
-
-  Only verified users may create groups.
-  */
 
   if (
     currentProfile?.isVerified !== true
@@ -1958,7 +2454,6 @@ async function createGroup(
     );
 
     return;
-
   }
 
 
@@ -1991,10 +2486,6 @@ async function createGroup(
     );
 
 
-  /* =====================================================
-     VALIDATION
-  ===================================================== */
-
   if (
     name.length < 3
   ) {
@@ -2004,7 +2495,6 @@ async function createGroup(
     );
 
     return;
-
   }
 
 
@@ -2017,7 +2507,6 @@ async function createGroup(
     );
 
     return;
-
   }
 
 
@@ -2030,13 +2519,8 @@ async function createGroup(
     );
 
     return;
-
   }
 
-
-  /*
-  Subscription validation.
-  */
 
   if (
     subscriptionEnabled &&
@@ -2051,18 +2535,7 @@ async function createGroup(
     );
 
     return;
-
   }
-
-
-  /*
-  Private groups with payment are allowed.
-  Public paid groups are also allowed by this
-  implementation.
-
-  If you later want paid groups to be private-only,
-  we can enforce that in both frontend and backend.
-  */
 
 
   const submitButton =
@@ -2076,18 +2549,10 @@ async function createGroup(
 
     submitButton.textContent =
       "Submitting...";
-
   }
 
 
   try {
-
-    /*
-    Re-read the creator profile from Firestore
-    before creating.
-
-    This gives us a fresh verification status.
-    */
 
     const userSnap =
       await getDoc(
@@ -2106,17 +2571,12 @@ async function createGroup(
       throw new Error(
         "Your CONNECTA profile could not be found."
       );
-
     }
 
 
     const userData =
       userSnap.data();
 
-
-    /*
-    IMPORTANT SECURITY CHECK #2
-    */
 
     if (
       userData.isVerified !== true
@@ -2125,17 +2585,8 @@ async function createGroup(
       throw new Error(
         "Only verified CONNECTA users can create groups."
       );
-
     }
 
-
-    /*
-    Generate a new Firestore document ID.
-
-    We use a client-generated ID here because
-    the group is created once and remains pending
-    until admin approval.
-    */
 
     const groupRef =
       doc(
@@ -2145,13 +2596,6 @@ async function createGroup(
         )
       );
 
-
-    /*
-    Creator is automatically the first member.
-
-    The group remains pending_review and therefore
-    is NOT shown in public discovery.
-    */
 
     const groupData = {
 
@@ -2223,7 +2667,22 @@ async function createGroup(
         null,
 
       rejectionReason:
-        ""
+        "",
+
+      lastMessageId:
+        "",
+
+      lastMessage:
+        "",
+
+      lastMessageSenderId:
+        "",
+
+      lastMessageSenderName:
+        "",
+
+      lastMessageAt:
+        null
 
     };
 
@@ -2236,32 +2695,17 @@ async function createGroup(
           groupRef,
           groupData
         );
-
       }
     );
 
 
-    /*
-    Close modal.
-    */
-
     closeCreateGroupModal();
-
-
-    /*
-    Reset form.
-    */
 
     $("createGroupForm")?.reset();
 
 
-    /*
-    Restore defaults.
-    */
-
     const publicRadio =
       $("publicGroup");
-
 
     if (publicRadio) {
       publicRadio.checked =
@@ -2272,12 +2716,10 @@ async function createGroup(
     const subscription =
       $("subscriptionEnabled");
 
-
     if (subscription) {
 
       subscription.value =
         "false";
-
     }
 
 
@@ -2288,10 +2730,6 @@ async function createGroup(
       "Group submitted for admin review."
     );
 
-
-    /*
-    Switch to My Groups.
-    */
 
     switchTab(
       "mine"
@@ -2320,11 +2758,8 @@ async function createGroup(
 
       submitButton.textContent =
         "Submit for Review";
-
     }
-
   }
-
 }
 
 
@@ -2402,9 +2837,7 @@ function switchTab(
       $("groupSearch")?.value ||
       ""
     );
-
   }
-
 }
 
 
@@ -2431,7 +2864,6 @@ function setupMenu() {
   ) {
 
     return;
-
   }
 
 
@@ -2451,7 +2883,6 @@ function setupMenu() {
       overlay.classList.add(
         "open"
       );
-
     }
   );
 
@@ -2476,9 +2907,7 @@ function setupMenu() {
     overlay.classList.remove(
       "open"
     );
-
   }
-
 }
 
 
@@ -2538,7 +2967,6 @@ function renderHeaderProfile(
           maximumFractionDigits: 2
         }
       );
-
   }
 
 
@@ -2559,7 +2987,6 @@ function renderHeaderProfile(
         `
 
         : initial;
-
   }
 
 
@@ -2580,7 +3007,6 @@ function renderHeaderProfile(
         `
 
         : initial;
-
   }
 
 
@@ -2593,7 +3019,6 @@ function renderHeaderProfile(
     menuName.innerHTML =
       `${escapeHtml(name)}
        ${verifiedBadge(profile)}`;
-
   }
 
 
@@ -2605,9 +3030,7 @@ function renderHeaderProfile(
 
     menuUsername.textContent =
       username;
-
   }
-
 }
 
 
@@ -2639,10 +3062,8 @@ function setupProfileButton() {
         `profile.html?uid=${encodeURIComponent(
           currentUser.uid
         )}`;
-
     }
   );
-
 }
 
 
@@ -2696,12 +3117,9 @@ function setupLogout() {
         showToast(
           "Could not log out."
         );
-
       }
-
     }
   );
-
 }
 
 
@@ -2728,13 +3146,10 @@ function setupComingSoon() {
             showToast(
               `${element.dataset.coming} is coming in the next module.`
             );
-
           }
         );
-
       }
     );
-
 }
 
 
@@ -2774,12 +3189,9 @@ function setupSearch() {
         renderPublicGroups(
           value
         );
-
       }
-
     }
   );
-
 }
 
 
@@ -2836,9 +3248,7 @@ function setupCreateGroup() {
       ) {
 
         closeCreateGroupModal();
-
       }
-
     }
   );
 
@@ -2856,7 +3266,6 @@ function setupCreateGroup() {
 
 
   updateSubscriptionUI();
-
 }
 
 
@@ -2873,7 +3282,6 @@ function setupTabs() {
       switchTab(
         "discover"
       );
-
     }
   );
 
@@ -2885,11 +3293,45 @@ function setupTabs() {
       switchTab(
         "mine"
       );
-
     }
   );
-
 }
+
+
+/* =========================================================
+   CLEANUP
+========================================================= */
+
+function cleanup() {
+
+  if (stopPublicGroups) {
+
+    stopPublicGroups();
+
+    stopPublicGroups =
+      null;
+  }
+
+
+  if (stopMyGroups) {
+
+    stopMyGroups();
+
+    stopMyGroups =
+      null;
+  }
+
+
+  clearTimeout(
+    unreadRefreshTimer
+  );
+}
+
+
+window.addEventListener(
+  "beforeunload",
+  cleanup
+);
 
 
 /* =========================================================
@@ -2900,10 +3342,6 @@ onAuthStateChanged(
   auth,
   async user => {
 
-    /*
-    User must be logged in.
-    */
-
     if (!user) {
 
       location.replace(
@@ -2911,7 +3349,6 @@ onAuthStateChanged(
       );
 
       return;
-
     }
 
 
@@ -2920,10 +3357,6 @@ onAuthStateChanged(
 
 
     try {
-
-      /*
-      Load fresh current-user profile.
-      */
 
       const userSnap =
         await getDoc(
@@ -2942,7 +3375,6 @@ onAuthStateChanged(
         throw new Error(
           "CONNECTA profile not found."
         );
-
       }
 
 
@@ -2953,25 +3385,12 @@ onAuthStateChanged(
         };
 
 
-      /*
-      Render header.
-      */
-
       renderHeaderProfile(
         currentProfile
       );
 
 
-      /*
-      Start realtime public groups.
-      */
-
       listenToPublicGroups();
-
-
-      /*
-      Start realtime user's groups.
-      */
 
       listenToMyGroups();
 
@@ -2987,9 +3406,7 @@ onAuthStateChanged(
       showToast(
         "Could not load your CONNECTA profile."
       );
-
     }
-
   }
 );
 
