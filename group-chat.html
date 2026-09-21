@@ -334,235 +334,71 @@
         }
 
 
-    /* =========================================================
-   COMPACT GROUP CHAT MESSAGES
+   /* =========================================================
+   CONNECTA — WHATSAPP STYLE MESSAGE + TIME
 ========================================================= */
 
 .message-row {
-
-    width: 100% !important;
-
     display: flex !important;
-
     align-items: flex-end !important;
-
-    height: auto !important;
-
-    min-height: 0 !important;
-
-    margin: 0 0 3px 0 !important;
-
-    padding: 0 !important;
-
-    flex: none !important;
-
-    gap: 6px;
+    width: 100% !important;
+    min-width: 0 !important;
 }
 
 
-.message-row.mine {
-
-    justify-content: flex-end !important;
-}
-
+/* Incoming */
 
 .message-row.other {
-
     justify-content: flex-start !important;
 }
 
 
-/* =========================================================
-   MESSAGE CONTENT
-========================================================= */
+/* Sent */
+
+.message-row.mine {
+    justify-content: flex-end !important;
+}
+
+
+/* Message wrapper */
 
 .message-content {
-
-    width: fit-content !important;
-
-    max-width: 78% !important;
-
+    flex: 0 1 auto !important;
+    width: auto !important;
+    max-width: min(78%, 390px) !important;
     min-width: 0 !important;
-
-    flex: 0 0 auto !important;
 }
 
 
-.message-row.mine .message-content {
-
-    display: flex;
-
-    justify-content: flex-end;
-
-    flex-direction: column;
-
-    align-items: flex-end;
-}
-
-
-.message-row.other .message-content {
-
-    display: flex;
-
-    justify-content: flex-start;
-
-    flex-direction: column;
-
-    align-items: flex-start;
-}
-
-
-/* =========================================================
-   SENDER NAME
-========================================================= */
+/* Sender */
 
 .message-sender {
+    width: max-content !important;
+    max-width: 100% !important;
 
-    display: flex;
+    margin-bottom: 4px !important;
 
-    align-items: center;
-
-    width: fit-content;
-
-    max-width: 100%;
-
-    margin:
-        0 0 2px 6px;
-
-    padding: 0;
-
-    font-size: 11px;
-
-    font-weight: 700;
-
-    line-height: 14px;
-
-    color: #26332b;
-
-    white-space: nowrap;
-
-    overflow: hidden;
-
-    text-overflow: ellipsis;
+    white-space: nowrap !important;
 }
 
 
 /* =========================================================
-   VERIFIED BADGE
-========================================================= */
-
-.verified-badge {
-
-    display: inline-flex !important;
-
-    align-items: center;
-
-    justify-content: center;
-
-    width: 16px;
-
-    height: 16px;
-
-    min-width: 16px;
-
-    margin-left: 3px;
-
-    border-radius: 50%;
-
-    background: #2196f3;
-
-    color: #ffffff;
-
-    font-size: 10px;
-
-    font-weight: 800;
-
-    line-height: 1;
-
-    vertical-align: middle;
-}
-
-
-/* =========================================================
-   MESSAGE BUBBLE
+   BUBBLE
 ========================================================= */
 
 .message-bubble {
-
     display: block !important;
 
     width: fit-content !important;
-
     max-width: 100% !important;
-
     min-width: 0 !important;
-
-    min-height: 0 !important;
-
-    height: auto !important;
-
-    margin: 0 !important;
-
-    padding:
-        4px 7px 4px 7px !important;
-
-    border-radius: 12px !important;
-
-    font-size: 14px !important;
-
-    line-height: 18px !important;
-
-    word-break: normal !important;
-
-    overflow-wrap: anywhere !important;
 
     box-sizing: border-box !important;
 
-    flex: 0 0 auto !important;
+    padding: 8px 10px !important;
 
-    box-shadow:
-        0 1px 3px
-        rgba(0, 0, 0, .06);
-}
-
-
-/* =========================================================
-   INCOMING BUBBLE
-========================================================= */
-
-.message-row.other .message-bubble {
-
-    background: #ffffff;
-
-    color: #202821;
-
-    border:
-        1px solid #e7ece8;
-
-    border-top-left-radius: 4px;
-}
-
-
-/* =========================================================
-   OUTGOING BUBBLE
-========================================================= */
-
-.message-row.mine .message-bubble {
-
-    background:
-        linear-gradient(
-            135deg,
-            #22c55e,
-            #19bd5b
-        );
-
-    color: #ffffff;
-
-    border-top-right-radius: 4px;
-
-    box-shadow:
-        0 1px 4px
-        rgba(34, 197, 94, .17);
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
 }
 
 
@@ -571,194 +407,58 @@
 ========================================================= */
 
 .message-text {
-
     display: inline !important;
 
     width: auto !important;
-
     max-width: none !important;
-
-    height: auto !important;
-
-    min-height: 0 !important;
 
     margin: 0 !important;
 
     padding: 0 !important;
 
     white-space: pre-wrap !important;
-
-    line-height: 18px !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
 
     font-size: 14px !important;
-
-    word-break: normal !important;
-
-    overflow-wrap: anywhere !important;
+    line-height: 1.35 !important;
 }
 
 
 /* =========================================================
-   MESSAGE META
+   TIME — SAME LINE AS MESSAGE
 ========================================================= */
 
-.message-meta {
-
-    display: inline-flex !important;
-
-    align-items: center !important;
-
-    justify-content: flex-end !important;
+.message-bubble .message-time {
+    display: inline-block !important;
 
     width: auto !important;
 
-    max-width: none !important;
+    margin-left: 8px !important;
 
-    height: 10px !important;
-
-    min-height: 10px !important;
-
-    margin:
-        0 0 0 5px !important;
-
-    padding: 0 !important;
-
-    gap: 2px !important;
-
-    font-size: 8px !important;
-
-    line-height: 10px !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
 
     white-space: nowrap !important;
 
-    vertical-align: bottom !important;
+    vertical-align: baseline !important;
 
-    user-select: none;
+    font-size: 9px !important;
+    line-height: 1 !important;
+
+    opacity: 0.75 !important;
 }
 
 
 /* =========================================================
-   INCOMING META
+   SHORT MESSAGE
 ========================================================= */
 
-.message-row.other .message-meta {
+.message-bubble .message-text
++ .message-time {
 
-    color: #a0a8a3;
-}
+    white-space: nowrap !important;
 
-
-/* =========================================================
-   OUTGOING META
-========================================================= */
-
-.message-row.mine .message-meta {
-
-    color:
-        rgba(255, 255, 255, .82);
-}
-
-
-/* =========================================================
-   MESSAGE TIME
-========================================================= */
-
-.message-time {
-
-    display: inline;
-
-    font-size: 8px;
-
-    line-height: 10px;
-
-    white-space: nowrap;
-}
-
-
-/* =========================================================
-   MESSAGE CHECKS
-========================================================= */
-
-.message-checks {
-
-    display: inline-flex !important;
-
-    align-items: center;
-
-    justify-content: center;
-
-    width: auto !important;
-
-    height: auto !important;
-
-    min-height: 0 !important;
-
-    margin: 0 !important;
-
-    padding: 0 !important;
-
-    font-size: 10px !important;
-
-    line-height: 10px !important;
-
-    font-weight: 700;
-
-    letter-spacing: -2px;
-
-    white-space: nowrap;
-}
-
-
-/* =========================================================
-   READ CHECKS
-========================================================= */
-
-.message-checks.read {
-
-    color: #2196f3 !important;
-}
-
-
-/* =========================================================
-   MESSAGE AVATAR
-========================================================= */
-
-.message-avatar {
-
-    width: 29px;
-
-    height: 29px;
-
-    min-width: 29px;
-
-    border-radius: 50%;
-
-    overflow: hidden;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: center;
-
-    background: #e8efea;
-
-    color: #4c5a51;
-
-    font-size: 10px;
-
-    font-weight: 700;
-
-    flex-shrink: 0;
-}
-
-
-.message-avatar img {
-
-    width: 100%;
-
-    height: 100%;
-
-    object-fit: cover;
 }
 
 
@@ -766,88 +466,88 @@
    PHOTO MESSAGE
 ========================================================= */
 
+.message-bubble.photo-message {
+    padding: 4px !important;
+}
+
+
 .message-image-wrap {
+    display: block !important;
 
-    display: block;
+    max-width: 100% !important;
 
-    width: fit-content;
-
-    max-width: 220px;
-
-    border-radius: 10px;
-
-    overflow: hidden;
+    margin: 0 !important;
 }
 
 
 .message-image {
+    display: block !important;
 
-    display: block;
+    width: auto !important;
 
-    width: auto;
+    max-width: min(68vw, 260px) !important;
 
-    max-width: 220px;
+    height: auto !important;
 
-    max-height: 280px;
+    border-radius: 11px !important;
+}
 
-    height: auto;
 
-    object-fit: cover;
+/* Photo timestamp */
 
-    border-radius: 10px;
+.message-bubble.photo-message .message-time {
+    display: block !important;
+
+    width: max-content !important;
+
+    margin-left: auto !important;
+    margin-right: 3px !important;
+
+    margin-top: 3px !important;
 }
 
 
 /* =========================================================
-   MOBILE
+   AVATAR
+========================================================= */
+
+.message-avatar {
+    flex: 0 0 auto !important;
+
+    width: 29px !important;
+    height: 29px !important;
+
+    margin: 0 7px !important;
+}
+
+
+/* =========================================================
+   VERY SMALL PHONES
 ========================================================= */
 
 @media (max-width: 380px) {
 
     .message-content {
-
-        max-width: 82% !important;
+        max-width: 80% !important;
     }
 
 
     .message-bubble {
-
-        padding:
-            4px 7px 4px 7px !important;
-
-        font-size: 14px !important;
-
-        line-height: 18px !important;
+        padding: 7px 9px !important;
     }
 
 
     .message-text {
-
-        font-size: 14px !important;
-
-        line-height: 18px !important;
+        font-size: 13px !important;
     }
 
 
-    .message-avatar {
-
-        width: 27px;
-
-        height: 27px;
-
-        min-width: 27px;
+    .message-bubble .message-time {
+        font-size: 8px !important;
+        margin-left: 6px !important;
     }
 
-
-    .message-image {
-
-        max-width: 210px;
-
-        max-height: 260px;
-    }
-
-}
-
+ }
         
         /* =========================================================
            EMPTY STATE
