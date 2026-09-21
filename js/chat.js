@@ -42,9 +42,13 @@ const $ = id =>
 
 let currentUser = null;
 
+let currentProfile = null;
+
 let otherUser = null;
 
 let chatId = null;
+
+let stopOwnProfile = null;
 
 let stopMessages = null;
 
@@ -2327,6 +2331,29 @@ async function markMessagesDelivered() {
 async function sendTextMessage(
     text
 ) {
+        const control =
+        getChatAccountControl(
+            currentProfile
+        );
+
+
+    if (
+        control.blocked ||
+        control.messagingRestricted
+    ) {
+
+        showChatRestrictionNotice(
+            control.message ||
+            "Private messaging has been restricted by CONNECTA.",
+            control.blocked
+                ? "account"
+                : "messaging"
+        );
+
+
+        return;
+
+    }
 
     if (
         !text ||
@@ -2769,6 +2796,23 @@ function formatFileSize(
 async function uploadPhoto(
     file
 ) {
+        const control =
+        getChatAccountControl(
+            currentProfile
+        );
+
+
+    if (
+        control.blocked ||
+        control.messagingRestricted
+    ) {
+
+        throw new Error(
+            control.message ||
+            "Private messaging has been restricted by CONNECTA."
+        );
+
+    }
 
     if (
         !currentUser ||
@@ -3091,6 +3135,30 @@ function getFileExtension(
 
 async function sendMessage() {
 
+        const control =
+        getChatAccountControl(
+            currentProfile
+        );
+
+
+    if (
+        control.blocked ||
+        control.messagingRestricted
+    ) {
+
+        showChatRestrictionNotice(
+            control.message ||
+            "Private messaging has been restricted by CONNECTA.",
+            control.blocked
+                ? "account"
+                : "messaging"
+        );
+
+
+        return;
+
+    }
+
     const input =
         $("messageInput");
 
@@ -3294,6 +3362,21 @@ async function setTyping(
     typing
 ) {
 
+        const control =
+        getChatAccountControl(
+            currentProfile
+        );
+
+
+    if (
+        control.blocked ||
+        control.messagingRestricted
+    ) {
+
+        return;
+
+    }
+
     if (
         !currentUser ||
         !chatId
@@ -3337,6 +3420,21 @@ async function setTyping(
 ===================================================== */
 
 function handleTyping() {
+
+        const control =
+        getChatAccountControl(
+            currentProfile
+        );
+
+
+    if (
+        control.blocked ||
+        control.messagingRestricted
+    ) {
+
+        return;
+
+    }
 
     const input =
         $("messageInput");
@@ -3473,6 +3571,559 @@ function showChatError(
 
 }
 
+/* =====================================================
+   ADMIN ACCOUNT / CHAT CONTROLS
+
+   Controlled by the CONNECTA Admin Panel:
+
+   status:
+   - active
+   - suspended
+   - banned
+
+   messagingRestricted:
+   - false → user can send messages
+   - true  → user can read chats but cannot send
+
+   IMPORTANT:
+   These frontend checks are UX protection.
+   Firestore/backend security rules must also
+   enforce the restriction so it cannot be bypassed.
+===================================================== */
+
+function getChatAccountControl(
+    profile = {}
+) {
+
+    const status =
+        String(
+            profile.status || "active"
+        )
+        .trim()
+        .toLowerCase();
+
+
+    const messagingRestricted =
+        profile.messagingRestricted === true;
+
+
+    if (status === "banned") {
+
+        return {
+
+            blocked: true,
+
+            status: "banned",
+
+            messagingRestricted: true,
+
+            message:
+                "Your CONNECTA account has been banned."
+
+        };
+
+    }
+
+
+    if (status === "suspended") {
+
+        return {
+
+            blocked: true,
+
+            status: "suspended",
+
+            messagingRestricted: true,
+
+            message:
+                "Your CONNECTA account is currently suspended."
+
+        };
+
+    }
+
+
+    return {
+
+        blocked: false,
+
+        status: "active",
+
+        messagingRestricted,
+
+        message:
+            messagingRestricted
+                ? "Private messaging has been restricted by CONNECTA."
+                : ""
+
+    };
+
+}
+
+
+/* =====================================================
+   CHAT COMPOSER CONTROL
+===================================================== */
+
+function applyChatMessagingControl(
+    profile = currentProfile
+) {
+
+    const control =
+        getChatAccountControl(
+            profile
+        );
+
+
+    const form =
+        $("messageForm");
+
+
+    const input =
+        $("messageInput");
+
+
+    const sendButton =
+        $("sendButton");
+
+
+    const attachButton =
+        $("attachButton");
+
+
+    const photoInput =
+        $("photoInput");
+
+
+    /*
+     * Account suspended/banned.
+     *
+     * The entire composer is disabled.
+     */
+
+    if (control.blocked) {
+
+        if (input) {
+
+            input.disabled =
+                true;
+
+            input.placeholder =
+                "Messaging unavailable";
+
+        }
+
+
+        if (sendButton) {
+
+            sendButton.disabled =
+                true;
+
+        }
+
+
+        if (attachButton) {
+
+            attachButton.disabled =
+                true;
+
+        }
+
+
+        if (photoInput) {
+
+            photoInput.disabled =
+                true;
+
+        }
+
+
+        if (form) {
+
+            form.style.opacity =
+                "0.55";
+
+        }
+
+
+        showChatRestrictionNotice(
+            control.message,
+            "account"
+        );
+
+
+        return control;
+
+    }
+
+
+    /*
+     * Messaging restriction.
+     *
+     * User can still read the conversation.
+     */
+
+    if (
+        control.messagingRestricted
+    ) {
+
+        if (input) {
+
+            input.disabled =
+                true;
+
+            input.placeholder =
+                "Private messaging is restricted";
+
+        }
+
+
+        if (sendButton) {
+
+            sendButton.disabled =
+                true;
+
+        }
+
+
+        if (attachButton) {
+
+            attachButton.disabled =
+                true;
+
+        }
+
+
+        if (photoInput) {
+
+            photoInput.disabled =
+                true;
+
+        }
+
+
+        if (form) {
+
+            form.style.opacity =
+                "0.65";
+
+        }
+
+
+        showChatRestrictionNotice(
+            control.message,
+            "messaging"
+        );
+
+
+        return control;
+
+    }
+
+
+    /*
+     * Normal active account.
+     */
+
+    if (input) {
+
+        input.disabled =
+            false;
+
+        input.placeholder =
+            input.dataset.originalPlaceholder ||
+            "Type a message...";
+
+    }
+
+
+    if (sendButton) {
+
+        sendButton.disabled =
+            false;
+
+    }
+
+
+    if (attachButton) {
+
+        attachButton.disabled =
+            false;
+
+    }
+
+
+    if (photoInput) {
+
+        photoInput.disabled =
+            false;
+
+    }
+
+
+    if (form) {
+
+        form.style.opacity =
+            "";
+
+    }
+
+
+    removeChatRestrictionNotice();
+
+
+    return control;
+
+}
+
+
+/* =====================================================
+   RESTRICTION NOTICE
+===================================================== */
+
+function showChatRestrictionNotice(
+    message,
+    type = "messaging"
+) {
+
+    let notice =
+        $("chatRestrictionNotice");
+
+
+    if (!notice) {
+
+        notice =
+            document.createElement(
+                "div"
+            );
+
+
+        notice.id =
+            "chatRestrictionNotice";
+
+
+        notice.style.cssText = `
+            margin:8px 12px;
+            padding:10px 12px;
+            border-radius:12px;
+            background:#fff7ed;
+            border:1px solid #fed7aa;
+            color:#9a3412;
+            font-size:12px;
+            font-weight:700;
+            line-height:1.45;
+            text-align:center;
+        `;
+
+
+        const form =
+            $("messageForm");
+
+
+        if (form?.parentNode) {
+
+            form.parentNode.insertBefore(
+                notice,
+                form
+            );
+
+        }
+
+    }
+
+
+    notice.textContent =
+        message ||
+        (
+            type === "account"
+                ? "Messaging is unavailable for this account."
+                : "Private messaging has been restricted by CONNECTA."
+        );
+
+
+    notice.style.display =
+        "block";
+
+}
+
+
+/* =====================================================
+   REMOVE RESTRICTION NOTICE
+===================================================== */
+
+function removeChatRestrictionNotice() {
+
+    const notice =
+        $("chatRestrictionNotice");
+
+
+    if (notice) {
+
+        notice.remove();
+
+    }
+
+}
+
+
+/* =====================================================
+   CURRENT USER ADMIN CONTROL LISTENER
+===================================================== */
+
+function listenToOwnProfile(
+    uid
+) {
+
+    if (
+        stopOwnProfile
+    ) {
+
+        stopOwnProfile();
+
+        stopOwnProfile =
+            null;
+
+    }
+
+
+    stopOwnProfile =
+        onSnapshot(
+
+            doc(
+                db,
+                "users",
+                uid
+            ),
+
+            snapshot => {
+
+                if (
+                    !snapshot.exists()
+                ) {
+
+                    return;
+
+                }
+
+
+                currentProfile = {
+
+                    uid,
+
+                    ...snapshot.data()
+
+                };
+
+
+                const control =
+                    applyChatMessagingControl(
+                        currentProfile
+                    );
+
+
+                /*
+                 * If an administrator suspends or
+                 * bans the account while this chat
+                 * is open, stop the chat session.
+                 */
+
+                if (
+                    control.blocked
+                ) {
+
+                    if (stopMessages) {
+
+                        stopMessages();
+
+                        stopMessages =
+                            null;
+
+                    }
+
+
+                    if (stopChat) {
+
+                        stopChat();
+
+                        stopChat =
+                            null;
+
+                    }
+
+
+                    if (stopOtherUser) {
+
+                        stopOtherUser();
+
+                        stopOtherUser =
+                            null;
+
+                    }
+
+
+                    showChatError(
+                        control.message
+                    );
+
+
+                    const form =
+                        $("messageForm");
+
+
+                    if (form) {
+
+                        form.style.display =
+                            "none";
+
+                    }
+
+                } else {
+
+                    const form =
+                        $("messageForm");
+
+
+                    if (form) {
+
+                        form.style.display =
+                            "";
+
+                    }
+
+                }
+
+            },
+
+            error => {
+
+                console.warn(
+                    "Own account control listener failed:",
+                    error
+                );
+
+
+                /*
+                 * Fail closed for sending.
+                 * We don't allow messaging when
+                 * the current account's control
+                 * state cannot be verified.
+                 */
+
+                applyChatMessagingControl({
+
+                    status:
+                        "active",
+
+                    messagingRestricted:
+                        true
+
+                });
+
+            }
+
+        );
+
+    }
 
 /* =====================================================
    PHOTO ATTACHMENT
@@ -3793,6 +4444,16 @@ onAuthStateChanged(
         currentUser =
             user;
 
+        /*
+=================================================
+LOAD CURRENT USER ADMIN CONTROLS
+=================================================
+*/
+
+listenToOwnProfile(
+    user.uid
+);
+
 
         const otherUid =
             getOtherUid();
@@ -4065,6 +4726,17 @@ window.addEventListener(
 
             stopOtherUser =
                 null;
+
+        }
+
+        if (
+    stopOwnProfile
+) {
+
+    stopOwnProfile();
+
+    stopOwnProfile =
+        null;
 
         }
 
