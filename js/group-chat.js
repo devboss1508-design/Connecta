@@ -2060,9 +2060,9 @@ function renderMessages() {
     );
 }
 
-
 /* =========================================================
    RENDER MESSAGE
+   WhatsApp-style message + time
 ========================================================= */
 
 function renderMessage(message) {
@@ -2131,11 +2131,17 @@ function renderMessage(message) {
         ).toLowerCase();
 
 
+    const timestamp =
+        formatTime(
+            message.createdAt
+        );
+
+
     let body = "";
 
 
     /* =====================================================
-       PHOTO MESSAGE
+       PHOTO
     ===================================================== */
 
     if (
@@ -2162,11 +2168,19 @@ function renderMessage(message) {
                     >
 
                 </div>
+
+                <span class="message-time">
+                    ${escapeHTML(timestamp)}
+                </span>
             `
 
             : `
                 <span class="message-text">
                     Photo unavailable
+                </span>
+
+                <span class="message-time">
+                    ${escapeHTML(timestamp)}
                 </span>
             `;
 
@@ -2174,31 +2188,30 @@ function renderMessage(message) {
 
 
     /* =====================================================
-       TEXT MESSAGE
+       TEXT
     ===================================================== */
 
     else {
 
         body = `
+
             <span class="message-text">
                 ${escapeHTML(
                     message.text || ""
                 )}
             </span>
+
+            <span
+                class="message-time"
+                aria-label="Message time"
+            >
+                ${escapeHTML(timestamp)}
+            </span>
+
         `;
 
     }
 
-
-    const timestamp =
-        formatTime(
-            message.createdAt
-        );
-
-
-    /* =====================================================
-       MESSAGE ROW
-    ===================================================== */
 
     return `
 
@@ -2219,15 +2232,7 @@ function renderMessage(message) {
             }
 
 
-            <div
-                class="message-content"
-                style="
-                    flex:0 1 auto;
-                    width:max-content;
-                    max-width:min(78vw,390px);
-                    min-width:0;
-                "
-            >
+            <div class="message-content">
 
                 ${
                     !isMine
@@ -2249,48 +2254,13 @@ function renderMessage(message) {
                 <div
                     class="
                         message-bubble
-                        ${messageType === "image" ||
-                          messageType === "photo"
-                            ? "photo-message"
-                            : ""}
-                    "
-                    style="
-                        display:inline-flex;
-                        width:max-content;
-                        max-width:100%;
-                        min-width:0;
-                        flex-direction:column;
-                        align-items:flex-end;
+                        ${isMine
+                            ? "sent-bubble"
+                            : "received-bubble"}
                     "
                 >
 
-                    <div
-                        style="
-                            width:max-content;
-                            max-width:100%;
-                            min-width:0;
-                        "
-                    >
-
-                        ${body}
-
-                    </div>
-
-
-                    <div
-                        class="message-time"
-                        style="
-                            width:max-content;
-                            white-space:nowrap;
-                            align-self:flex-end;
-                        "
-                    >
-
-                        ${escapeHTML(
-                            timestamp
-                        )}
-
-                    </div>
+                    ${body}
 
                 </div>
 
@@ -2307,6 +2277,7 @@ function renderMessage(message) {
 
     `;
 }
+
 
 /* =========================================================
    SENDER NAME
