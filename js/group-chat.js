@@ -1026,18 +1026,21 @@ async function loadGroup() {
 
     if (cached) {
 
-        currentGroup =
-            cached;
+    currentGroup =
+        cached;
 
-        groupControl =
-            getGroupControl(
-                currentGroup
-            );
+    groupControl =
+        getGroupControl(
+            currentGroup
+        );
 
-        renderGroup();
+    renderGroup();
 
-        updateOwnerControls();
-        updateAccessUI();
+    updateOwnerControls();
+    updateAccessUI();
+
+    // Show cached messages immediately
+    loadCachedMessages();
     }
 
     try {
@@ -1086,7 +1089,10 @@ async function loadGroup() {
         updateOwnerControls();
         updateAccessUI();
 
-        setupGroupListener();
+         setupGroupListener();
+
+        // Start listening for group messages
+        setupMessageListener();
 
         hideLoading();
 
