@@ -1564,6 +1564,367 @@
             }
         }
 
+    /* =========================================================
+   CONNECTA — FINAL MESSAGE OVERRIDE
+   Keeps message + time inside one compact bubble
+========================================================= */
+
+.message-row {
+    display: flex !important;
+    width: 100% !important;
+    align-items: flex-end !important;
+    min-width: 0 !important;
+    margin: 0 0 7px !important;
+}
+
+.message-row.other {
+    justify-content: flex-start !important;
+}
+
+.message-row.mine {
+    justify-content: flex-end !important;
+}
+
+
+/* =========================================================
+   AVATAR
+========================================================= */
+
+.message-avatar {
+    flex: 0 0 29px !important;
+
+    width: 29px !important;
+    height: 29px !important;
+
+    min-width: 29px !important;
+    min-height: 29px !important;
+
+    margin: 0 7px !important;
+
+    border-radius: 50% !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    overflow: hidden !important;
+
+    background: #e8f8ed !important;
+    color: #16a34a !important;
+
+    font-size: 9px !important;
+    font-weight: 800 !important;
+
+    line-height: 1 !important;
+}
+
+.message-avatar img {
+    display: block !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    object-fit: cover !important;
+}
+
+
+/* =========================================================
+   CONTENT
+========================================================= */
+
+.message-content {
+    display: block !important;
+
+    flex: 0 1 auto !important;
+
+    width: auto !important;
+
+    min-width: 0 !important;
+
+    max-width: min(78%, 390px) !important;
+}
+
+
+/* =========================================================
+   SENDER
+========================================================= */
+
+.message-sender {
+    display: flex !important;
+    align-items: center !important;
+
+    width: max-content !important;
+    max-width: 100% !important;
+
+    margin: 0 0 3px 8px !important;
+
+    color: #26332b !important;
+
+    font-size: 12px !important;
+    font-weight: 700 !important;
+
+    line-height: 1.2 !important;
+
+    white-space: nowrap !important;
+
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+
+/* =========================================================
+   MESSAGE BUBBLE
+========================================================= */
+
+.message-bubble {
+    display: block !important;
+
+    width: fit-content !important;
+    max-width: 100% !important;
+
+    min-width: 0 !important;
+
+    padding: 7px 9px !important;
+
+    border-radius: 15px !important;
+
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+
+    box-sizing: border-box !important;
+
+    line-height: 1.3 !important;
+
+    box-shadow: none !important;
+}
+
+
+/* =========================================================
+   RECEIVED BUBBLE
+========================================================= */
+
+.message-bubble.received-bubble {
+    background: #ffffff !important;
+
+    color: #17211b !important;
+
+    border: 1px solid #e4ebe6 !important;
+
+    border-top-left-radius: 5px !important;
+}
+
+
+/* =========================================================
+   SENT BUBBLE
+========================================================= */
+
+.message-bubble.sent-bubble {
+    background: #22c55e !important;
+
+    color: #ffffff !important;
+
+    border: 0 !important;
+
+    border-top-right-radius: 5px !important;
+}
+
+
+/* =========================================================
+   MESSAGE TEXT
+========================================================= */
+
+.message-text {
+    display: inline !important;
+
+    width: auto !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    color: inherit !important;
+
+    font-size: 14px !important;
+    font-weight: 400 !important;
+
+    line-height: 1.35 !important;
+
+    white-space: pre-wrap !important;
+
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+}
+
+
+/* =========================================================
+   TIME — INSIDE THE SAME BUBBLE
+========================================================= */
+
+.message-bubble .message-time {
+    display: inline-block !important;
+
+    position: static !important;
+
+    width: auto !important;
+    height: auto !important;
+
+    margin: 0 0 0 7px !important;
+    padding: 0 !important;
+
+    color: inherit !important;
+
+    font-size: 9px !important;
+    font-weight: 400 !important;
+
+    line-height: 1 !important;
+
+    white-space: nowrap !important;
+
+    vertical-align: baseline !important;
+
+    opacity: .68 !important;
+}
+
+
+/* =========================================================
+   SENT TIME
+========================================================= */
+
+.message-bubble.sent-bubble .message-time {
+    color: rgba(255,255,255,.9) !important;
+}
+
+
+/* =========================================================
+   RECEIVED TIME
+========================================================= */
+
+.message-bubble.received-bubble .message-time {
+    color: #68756d !important;
+}
+
+
+/* =========================================================
+   PHOTO BUBBLE
+========================================================= */
+
+.message-bubble.photo-bubble {
+    padding: 4px !important;
+
+    overflow: hidden !important;
+}
+
+
+/* =========================================================
+   PHOTO
+========================================================= */
+
+.message-image-wrap {
+    display: block !important;
+
+    width: auto !important;
+    max-width: 100% !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.message-image {
+    display: block !important;
+
+    width: auto !important;
+
+    max-width: min(68vw, 260px) !important;
+
+    height: auto !important;
+
+    border-radius: 11px !important;
+}
+
+
+/* =========================================================
+   PHOTO TIME
+========================================================= */
+
+.message-bubble .photo-time {
+    display: block !important;
+
+    width: max-content !important;
+
+    margin: 3px 3px 2px auto !important;
+
+    font-size: 9px !important;
+
+    line-height: 1 !important;
+}
+
+
+/* =========================================================
+   SELECTED MESSAGE
+========================================================= */
+
+.message-row.selected .message-bubble {
+    outline: 2px solid #ef4444 !important;
+
+    outline-offset: 2px !important;
+}
+
+
+/* =========================================================
+   DELETE MODE
+========================================================= */
+
+.message-row.selectable {
+    cursor: pointer !important;
+}
+
+
+/* =========================================================
+   SMALL PHONES
+========================================================= */
+
+@media (max-width: 380px) {
+
+    .message-content {
+        max-width: 82% !important;
+    }
+
+    .message-bubble {
+        padding: 6px 8px !important;
+
+        border-radius: 14px !important;
+    }
+
+    .message-text {
+        font-size: 13px !important;
+    }
+
+    .message-bubble .message-time {
+        font-size: 8px !important;
+
+        margin-left: 6px !important;
+    }
+
+    .message-avatar {
+        width: 27px !important;
+        height: 27px !important;
+
+        flex-basis: 27px !important;
+        min-width: 27px !important;
+    }
+}
+
+
+/* =========================================================
+   TABLET / DESKTOP
+========================================================= */
+
+@media (min-width: 700px) {
+
+    .message-content {
+        max-width: 55% !important;
+    }
+}
+
     </style>
 </head>
 
