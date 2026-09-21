@@ -314,6 +314,19 @@ function loadDashboardCache(uid) {
 
 }
 
+/* GROUPS */
+
+if (
+  Array.isArray(cache.groups)
+) {
+
+  recentGroups =
+    cache.groups;
+
+  mergeRecentChats();
+
+}
+
 
 /* =========================================================
    PROFILE CACHE
@@ -2580,14 +2593,19 @@ async function listenToChats(
                   data.senderName ||
                   name,
 
-                time:
-                  formatTimestamp(
-                    data.updatedAt
-                  ),
+                lastMessageAt:
+  data.lastMessageAt ||
+  data.updatedAt ||
+  null,
 
-                unread:
-                  unreadCount,
+time:
+  formatTimestamp(
+    data.lastMessageAt ||
+    data.updatedAt
+  ),
 
+unread:
+  unreadCount,
                 href:
                   `chat.html?uid=${encodeURIComponent(
                     otherUid
@@ -2919,12 +2937,12 @@ async function listenToGroups(
                   senderUid,
 
                 lastMessageSenderName:
-                  group.lastMessageSenderName ||
-                  senderProfile
-                    ? getFullName(
-                        senderProfile || {}
-                      )
-                    : "User",
+  group.lastMessageSenderName ||
+  (
+    senderProfile
+      ? getFullName(senderProfile)
+      : "User"
+  ),
 
                 lastMessageSenderVerified:
                   senderProfile?.isVerified === true,
@@ -4121,14 +4139,21 @@ async function initializeDashboard() {
 
 
   /* =======================================================
-     RECENT CHATS
-  ======================================================= */
+   RECENT CHATS
+======================================================= */
 
-  listenToChats(
-    currentUser.uid
-  );
+listenToChats(
+  currentUser.uid
+);
 
-}
+
+/* =======================================================
+   RECENT GROUP CHATS
+======================================================= */
+
+listenToGroups(
+  currentUser.uid
+);
 
 
 /* =========================================================
