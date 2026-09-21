@@ -410,10 +410,15 @@
         ========================================================= */
 
         .message-content {
-            max-width: min(68%, 390px);
+    width: fit-content;
+    max-width: min(78%, 390px);
+    min-width: 0;
+}
 
-            min-width: 0;
-        }
+       .message-bubble {
+    width: fit-content;
+    max-width: 100%;
+}
 
         .message-sender {
             display: flex;
