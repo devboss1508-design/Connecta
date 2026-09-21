@@ -1,13 +1,13 @@
 import {
-    auth,
     db,
     storage
 } from "./firebase.js";
 
 
 import {
-    onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+    getCurrentConnectaUser,
+    logout
+} from "./globalAuth.js";
 
 
 import {
@@ -43,6 +43,19 @@ const $ = id =>
 let currentUser = null;
 
 let currentProfile = null;
+
+/*
+ * IMPORTANT:
+ * Messaging is disabled until the current user's
+ * account-control profile has been verified.
+ *
+ * This prevents a user from sending a message during
+ * the short period before Firestore returns:
+ *
+ * - status
+ * - messagingRestricted
+ */
+let accountControlLoaded = false;
 
 let otherUser = null;
 
@@ -3592,8 +3605,37 @@ function showChatError(
 ===================================================== */
 
 function getChatAccountControl(
-    profile = {}
+    profile = null
 ) {
+
+    /*
+     * FAIL CLOSED
+     *
+     * Until we have confirmed the current user's
+     * Firestore profile, messaging is restricted.
+     */
+    if (
+        !accountControlLoaded ||
+        !profile
+    ) {
+
+        return {
+
+            blocked: false,
+
+            status:
+                "checking",
+
+            messagingRestricted:
+                true,
+
+            message:
+                "Checking your CONNECTA account permissions..."
+
+        };
+
+    }
+
 
     const status =
         String(
@@ -3607,15 +3649,23 @@ function getChatAccountControl(
         profile.messagingRestricted === true;
 
 
-    if (status === "banned") {
+    /*
+     * BANNED
+     */
+
+    if (
+        status === "banned"
+    ) {
 
         return {
 
             blocked: true,
 
-            status: "banned",
+            status:
+                "banned",
 
-            messagingRestricted: true,
+            messagingRestricted:
+                true,
 
             message:
                 "Your CONNECTA account has been banned."
@@ -3625,15 +3675,23 @@ function getChatAccountControl(
     }
 
 
-    if (status === "suspended") {
+    /*
+     * SUSPENDED
+     */
+
+    if (
+        status === "suspended"
+    ) {
 
         return {
 
             blocked: true,
 
-            status: "suspended",
+            status:
+                "suspended",
 
-            messagingRestricted: true,
+            messagingRestricted:
+                true,
 
             message:
                 "Your CONNECTA account is currently suspended."
@@ -3643,23 +3701,52 @@ function getChatAccountControl(
     }
 
 
+    /*
+     * ACTIVE BUT MESSAGING RESTRICTED
+     */
+
+    if (
+        messagingRestricted
+    ) {
+
+        return {
+
+            blocked: false,
+
+            status:
+                "active",
+
+            messagingRestricted:
+                true,
+
+            message:
+                "Private messaging has been restricted by CONNECTA."
+
+        };
+
+    }
+
+
+    /*
+     * NORMAL ACTIVE ACCOUNT
+     */
+
     return {
 
         blocked: false,
 
-        status: "active",
+        status:
+            "active",
 
-        messagingRestricted,
+        messagingRestricted:
+            false,
 
         message:
-            messagingRestricted
-                ? "Private messaging has been restricted by CONNECTA."
-                : ""
+            ""
 
     };
 
 }
-
 
 /* =====================================================
    CHAT COMPOSER CONTROL
@@ -3986,6 +4073,23 @@ function listenToOwnProfile(
     }
 
 
+    /*
+     * Start in fail-closed mode.
+     */
+
+    accountControlLoaded =
+        false;
+
+
+    applyChatMessagingControl({
+        status:
+            "checking",
+
+        messagingRestricted:
+            true
+    });
+
+
     stopOwnProfile =
         onSnapshot(
 
@@ -4001,10 +4105,41 @@ function listenToOwnProfile(
                     !snapshot.exists()
                 ) {
 
+                    /*
+                     * We cannot verify the account.
+                     * Fail closed.
+                     */
+
+                    accountControlLoaded =
+                        false;
+
+
+                    currentProfile = {
+
+                        uid,
+
+                        status:
+                            "active",
+
+                        messagingRestricted:
+                            true
+
+                    };
+
+
+                    applyChatMessagingControl(
+                        currentProfile
+                    );
+
+
                     return;
 
                 }
 
+
+                /*
+                 * LIVE ADMIN-CONTROLLED PROFILE
+                 */
 
                 currentProfile = {
 
@@ -4015,82 +4150,38 @@ function listenToOwnProfile(
                 };
 
 
+                /*
+                 * The profile has now been verified.
+                 */
+
+                accountControlLoaded =
+                    true;
+
+
                 const control =
                     applyChatMessagingControl(
                         currentProfile
                     );
 
 
+                console.log(
+                    "[CONNECTA] Chat account control:",
+                    control
+                );
+
+
                 /*
-                 * If an administrator suspends or
-                 * bans the account while this chat
-                 * is open, stop the chat session.
+                 * IMPORTANT:
+                 *
+                 * We do NOT destroy the chat listeners
+                 * when an account becomes restricted.
+                 *
+                 * This allows the admin to restore the
+                 * account while the user remains on the
+                 * page.
+                 *
+                 * The composer is disabled while restricted.
                  */
-
-                if (
-                    control.blocked
-                ) {
-
-                    if (stopMessages) {
-
-                        stopMessages();
-
-                        stopMessages =
-                            null;
-
-                    }
-
-
-                    if (stopChat) {
-
-                        stopChat();
-
-                        stopChat =
-                            null;
-
-                    }
-
-
-                    if (stopOtherUser) {
-
-                        stopOtherUser();
-
-                        stopOtherUser =
-                            null;
-
-                    }
-
-
-                    showChatError(
-                        control.message
-                    );
-
-
-                    const form =
-                        $("messageForm");
-
-
-                    if (form) {
-
-                        form.style.display =
-                            "none";
-
-                    }
-
-                } else {
-
-                    const form =
-                        $("messageForm");
-
-
-                    if (form) {
-
-                        form.style.display =
-                            "";
-
-                    }
-
-                }
 
             },
 
@@ -4103,13 +4194,16 @@ function listenToOwnProfile(
 
 
                 /*
-                 * Fail closed for sending.
-                 * We don't allow messaging when
-                 * the current account's control
-                 * state cannot be verified.
+                 * FAIL CLOSED
                  */
 
-                applyChatMessagingControl({
+                accountControlLoaded =
+                    false;
+
+
+                currentProfile = {
+
+                    uid,
 
                     status:
                         "active",
@@ -4117,13 +4211,18 @@ function listenToOwnProfile(
                     messagingRestricted:
                         true
 
-                });
+                };
+
+
+                applyChatMessagingControl(
+                    currentProfile
+                );
 
             }
 
         );
 
-    }
+}
 
 /* =====================================================
    PHOTO ATTACHMENT
@@ -4420,242 +4519,312 @@ function setupUI() {
 
 }
 
-
 /* =====================================================
-   AUTH
+   CONNECTA GLOBAL AUTH SESSION
 ===================================================== */
 
-onAuthStateChanged(
-    auth,
+async function initializeChat() {
 
-    async user => {
+    /*
+     * globalAuth.js is now the single authentication
+     * source for CONNECTA.
+     *
+     * This means dashboard.html, chat.html,
+     * groups.html, profile.html, etc. all use
+     * the same Firebase Auth session.
+     */
 
-        if (!user) {
+    const session =
+        await getCurrentConnectaUser({
+            redirect: true,
+            allowBlocked: true
+        });
 
-            location.replace(
-                "login.html"
-            );
 
-            return;
+    /*
+     * Not authenticated.
+     *
+     * globalAuth handles the redirect.
+     */
+
+    if (!session) {
+
+        return;
+
+    }
+
+
+    /*
+     * =================================================
+     * AUTHENTICATED USER
+     * =================================================
+     */
+
+    currentUser =
+        session.authUser;
+
+
+    currentProfile =
+        session.profile || {
+
+            uid:
+                currentUser.uid,
+
+            displayName:
+                currentUser.displayName || "",
+
+            photoURL:
+                currentUser.photoURL || "",
+
+            status:
+                "active"
+
+        };
+
+
+    console.log(
+        "[CONNECTA] Chat user:",
+        currentUser.uid
+    );
+
+
+    /*
+     * =================================================
+     * CURRENT USER ADMIN CONTROLS
+     * =================================================
+     *
+     * This listener remains active so the admin panel
+     * can change:
+     *
+     * messagingRestricted
+     * suspended
+     * banned
+     *
+     * while the user is already inside the chat.
+     */
+
+    listenToOwnProfile(
+        currentUser.uid
+    );
+
+
+    /*
+     * =================================================
+     * GET OTHER USER
+     * =================================================
+     */
+
+    const otherUid =
+        getOtherUid();
+
+
+    if (!otherUid) {
+
+        showChatError(
+            "No user was selected for this conversation."
+        );
+
+
+        const form =
+            $("messageForm");
+
+
+        if (form) {
+
+            form.style.display =
+                "none";
 
         }
 
 
-        currentUser =
-            user;
+        return;
+
+    }
+
+
+    /*
+     * =================================================
+     * SELF CHAT
+     * =================================================
+     */
+
+    if (
+        otherUid ===
+        currentUser.uid
+    ) {
+
+        showChatError(
+            "You cannot start a private chat with yourself."
+        );
+
+
+        const form =
+            $("messageForm");
+
+
+        if (form) {
+
+            form.style.display =
+                "none";
+
+        }
+
+
+        return;
+
+    }
+
+
+    /*
+     * =================================================
+     * CHAT INITIALIZATION
+     * =================================================
+     */
+
+    try {
 
         /*
-=================================================
-LOAD CURRENT USER ADMIN CONTROLS
-=================================================
-*/
+         * 1. CREATE CHAT ID
+         */
 
-listenToOwnProfile(
-    user.uid
-);
-
-
-        const otherUid =
-            getOtherUid();
-
-
-        /*
-        =================================================
-        NO USER SELECTED
-        =================================================
-        */
-
-        if (!otherUid) {
-
-            showChatError(
-                "No user was selected for this conversation."
+        chatId =
+            createChatId(
+                currentUser.uid,
+                otherUid
             );
 
 
-            const form =
-                $("messageForm");
+        /*
+         * 2. LOAD CACHED OTHER PROFILE
+         */
+
+        const cachedProfile =
+            getCachedProfile(
+                otherUid
+            );
 
 
-            if (form) {
+        if (cachedProfile) {
 
-                form.style.display =
-                    "none";
+            otherUser = {
 
-            }
+                uid:
+                    otherUid,
+
+                ...cachedProfile
+
+            };
 
 
-            return;
+            renderChatHeader(
+                otherUser
+            );
 
         }
 
 
         /*
-        =================================================
-        SELF CHAT
-        =================================================
-        */
+         * 3. LOAD CACHED MESSAGES
+         */
+
+        const cachedMessages =
+            getMessageCache(
+                chatId
+            );
+
 
         if (
-            otherUid ===
-            currentUser.uid
+            cachedMessages.length
+        ) {
+
+            latestMessages =
+                cachedMessages;
+
+
+            renderMessages(
+                cachedMessages
+            );
+
+        }
+
+
+        /*
+         * 4. REALTIME OTHER USER
+         */
+
+        listenToOtherUser(
+            otherUid
+        );
+
+
+        /*
+         * 5. REALTIME MESSAGES
+         */
+
+        listenToMessages();
+
+
+        /*
+         * 6. REALTIME CHAT METADATA
+         */
+
+        listenToChat();
+
+
+        /*
+         * 7. LOAD OTHER USER FROM FIRESTORE
+         */
+
+        await loadOtherUser(
+            otherUid
+        );
+
+
+        /*
+         * 8. CREATE / REPAIR CHAT
+         */
+
+        await ensureChat();
+
+
+        /*
+         * Apply the already-known account
+         * control after chat initialization.
+         */
+
+        applyChatMessagingControl(
+            currentProfile
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Chat initialization error:",
+            error
+        );
+
+
+        if (
+            !latestMessages.length
         ) {
 
             showChatError(
-                "You cannot start a private chat with yourself."
+                "Could not open this conversation. Please try again."
             );
-
-
-            const form =
-                $("messageForm");
-
-
-            if (form) {
-
-                form.style.display =
-                    "none";
-
-            }
-
-
-            return;
-
-        }
-
-
-        /*
-        =================================================
-        CHAT INITIALIZATION
-        =================================================
-        */
-
-        try {
-
-            /*
-            1. CHAT ID
-            */
-
-            chatId =
-                createChatId(
-                    currentUser.uid,
-                    otherUid
-                );
-
-
-            /*
-            2. CACHED PROFILE
-            */
-
-            const cachedProfile =
-                getCachedProfile(
-                    otherUid
-                );
-
-
-            if (cachedProfile) {
-
-                otherUser = {
-
-                    uid:
-                        otherUid,
-
-                    ...cachedProfile
-
-                };
-
-
-                renderChatHeader(
-                    otherUser
-                );
-
-            }
-
-
-            /*
-            3. CACHED MESSAGES
-            */
-
-            const cachedMessages =
-                getMessageCache(
-                    chatId
-                );
-
-
-            if (
-                cachedMessages.length
-            ) {
-
-                latestMessages =
-                    cachedMessages;
-
-
-                renderMessages(
-                    cachedMessages
-                );
-
-            }
-
-
-            /*
-            4. REALTIME PROFILE
-            */
-
-            listenToOtherUser(
-                otherUid
-            );
-
-
-            /*
-            5. REALTIME MESSAGES
-            */
-
-            listenToMessages();
-
-
-            /*
-            6. CHAT METADATA
-            */
-
-            listenToChat();
-
-
-            /*
-            7. FIRESTORE PROFILE
-            */
-
-            await loadOtherUser(
-                otherUid
-            );
-
-
-            /*
-            8. CREATE / REPAIR CHAT
-            */
-
-            await ensureChat();
-
-
-        } catch (error) {
-
-            console.error(
-                "Chat initialization error:",
-                error
-            );
-
-
-            if (
-                !latestMessages.length
-            ) {
-
-                showChatError(
-                    "Could not open this conversation. Please try again."
-                );
-
-            }
 
         }
 
     }
-);
+
+}
+
+
+/* =====================================================
+   START CHAT
+===================================================== */
+
+initializeChat();
 
 
 /* =====================================================
