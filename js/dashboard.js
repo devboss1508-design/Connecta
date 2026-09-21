@@ -1806,7 +1806,6 @@ function renderChats(
   const box =
     $("chatList");
 
-
   if (!box) {
     return;
   }
@@ -1825,7 +1824,8 @@ function renderChats(
         const searchText =
           `${chat.name || ""}
            ${chat.lastMessage || ""}
-           ${chat.username || ""}`
+           ${chat.username || ""}
+           ${chat.type || ""}`
             .toLowerCase();
 
 
@@ -1859,16 +1859,32 @@ function renderChats(
     filtered.map(
       chat => {
 
+        const isGroup =
+          chat.type === "group";
+
+
         const otherUid =
           chat.otherUid || "";
 
 
+        const groupId =
+          chat.groupId || "";
+
+
         const href =
-          otherUid
-            ? `chat.html?uid=${encodeURIComponent(
-                otherUid
+          isGroup
+
+            ? `group-chat.html?groupId=${encodeURIComponent(
+                groupId
               )}`
-            : "#";
+
+            : otherUid
+
+              ? `chat.html?uid=${encodeURIComponent(
+                  otherUid
+                )}`
+
+              : "#";
 
 
         const unread =
@@ -1914,7 +1930,151 @@ function renderChats(
 
         const name =
           chat.name ||
-          "CONNECTA User";
+          (
+            isGroup
+              ? "CONNECTA Group"
+              : "CONNECTA User"
+          );
+
+
+        /*
+         * =====================================================
+         * MESSAGE STATUS TICKS
+         *
+         * Only show these for messages sent BY the
+         * currently logged-in user.
+         * =====================================================
+         */
+
+        let messageStatus = "";
+
+
+        if (
+          !isGroup &&
+          chat.lastMessageSenderId ===
+            currentUser?.uid
+        ) {
+
+          if (
+            chat.lastMessageRead === true
+          ) {
+
+            messageStatus = `
+              <span
+                class="message-status message-status-read"
+                aria-label="Read"
+                title="Read"
+                style="
+                  margin-left:4px;
+                  font-size:13px;
+                  font-weight:900;
+                  color:#2196F3;
+                  letter-spacing:-4px;
+                  display:inline-block;
+                "
+              >
+                ✓✓
+              </span>
+            `;
+
+          } else if (
+            chat.lastMessageDelivered === true
+          ) {
+
+            messageStatus = `
+              <span
+                class="message-status message-status-delivered"
+                aria-label="Delivered"
+                title="Delivered"
+                style="
+                  margin-left:4px;
+                  font-size:13px;
+                  font-weight:900;
+                  color:#8b949e;
+                  letter-spacing:-4px;
+                  display:inline-block;
+                "
+              >
+                ✓✓
+              </span>
+            `;
+
+          } else {
+
+            messageStatus = `
+              <span
+                class="message-status message-status-sent"
+                aria-label="Sent"
+                title="Sent"
+                style="
+                  margin-left:4px;
+                  font-size:13px;
+                  font-weight:900;
+                  color:#8b949e;
+                  display:inline-block;
+                "
+              >
+                ✓
+              </span>
+            `;
+
+          }
+
+        }
+
+
+        /*
+         * =====================================================
+         * LAST MESSAGE PREVIEW
+         * =====================================================
+         */
+
+        let preview =
+          chat.lastMessage ||
+          "No messages yet";
+
+
+        if (
+          chat.lastMessageType === "image" ||
+          chat.lastMessageType === "photo"
+        ) {
+
+          preview =
+            "📷 Photo";
+
+        } else if (
+          chat.lastMessageType === "video"
+        ) {
+
+          preview =
+            "🎥 Video";
+
+        } else if (
+          chat.lastMessageType === "file"
+        ) {
+
+          preview =
+            "📎 File";
+
+        }
+
+
+        /*
+         * Group preview:
+         *
+         * John Chumo: Hello everyone
+         */
+
+        if (
+          isGroup &&
+          chat.lastMessageSenderName &&
+          chat.lastMessage
+        ) {
+
+          preview =
+            `${chat.lastMessageSenderName}: ${preview}`;
+
+        }
 
 
         return `
@@ -1922,7 +2082,10 @@ function renderChats(
             class="chat-item"
             href="${href}"
             data-chat-id="${escapeHtml(
-              chat.id || ""
+              chat.id || groupId || ""
+            )}"
+            data-chat-type="${escapeHtml(
+              chat.type || "individual"
             )}"
           >
 
@@ -1949,17 +2112,63 @@ function renderChats(
             </div>
 
 
-            <div class="chat-copy">
+            <div
+              class="chat-copy"
+              style="
+                min-width:0;
+                flex:1;
+              "
+            >
 
-              <strong>
-                ${escapeHtml(name)}
+              <strong
+                style="
+                  display:flex;
+                  align-items:center;
+                  min-width:0;
+                "
+              >
+
+                <span
+                  style="
+                    white-space:nowrap;
+                    overflow:hidden;
+                    text-overflow:ellipsis;
+                  "
+                >
+                  ${escapeHtml(name)}
+                </span>
+
+                ${
+                  !isGroup
+                    ? verifiedBadge(chat)
+                    : ""
+                }
+
               </strong>
 
-              <p>
-                ${escapeHtml(
-                  chat.lastMessage ||
-                  "No messages yet"
-                )}
+
+              <p
+                style="
+                  display:flex;
+                  align-items:center;
+                  min-width:0;
+                  margin:3px 0 0;
+                "
+              >
+
+                <span
+                  style="
+                    min-width:0;
+                    overflow:hidden;
+                    text-overflow:ellipsis;
+                    white-space:nowrap;
+                  "
+                >
+                  ${escapeHtml(preview)}
+                </span>
+
+                ${messageStatus}
+
               </p>
 
             </div>
@@ -1997,7 +2206,7 @@ function renderChats(
 
 
 /* =========================================================
-   LOAD RECENT CHATS
+   LOAD RECENT INDIVIDUAL CHATS
 ========================================================= */
 
 async function listenToChats(
@@ -2016,7 +2225,7 @@ async function listenToChats(
           "updatedAt",
           "desc"
         ),
-        limit(30)
+        limit(50)
       );
 
 
@@ -2100,6 +2309,12 @@ async function listenToChats(
                 "";
 
 
+              /*
+               * =================================================
+               * UNREAD COUNT
+               * =================================================
+               */
+
               const unreadCount =
                 Number(
                   data.unreadCount?.[uid] ??
@@ -2108,10 +2323,60 @@ async function listenToChats(
                 );
 
 
+              /*
+               * =================================================
+               * LAST MESSAGE SENDER
+               * =================================================
+               */
+
+              const lastMessageSenderId =
+                data.lastMessageSenderId ||
+                data.senderId ||
+                data.lastSenderId ||
+                "";
+
+
+              /*
+               * =================================================
+               * DELIVERY / READ STATUS
+               *
+               * Support the common field names already used
+               * by CONNECTA chat data.
+               * =================================================
+               */
+
+              const lastMessageDelivered =
+                data.lastMessageDelivered === true ||
+                data.delivered === true ||
+                data.lastDelivered === true;
+
+
+              const lastMessageRead =
+                data.lastMessageRead === true ||
+                data.read === true ||
+                data.lastRead === true;
+
+
+              /*
+               * =================================================
+               * MESSAGE TYPE
+               * =================================================
+               */
+
+              const lastMessageType =
+                data.lastMessageType ||
+                data.messageType ||
+                data.type ||
+                "text";
+
+
               chats.push({
 
                 id:
                   snap.id,
+
+                type:
+                  "individual",
 
                 otherUid,
 
@@ -2123,9 +2388,25 @@ async function listenToChats(
 
                 photoURL,
 
+                isVerified:
+                  cachedUser?.isVerified === true,
+
                 lastMessage:
                   data.lastMessage ||
                   "",
+
+                lastMessageType,
+
+                lastMessageSenderId,
+
+                lastMessageDelivered,
+
+                lastMessageRead,
+
+                lastMessageSenderName:
+                  data.lastMessageSenderName ||
+                  data.senderName ||
+                  name,
 
                 time:
                   formatTimestamp(
@@ -2141,6 +2422,37 @@ async function listenToChats(
                   )}`
 
               });
+
+            }
+          );
+
+
+          /*
+           * =====================================================
+           * SORT
+           *
+           * Unread conversations first, then newest.
+           * =====================================================
+           */
+
+          chats.sort(
+            (a, b) => {
+
+              const unreadDifference =
+                Number(b.unread || 0) -
+                Number(a.unread || 0);
+
+
+              if (
+                unreadDifference !== 0
+              ) {
+
+                return unreadDifference;
+
+              }
+
+
+              return 0;
 
             }
           );
