@@ -334,8 +334,8 @@
         }
 
 
-   /* =========================================================
-   CONNECTA — WHATSAPP STYLE MESSAGE + TIME
+  /* =========================================================
+   CONNECTA — WHATSAPP STYLE GROUP MESSAGES
 ========================================================= */
 
 .message-row {
@@ -343,62 +343,83 @@
     align-items: flex-end !important;
     width: 100% !important;
     min-width: 0 !important;
+
+    margin-bottom: 7px !important;
 }
 
 
-/* Incoming */
+/* =========================================================
+   INCOMING / SENT
+========================================================= */
 
 .message-row.other {
     justify-content: flex-start !important;
 }
-
-
-/* Sent */
 
 .message-row.mine {
     justify-content: flex-end !important;
 }
 
 
-/* Message wrapper */
+/* =========================================================
+   MESSAGE CONTENT
+========================================================= */
 
 .message-content {
     flex: 0 1 auto !important;
+
     width: auto !important;
+
     max-width: min(78%, 390px) !important;
+
     min-width: 0 !important;
 }
 
 
-/* Sender */
+/* =========================================================
+   SENDER NAME
+========================================================= */
 
 .message-sender {
     width: max-content !important;
     max-width: 100% !important;
 
-    margin-bottom: 4px !important;
+    margin:
+        0 0 4px
+        10px !important;
 
     white-space: nowrap !important;
+
+    font-size: 13px !important;
+    font-weight: 700 !important;
 }
 
 
 /* =========================================================
-   BUBBLE
+   MESSAGE BUBBLE
 ========================================================= */
 
 .message-bubble {
     display: block !important;
 
     width: fit-content !important;
+
     max-width: 100% !important;
+
     min-width: 0 !important;
+
+    padding:
+        8px
+        10px !important;
+
+    border-radius: 15px !important;
 
     box-sizing: border-box !important;
 
-    padding: 8px 10px !important;
-
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
+
+    line-height: 1.35 !important;
 }
 
 
@@ -409,56 +430,79 @@
 .message-text {
     display: inline !important;
 
-    width: auto !important;
-    max-width: none !important;
-
     margin: 0 !important;
-
     padding: 0 !important;
 
-    white-space: pre-wrap !important;
-    overflow-wrap: anywhere !important;
-    word-break: break-word !important;
+    width: auto !important;
 
     font-size: 14px !important;
     line-height: 1.35 !important;
+
+    white-space: pre-wrap !important;
+
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
 }
 
 
 /* =========================================================
-   TIME — SAME LINE AS MESSAGE
+   MESSAGE TIME
+   IMPORTANT:
+   SAME LINE AS MESSAGE
 ========================================================= */
 
 .message-bubble .message-time {
-    display: inline-block !important;
+    display: inline !important;
 
     width: auto !important;
 
-    margin-left: 8px !important;
+    margin:
+        0
+        0
+        0
+        8px !important;
 
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
+    padding: 0 !important;
 
     white-space: nowrap !important;
 
     vertical-align: baseline !important;
 
     font-size: 9px !important;
+
     line-height: 1 !important;
 
-    opacity: 0.75 !important;
+    opacity: .72 !important;
 }
 
 
 /* =========================================================
-   SHORT MESSAGE
+   MESSAGE AVATAR
 ========================================================= */
 
-.message-bubble .message-text
-+ .message-time {
+.message-avatar {
+    flex:
+        0
+        0
+        29px !important;
 
-    white-space: nowrap !important;
+    width: 29px !important;
+    height: 29px !important;
 
+    margin:
+        0
+        7px !important;
+
+    border-radius: 50% !important;
+
+    overflow: hidden !important;
+}
+
+.message-avatar img {
+    width: 100% !important;
+    height: 100% !important;
+
+    object-fit: cover !important;
 }
 
 
@@ -466,19 +510,15 @@
    PHOTO MESSAGE
 ========================================================= */
 
-.message-bubble.photo-message {
-    padding: 4px !important;
-}
-
-
 .message-image-wrap {
     display: block !important;
+
+    width: auto !important;
 
     max-width: 100% !important;
 
     margin: 0 !important;
 }
-
 
 .message-image {
     display: block !important;
@@ -493,61 +533,77 @@
 }
 
 
-/* Photo timestamp */
+/* =========================================================
+   PHOTO TIME
+========================================================= */
 
-.message-bubble.photo-message .message-time {
+.message-image-wrap + .message-time {
     display: block !important;
 
     width: max-content !important;
 
-    margin-left: auto !important;
-    margin-right: 3px !important;
+    margin:
+        3px
+        3px
+        0
+        auto !important;
 
-    margin-top: 3px !important;
+    font-size: 9px !important;
 }
 
 
 /* =========================================================
-   AVATAR
+   SELECTED MESSAGE
 ========================================================= */
 
-.message-avatar {
-    flex: 0 0 auto !important;
+.message-row.selected .message-bubble {
+    outline:
+        2px solid
+        var(--danger) !important;
 
-    width: 29px !important;
-    height: 29px !important;
-
-    margin: 0 7px !important;
+    outline-offset: 2px !important;
 }
 
 
 /* =========================================================
-   VERY SMALL PHONES
+   SMALL PHONES
 ========================================================= */
 
 @media (max-width: 380px) {
 
     .message-content {
-        max-width: 80% !important;
+        max-width: 82% !important;
     }
-
 
     .message-bubble {
-        padding: 7px 9px !important;
+        padding:
+            7px
+            9px !important;
     }
-
 
     .message-text {
         font-size: 13px !important;
     }
 
-
     .message-bubble .message-time {
         font-size: 8px !important;
+
         margin-left: 6px !important;
     }
+}
 
- }
+
+/* =========================================================
+   DESKTOP / TABLET
+========================================================= */
+
+@media (min-width: 700px) {
+
+    .message-content {
+        max-width: 55% !important;
+    }
+}
+    
         
         /* =========================================================
            EMPTY STATE
@@ -1507,112 +1563,6 @@
                 max-width: 55%;
             }
         }
-
-    /* =========================================================
-   CONNECTA — COMPACT GROUP MESSAGE BUBBLES
-========================================================= */
-
-.message-row {
-    display: flex !important;
-    align-items: flex-end !important;
-    width: 100% !important;
-    min-width: 0 !important;
-}
-
-
-/* Incoming messages */
-
-.message-row.other {
-    justify-content: flex-start !important;
-}
-
-
-/* My messages */
-
-.message-row.mine {
-    justify-content: flex-end !important;
-}
-
-
-/* Message content must NOT stretch */
-
-.message-row .message-content {
-    flex: 0 1 auto !important;
-    width: max-content !important;
-    max-width: min(78vw, 390px) !important;
-    min-width: 0 !important;
-}
-
-
-/* Sender name */
-
-.message-sender {
-    width: max-content !important;
-    max-width: 100% !important;
-    margin-bottom: 4px !important;
-}
-
-
-/* Actual bubble */
-
-.message-row .message-bubble {
-    display: inline-flex !important;
-    flex-direction: column !important;
-
-    width: max-content !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-
-    box-sizing: border-box !important;
-}
-
-
-/* Text itself must determine bubble width */
-
-.message-row .message-text {
-    display: block !important;
-
-    width: max-content !important;
-    max-width: 100% !important;
-
-    white-space: pre-wrap !important;
-    overflow-wrap: anywhere !important;
-    word-break: break-word !important;
-}
-
-
-/* Timestamp stays inside the bubble */
-
-.message-row .message-time {
-    display: block !important;
-
-    width: max-content !important;
-
-    white-space: nowrap !important;
-
-    align-self: flex-end !important;
-
-    margin-top: 3px !important;
-}
-
-
-/* Photos should still have a controlled width */
-
-.message-row .message-image-wrap {
-    width: auto !important;
-    max-width: 100% !important;
-}
-
-
-.message-row .message-image {
-    display: block !important;
-
-    width: auto !important;
-    max-width: min(68vw, 260px) !important;
-    height: auto !important;
-
-    border-radius: 12px !important;
-}
 
     </style>
 </head>
