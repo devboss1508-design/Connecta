@@ -1808,6 +1808,112 @@
             }
         }
 
+    /* =========================================================
+   CONNECTA — COMPACT GROUP MESSAGE BUBBLES
+========================================================= */
+
+.message-row {
+    display: flex !important;
+    align-items: flex-end !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+
+/* Incoming messages */
+
+.message-row.other {
+    justify-content: flex-start !important;
+}
+
+
+/* My messages */
+
+.message-row.mine {
+    justify-content: flex-end !important;
+}
+
+
+/* Message content must NOT stretch */
+
+.message-row .message-content {
+    flex: 0 1 auto !important;
+    width: max-content !important;
+    max-width: min(78vw, 390px) !important;
+    min-width: 0 !important;
+}
+
+
+/* Sender name */
+
+.message-sender {
+    width: max-content !important;
+    max-width: 100% !important;
+    margin-bottom: 4px !important;
+}
+
+
+/* Actual bubble */
+
+.message-row .message-bubble {
+    display: inline-flex !important;
+    flex-direction: column !important;
+
+    width: max-content !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+
+    box-sizing: border-box !important;
+}
+
+
+/* Text itself must determine bubble width */
+
+.message-row .message-text {
+    display: block !important;
+
+    width: max-content !important;
+    max-width: 100% !important;
+
+    white-space: pre-wrap !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+}
+
+
+/* Timestamp stays inside the bubble */
+
+.message-row .message-time {
+    display: block !important;
+
+    width: max-content !important;
+
+    white-space: nowrap !important;
+
+    align-self: flex-end !important;
+
+    margin-top: 3px !important;
+}
+
+
+/* Photos should still have a controlled width */
+
+.message-row .message-image-wrap {
+    width: auto !important;
+    max-width: 100% !important;
+}
+
+
+.message-row .message-image {
+    display: block !important;
+
+    width: auto !important;
+    max-width: min(68vw, 260px) !important;
+    height: auto !important;
+
+    border-radius: 12px !important;
+}
+
     </style>
 </head>
 
