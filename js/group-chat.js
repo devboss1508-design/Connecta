@@ -2062,7 +2062,7 @@ function renderMessages() {
 
 /* =========================================================
    RENDER MESSAGE
-   WhatsApp-style message + time
+   CONNECTA — COMPACT WHATSAPP-STYLE MESSAGE
 ========================================================= */
 
 function renderMessage(message) {
@@ -2078,36 +2078,61 @@ function renderMessage(message) {
         "User";
 
 
-    const photo =
+    const senderPhoto =
         message.senderPhotoURL ||
         "";
 
 
-    const avatar =
-        photo
+    const messageId =
+        getMessageId(message);
 
-            ? `
-                <div class="message-avatar">
 
-                    <img
-                        src="${escapeHTML(photo)}"
-                        alt=""
-                        loading="lazy"
-                    >
+    const messageType =
+        String(
+            message.type || "text"
+        ).toLowerCase();
 
-                </div>
-            `
 
-            : `
-                <div class="message-avatar">
+    const timestamp =
+        formatTime(
+            message.createdAt
+        );
 
-                    ${escapeHTML(
-                        getInitials(senderName)
-                    )}
 
-                </div>
-            `;
+    /* =====================================================
+       AVATAR
+    ===================================================== */
 
+    const avatar = senderPhoto
+
+        ? `
+            <div
+                class="message-avatar"
+                aria-hidden="true"
+            >
+                <img
+                    src="${escapeHTML(senderPhoto)}"
+                    alt=""
+                    loading="lazy"
+                >
+            </div>
+        `
+
+        : `
+            <div
+                class="message-avatar"
+                aria-hidden="true"
+            >
+                ${escapeHTML(
+                    getInitials(senderName)
+                )}
+            </div>
+        `;
+
+
+    /* =====================================================
+       VERIFIED BADGE
+    ===================================================== */
 
     const verified =
         message.senderVerified === true
@@ -2125,92 +2150,142 @@ function renderMessage(message) {
             : "";
 
 
-    const messageType =
-        String(
-            message.type || "text"
-        ).toLowerCase();
-
-
-    const timestamp =
-        formatTime(
-            message.createdAt
-        );
-
-
-    let body = "";
-
-
     /* =====================================================
-       PHOTO
+       TEXT MESSAGE
     ===================================================== */
 
     if (
-        messageType === "image" ||
-        messageType === "photo"
+        messageType !== "image" &&
+        messageType !== "photo"
     ) {
 
-        const imageURL =
-            message.imageURL ||
-            message.photoURL ||
-            "";
+        const text =
+            escapeHTML(
+                message.text || ""
+            );
 
 
-        body = imageURL
+        return `
 
-            ? `
-                <div class="message-image-wrap">
+            <div
+                class="
+                    message-row
+                    ${isMine ? "mine" : "other"}
+                "
+                data-message-id="${escapeHTML(
+                    messageId
+                )}"
+            >
 
-                    <img
-                        src="${escapeHTML(imageURL)}"
-                        alt="Group photo"
-                        class="message-image"
-                        loading="lazy"
+                ${
+                    !isMine
+                        ? avatar
+                        : ""
+                }
+
+
+                <div class="message-content">
+
+                    ${
+                        !isMine
+                            ? `
+                                <div class="message-sender">
+
+                                    ${escapeHTML(
+                                        senderName
+                                    )}
+
+                                    ${verified}
+
+                                </div>
+                            `
+                            : ""
+                    }
+
+
+                    <div
+                        class="
+                            message-bubble
+                            ${isMine
+                                ? "sent-bubble"
+                                : "received-bubble"}
+                        "
                     >
+
+                        <span
+                            class="message-text"
+                        >${text}</span>
+
+                        <span
+                            class="message-time"
+                            aria-label="Message time"
+                        >${escapeHTML(
+                            timestamp
+                        )}</span>
+
+                    </div>
 
                 </div>
 
-                <span class="message-time">
-                    ${escapeHTML(timestamp)}
-                </span>
-            `
 
-            : `
-                <span class="message-text">
-                    Photo unavailable
-                </span>
+                ${
+                    isMine
+                        ? avatar
+                        : ""
+                }
 
-                <span class="message-time">
-                    ${escapeHTML(timestamp)}
-                </span>
-            `;
+            </div>
 
+        `;
     }
 
 
     /* =====================================================
-       TEXT
+       PHOTO MESSAGE
     ===================================================== */
 
-    else {
+    const imageURL =
+        message.imageURL ||
+        message.photoURL ||
+        "";
 
-        body = `
+
+    const photoBody = imageURL
+
+        ? `
+            <div class="message-image-wrap">
+
+                <img
+                    src="${escapeHTML(imageURL)}"
+                    alt="Group photo"
+                    class="message-image"
+                    loading="lazy"
+                >
+
+            </div>
+
+            <span
+                class="message-time photo-time"
+                aria-label="Message time"
+            >${escapeHTML(
+                timestamp
+            )}</span>
+        `
+
+        : `
 
             <span class="message-text">
-                ${escapeHTML(
-                    message.text || ""
-                )}
+                Photo unavailable
             </span>
 
             <span
                 class="message-time"
                 aria-label="Message time"
-            >
-                ${escapeHTML(timestamp)}
-            </span>
+            >${escapeHTML(
+                timestamp
+            )}</span>
 
         `;
-
-    }
 
 
     return `
@@ -2221,7 +2296,7 @@ function renderMessage(message) {
                 ${isMine ? "mine" : "other"}
             "
             data-message-id="${escapeHTML(
-                getMessageId(message)
+                messageId
             )}"
         >
 
@@ -2254,13 +2329,14 @@ function renderMessage(message) {
                 <div
                     class="
                         message-bubble
+                        photo-bubble
                         ${isMine
                             ? "sent-bubble"
                             : "received-bubble"}
                     "
                 >
 
-                    ${body}
+                    ${photoBody}
 
                 </div>
 
