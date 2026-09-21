@@ -62,6 +62,7 @@
 
         html,
         body {
+
             width: 100%;
             height: 100%;
 
@@ -89,7 +90,8 @@
 
             overflow: hidden;
 
-            -webkit-font-smoothing: antialiased;
+            -webkit-font-smoothing:
+                antialiased;
 
             -webkit-tap-highlight-color:
                 transparent;
@@ -98,12 +100,15 @@
 
         button,
         textarea {
+
             font: inherit;
         }
 
 
         button {
+
             border: 0;
+
             cursor: pointer;
         }
 
@@ -562,6 +567,310 @@
 
 
         /* =====================================================
+           INSTANT CHAT SKELETON
+           
+           IMPORTANT:
+           This replaces "Loading conversation..."
+           with lightweight app-style placeholders.
+        ===================================================== */
+
+        .chat-instant-skeleton {
+
+            width: 100%;
+
+            min-height: 100%;
+
+            padding:
+                18px
+                7px
+                20px;
+
+            display:
+                flex;
+
+            flex-direction:
+                column;
+
+            justify-content:
+                flex-end;
+
+            gap:
+                10px;
+
+            pointer-events:
+                none;
+        }
+
+
+        .chat-skeleton-row {
+
+            display:
+                flex;
+
+            width:
+                100%;
+        }
+
+
+        .chat-skeleton-row.left {
+
+            justify-content:
+                flex-start;
+        }
+
+
+        .chat-skeleton-row.right {
+
+            justify-content:
+                flex-end;
+        }
+
+
+        .chat-skeleton-bubble {
+
+            height:
+                30px;
+
+            border-radius:
+                13px;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(255,255,255,.85),
+                    rgba(230,237,232,.95),
+                    rgba(255,255,255,.85)
+                );
+
+            background-size:
+                220% 100%;
+
+            animation:
+                connectaSkeleton
+                1.35s
+                ease-in-out
+                infinite;
+
+            border:
+                1px solid
+                rgba(220,229,223,.8);
+        }
+
+
+        .chat-skeleton-row.left
+        .chat-skeleton-bubble {
+
+            width:
+                145px;
+
+            border-bottom-left-radius:
+                5px;
+        }
+
+
+        .chat-skeleton-row.right
+        .chat-skeleton-bubble {
+
+            width:
+                190px;
+
+            border-bottom-right-radius:
+                5px;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(34,197,94,.35),
+                    rgba(125,239,163,.55),
+                    rgba(34,197,94,.35)
+                );
+
+            background-size:
+                220% 100%;
+
+            border:
+                0;
+        }
+
+
+        .chat-skeleton-row:nth-child(2)
+        .chat-skeleton-bubble {
+
+            width:
+                220px;
+        }
+
+
+        .chat-skeleton-row:nth-child(3)
+        .chat-skeleton-bubble {
+
+            width:
+                115px;
+        }
+
+
+        .chat-skeleton-row:nth-child(4)
+        .chat-skeleton-bubble {
+
+            width:
+                175px;
+        }
+
+
+        .chat-skeleton-row:nth-child(5)
+        .chat-skeleton-bubble {
+
+            width:
+                135px;
+        }
+
+
+        @keyframes connectaSkeleton {
+
+            0% {
+
+                background-position:
+                    100% 0;
+
+                opacity:
+                    .55;
+            }
+
+            50% {
+
+                background-position:
+                    0 0;
+
+                opacity:
+                    .9;
+            }
+
+            100% {
+
+                background-position:
+                    -100% 0;
+
+                opacity:
+                    .55;
+            }
+        }
+
+
+        /* =====================================================
+           HEADER SKELETON
+           
+           Appears instantly before chat.js has loaded
+           the actual person/group.
+        ===================================================== */
+
+        .chat-header-skeleton {
+
+            display:
+                flex;
+
+            align-items:
+                center;
+
+            gap:
+                10px;
+
+            width:
+                100%;
+        }
+
+
+        .chat-header-skeleton-avatar {
+
+            width:
+                48px;
+
+            height:
+                48px;
+
+            min-width:
+                48px;
+
+            border-radius:
+                50%;
+
+            background:
+                rgba(255,255,255,.28);
+
+            animation:
+                headerSkeleton
+                1.3s
+                ease-in-out
+                infinite;
+        }
+
+
+        .chat-header-skeleton-lines {
+
+            display:
+                flex;
+
+            flex-direction:
+                column;
+
+            gap:
+                7px;
+        }
+
+
+        .chat-header-skeleton-line {
+
+            height:
+                9px;
+
+            border-radius:
+                10px;
+
+            background:
+                rgba(255,255,255,.38);
+
+            animation:
+                headerSkeleton
+                1.3s
+                ease-in-out
+                infinite;
+        }
+
+
+        .chat-header-skeleton-line.name {
+
+            width:
+                125px;
+        }
+
+
+        .chat-header-skeleton-line.status {
+
+            width:
+                75px;
+
+            opacity:
+                .7;
+        }
+
+
+        @keyframes headerSkeleton {
+
+            0%,
+            100% {
+
+                opacity:
+                    .45;
+            }
+
+            50% {
+
+                opacity:
+                    .9;
+            }
+        }
+
+
+        /* =====================================================
            MESSAGES CONTAINER
         ===================================================== */
 
@@ -627,11 +936,14 @@
 
         .date-separator {
 
-            display: flex;
+            display:
+                flex;
 
-            align-items: center;
+            align-items:
+                center;
 
-            justify-content: center;
+            justify-content:
+                center;
 
             margin:
                 7px 0 11px;
@@ -665,17 +977,6 @@
 
         /* =====================================================
            MESSAGE ROW
-
-           IMPORTANT:
-           Supports:
-
-           .incoming
-           .outgoing
-
-           AND
-
-           .theirs
-           .mine
         ===================================================== */
 
         .message-row {
@@ -718,52 +1019,64 @@
 
 
         /* =====================================================
-           COMPACT MESSAGE BUBBLE
-
-           THIS IS THE MAIN FIX
-
-           The bubble only grows around its content.
+           MESSAGE BUBBLE
         ===================================================== */
 
         .message-bubble {
 
-    display: block !important;
+            display:
+                block !important;
 
-    width: fit-content !important;
+            width:
+                fit-content !important;
 
-    max-width: 78% !important;
+            max-width:
+                78% !important;
 
-    min-width: 0 !important;
+            min-width:
+                0 !important;
 
-    min-height: 0 !important;
+            min-height:
+                0 !important;
 
-    height: auto !important;
+            height:
+                auto !important;
 
-    margin: 0 !important;
+            margin:
+                0 !important;
 
-    padding: 4px 7px 4px 7px !important;
+            padding:
+                4px 7px 4px 7px !important;
 
-    border-radius: 12px !important;
+            border-radius:
+                12px !important;
 
-    font-size: 14px !important;
+            font-size:
+                14px !important;
 
-    line-height: 18px !important;
+            line-height:
+                18px !important;
 
-    word-break: normal !important;
+            word-break:
+                normal !important;
 
-    overflow-wrap: anywhere !important;
+            overflow-wrap:
+                anywhere !important;
 
-    box-sizing: border-box !important;
+            box-sizing:
+                border-box !important;
 
-    flex: 0 0 auto !important;
+            flex:
+                0 0 auto !important;
 
-    box-shadow:
-        0 1px 3px rgba(0,0,0,.06);
-    }
+            box-shadow:
+                0 1px 3px
+                rgba(0,0,0,.06);
+        }
 
 
         /* =====================================================
-           INCOMING MESSAGE
+           INCOMING
         ===================================================== */
 
         .incoming .message-bubble,
@@ -784,7 +1097,7 @@
 
 
         /* =====================================================
-           OUTGOING MESSAGE
+           OUTGOING
         ===================================================== */
 
         .outgoing .message-bubble,
@@ -811,83 +1124,100 @@
 
         /* =====================================================
            MESSAGE TEXT
-
-           IMPORTANT:
-           No width:100%
         ===================================================== */
 
         .message-text {
 
-    display: inline !important;
+            display:
+                inline !important;
 
-    width: auto !important;
+            width:
+                auto !important;
 
-    max-width: none !important;
+            max-width:
+                none !important;
 
-    height: auto !important;
+            height:
+                auto !important;
 
-    min-height: 0 !important;
+            min-height:
+                0 !important;
 
-    margin: 0 !important;
+            margin:
+                0 !important;
 
-    padding: 0 !important;
+            padding:
+                0 !important;
 
-    white-space: pre-wrap !important;
+            white-space:
+                pre-wrap !important;
 
-    line-height: 18px !important;
+            line-height:
+                18px !important;
 
-    font-size: 14px !important;
+            font-size:
+                14px !important;
 
-    word-break: normal !important;
+            word-break:
+                normal !important;
 
-    overflow-wrap: anywhere !important;
-    }
+            overflow-wrap:
+                anywhere !important;
+        }
 
 
         /* =====================================================
            MESSAGE META
-
-           IMPORTANT:
-           NO width:100%
         ===================================================== */
 
         .message-meta {
 
-    display: inline-flex !important;
+            display:
+                inline-flex !important;
 
-    align-items: center !important;
+            align-items:
+                center !important;
 
-    justify-content: flex-end !important;
+            justify-content:
+                flex-end !important;
 
-    width: auto !important;
+            width:
+                auto !important;
 
-    max-width: none !important;
+            max-width:
+                none !important;
 
-    height: 10px !important;
+            height:
+                10px !important;
 
-    min-height: 10px !important;
+            min-height:
+                10px !important;
 
-    margin: 0 0 0 5px !important;
+            margin:
+                0 0 0 5px !important;
 
-    padding: 0 !important;
+            padding:
+                0 !important;
 
-    gap: 2px !important;
+            gap:
+                2px !important;
 
-    font-size: 8px !important;
+            font-size:
+                8px !important;
 
-    line-height: 10px !important;
+            line-height:
+                10px !important;
 
-    white-space: nowrap !important;
+            white-space:
+                nowrap !important;
 
-    vertical-align: bottom !important;
+            vertical-align:
+                bottom !important;
 
-    user-select: none;
-  }
+            user-select:
+                none;
+        }
 
-
-        /* =====================================================
-           INCOMING META
-        ===================================================== */
 
         .incoming .message-meta,
         .theirs .message-meta {
@@ -896,10 +1226,6 @@
                 #a0a8a3;
         }
 
-
-        /* =====================================================
-           OUTGOING META
-        ===================================================== */
 
         .outgoing .message-meta,
         .mine .message-meta {
@@ -953,220 +1279,258 @@
         }
 
 
-        /* =====================================================
-           READ = BLUE DOUBLE CHECK
-        ===================================================== */
-
         .message-checks.read {
 
             color:
                 var(--blue-read) !important;
         }
 
+
         /* =====================================================
-   PHOTO MESSAGE
-===================================================== */
+           PHOTO MESSAGE
+        ===================================================== */
 
-.message-image {
+        .message-image {
 
-    display: block;
+            display:
+                block;
 
-    width: auto;
+            width:
+                auto;
 
-    max-width: 260px;
+            max-width:
+                260px;
 
-    max-height: 320px;
+            max-height:
+                320px;
 
-    border-radius: 10px;
+            border-radius:
+                10px;
 
-    object-fit: cover;
+            object-fit:
+                cover;
 
-    cursor: pointer;
+            cursor:
+                pointer;
 
-    margin: 0;
+            margin:
+                0;
+        }
 
-}
 
+        .incoming .message-image,
+        .theirs .message-image {
 
-.incoming .message-image,
-.theirs .message-image {
+            border:
+                1px solid #e7ece8;
+        }
 
-    border:
-        1px solid #e7ece8;
-}
 
+        .outgoing .message-image,
+        .mine .message-image {
 
-.outgoing .message-image,
-.mine .message-image {
+            border:
+                1px solid rgba(255,255,255,.35);
+        }
 
-    border:
-        1px solid rgba(255,255,255,.35);
-}
 
+        .image-message-content {
 
-.image-message-content {
+            display:
+                block;
 
-    display: block;
+            line-height:
+                0;
+        }
 
-    line-height: 0;
-}
 
+        /* =====================================================
+           PHOTO UPLOAD STATUS
+        ===================================================== */
 
-/* =====================================================
-   PHOTO UPLOAD STATUS
-===================================================== */
+        .photo-upload-status {
 
-.photo-upload-status {
+            display:
+                none;
 
-    display: none;
+            position:
+                absolute;
 
-    position: absolute;
+            left:
+                8px;
 
-    left: 8px;
+            right:
+                8px;
 
-    right: 8px;
+            bottom:
+                84px;
 
-    bottom: 84px;
+            padding:
+                9px 12px;
 
-    padding: 9px 12px;
+            border-radius:
+                12px;
 
-    border-radius: 12px;
+            background:
+                rgba(24,34,28,.92);
 
-    background: rgba(24,34,28,.92);
+            color:
+                #ffffff;
 
-    color: #ffffff;
+            font-size:
+                12px;
 
-    font-size: 12px;
+            text-align:
+                center;
 
-    text-align: center;
+            z-index:
+                50;
+        }
 
-    z-index: 50;
-}
 
+        .photo-upload-status.show {
 
-.photo-upload-status.show {
+            display:
+                block;
+        }
 
-    display: block;
-}
 
+        /* =====================================================
+           PHOTO PREVIEW
+        ===================================================== */
 
-/* =====================================================
-   PHOTO PREVIEW
-===================================================== */
+        .photo-preview {
 
-.photo-preview {
+            display:
+                none;
 
-    display: none;
+            position:
+                absolute;
 
-    position: absolute;
+            left:
+                8px;
 
-    left: 8px;
+            right:
+                8px;
 
-    right: 8px;
+            bottom:
+                84px;
 
-    bottom: 84px;
+            padding:
+                8px;
 
-    padding: 8px;
+            border-radius:
+                14px;
 
-    border-radius: 14px;
+            background:
+                #ffffff;
 
-    background: #ffffff;
+            border:
+                1px solid var(--border);
 
-    border: 1px solid var(--border);
+            box-shadow:
+                0 4px 18px
+                rgba(0,0,0,.12);
 
-    box-shadow:
-        0 4px 18px rgba(0,0,0,.12);
+            z-index:
+                45;
+        }
 
-    z-index: 45;
-}
 
+        .photo-preview.show {
 
-.photo-preview.show {
+            display:
+                flex;
 
-    display: flex;
+            align-items:
+                center;
 
-    align-items: center;
+            gap:
+                10px;
+        }
 
-    gap: 10px;
-}
 
+        .photo-preview img {
 
-.photo-preview img {
+            width:
+                54px;
 
-    width: 54px;
+            height:
+                54px;
 
-    height: 54px;
+            border-radius:
+                9px;
 
-    border-radius: 9px;
+            object-fit:
+                cover;
+        }
 
-    object-fit: cover;
-}
 
+        .photo-preview-info {
 
-.photo-preview-info {
+            min-width:
+                0;
 
-    min-width: 0;
+            flex:
+                1;
+        }
 
-    flex: 1;
-}
 
+        .photo-preview-title {
 
-.photo-preview-title {
+            font-size:
+                13px;
 
-    font-size: 13px;
+            font-weight:
+                700;
 
-    font-weight: 700;
+            color:
+                var(--text);
+        }
 
-    color: var(--text);
-}
 
+        .photo-preview-size {
 
-.photo-preview-size {
+            margin-top:
+                2px;
 
-    margin-top: 2px;
+            font-size:
+                11px;
 
-    font-size: 11px;
+            color:
+                var(--muted);
+        }
 
-    color: var(--muted);
-}
 
+        .photo-preview-cancel {
 
-.photo-preview-cancel {
+            width:
+                34px;
 
-    width: 34px;
+            height:
+                34px;
 
-    height: 34px;
+            border-radius:
+                50%;
 
-    border-radius: 50%;
+            background:
+                #f1f4f2;
 
-    background: #f1f4f2;
+            color:
+                #68736c;
 
-    color: #68736c;
+            display:
+                flex;
 
-    display: flex;
+            align-items:
+                center;
 
-    align-items: center;
+            justify-content:
+                center;
 
-    justify-content: center;
-
-    font-size: 18px;
-}
-
-
-/* =====================================================
-   PHOTO MESSAGE MOBILE SIZE
-===================================================== */
-
-@media (max-width: 380px) {
-
-    .message-image {
-
-        max-width: 220px;
-
-        max-height: 280px;
-    }
-
-}
+            font-size:
+                18px;
+        }
 
 
         /* =====================================================
@@ -1323,7 +1687,7 @@
 
 
         /* =====================================================
-           ATTACH BUTTON
+           ATTACH
         ===================================================== */
 
         .attach-button {
@@ -1519,7 +1883,7 @@
 
 
         /* =====================================================
-           SEND BUTTON
+           SEND
         ===================================================== */
 
         .send-button {
@@ -1593,68 +1957,7 @@
 
 
         /* =====================================================
-           LOADING
-        ===================================================== */
-
-        .chat-loading {
-
-            min-height:
-                100%;
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                center;
-
-            color:
-                var(--muted);
-
-            font-size:
-                13px;
-        }
-
-
-        .loading-spinner {
-
-            width:
-                22px;
-
-            height:
-                22px;
-
-            margin-right:
-                8px;
-
-            border:
-                3px solid
-                #dce6df;
-
-            border-top-color:
-                var(--connecta-green);
-
-            border-radius:
-                50%;
-
-            animation:
-                spin .8s linear infinite;
-        }
-
-
-        @keyframes spin {
-
-            to {
-                transform:
-                    rotate(360deg);
-            }
-        }
-
-
-        /* =====================================================
-           SMALL PHONES
+           MOBILE
         ===================================================== */
 
         @media (max-width: 380px) {
@@ -1702,14 +2005,18 @@
 
             .message-bubble {
 
-              max-width: 84% !important;
+                max-width:
+                    84% !important;
 
-             padding: 4px 7px 4px 7px !important;
+                padding:
+                    4px 7px 4px 7px !important;
 
-            font-size: 14px !important;
+                font-size:
+                    14px !important;
 
-             line-height: 18px !important;
-           }
+                line-height:
+                    18px !important;
+            }
 
 
             .attach-button,
@@ -1731,6 +2038,7 @@
                 min-height:
                     46px;
             }
+
         }
 
 
@@ -1769,6 +2077,7 @@
                 max-width:
                     65% !important;
             }
+
         }
 
     </style>
@@ -1789,7 +2098,7 @@
     <header class="chat-header">
 
 
-        <!-- BACK BUTTON -->
+        <!-- BACK -->
 
         <button
             id="backBtn"
@@ -1826,15 +2135,29 @@
             class="chat-user"
         >
 
-
             <div class="chat-avatar-wrap">
-
 
                 <div
                     id="chatAvatar"
                     class="chat-avatar"
                 >
-                    ?
+
+                    <!--
+                        Neutral instant placeholder.
+                        chat.js will replace this with
+                        the real avatar.
+                    -->
+
+                    <div
+                        style="
+                            width:22px;
+                            height:22px;
+                            border-radius:50%;
+                            background:rgba(34,197,94,.18);
+                            animation:headerSkeleton 1.3s ease-in-out infinite;
+                        "
+                    ></div>
+
                 </div>
 
 
@@ -1843,22 +2166,42 @@
                     class="chat-online-dot"
                 ></span>
 
-
             </div>
 
 
-            <div class="chat-user-info">
-
+            <div
+                class="chat-user-info"
+            >
 
                 <div
                     class="chat-user-name-row"
+                    id="chatUserNameRow"
                 >
+
+                    <!--
+                        No "Loading..." text.
+                        Skeleton is replaced by chat.js.
+                    -->
+
+                    <span
+                        id="chatUserNameSkeleton"
+                        class="chat-header-skeleton-lines"
+                    >
+
+                        <span
+                            class="
+                                chat-header-skeleton-line
+                                name
+                            "
+                        ></span>
+
+                    </span>
+
 
                     <strong
                         id="chatUserName"
-                    >
-                        Loading...
-                    </strong>
+                        style="display:none;"
+                    ></strong>
 
                 </div>
 
@@ -1868,22 +2211,28 @@
                 >
 
                     <span
+                        id="chatStatusSkeleton"
+                        class="
+                            chat-header-skeleton-line
+                            status
+                        "
+                    ></span>
+
+
+                    <span
                         id="chatStatusText"
-                    >
-                        Loading...
-                    </span>
+                        style="display:none;"
+                    ></span>
 
                 </div>
 
-
             </div>
-
 
         </div>
 
 
         <!-- =================================================
-             MENU / PROFILE
+             MENU
         ================================================= -->
 
         <button
@@ -1906,7 +2255,6 @@
     </header>
 
 
-
     <!-- =====================================================
          MESSAGES
     ===================================================== -->
@@ -1917,22 +2265,78 @@
         aria-live="polite"
     >
 
+        <!--
+            Instant skeleton.
+
+            This appears immediately while chat.js checks
+            local/cache data and attaches the Firebase listener.
+
+            It contains NO "Loading conversation..." text.
+        -->
 
         <div
-            class="chat-loading"
+            id="chatInstantSkeleton"
+            class="chat-instant-skeleton"
+            aria-hidden="true"
         >
 
-            <span
-                class="loading-spinner"
-            ></span>
+            <div
+                class="chat-skeleton-row left"
+            >
 
-            Loading conversation...
+                <div
+                    class="chat-skeleton-bubble"
+                ></div>
+
+            </div>
+
+
+            <div
+                class="chat-skeleton-row right"
+            >
+
+                <div
+                    class="chat-skeleton-bubble"
+                ></div>
+
+            </div>
+
+
+            <div
+                class="chat-skeleton-row left"
+            >
+
+                <div
+                    class="chat-skeleton-bubble"
+                ></div>
+
+            </div>
+
+
+            <div
+                class="chat-skeleton-row right"
+            >
+
+                <div
+                    class="chat-skeleton-bubble"
+                ></div>
+
+            </div>
+
+
+            <div
+                class="chat-skeleton-row left"
+            >
+
+                <div
+                    class="chat-skeleton-bubble"
+                ></div>
+
+            </div>
 
         </div>
 
-
     </main>
-
 
 
     <!-- =====================================================
@@ -1945,53 +2349,63 @@
         autocomplete="off"
     >
 
-    <div
-    id="photoUploadStatus"
-    class="photo-upload-status"
-    role="status"
-    aria-live="polite"
-></div>
 
-
-<div
-    id="photoPreview"
-    class="photo-preview"
->
-
-    <img
-        id="photoPreviewImage"
-        src=""
-        alt="Selected photo"
-    >
-
-    <div class="photo-preview-info">
+        <!-- PHOTO UPLOAD STATUS -->
 
         <div
-            id="photoPreviewTitle"
-            class="photo-preview-title"
-        >
-            Photo selected
-        </div>
+            id="photoUploadStatus"
+            class="photo-upload-status"
+            role="status"
+            aria-live="polite"
+        ></div>
+
+
+        <!-- PHOTO PREVIEW -->
 
         <div
-            id="photoPreviewSize"
-            class="photo-preview-size"
+            id="photoPreview"
+            class="photo-preview"
         >
-            Ready to send
+
+            <img
+                id="photoPreviewImage"
+                src=""
+                alt="Selected photo"
+            >
+
+
+            <div
+                class="photo-preview-info"
+            >
+
+                <div
+                    id="photoPreviewTitle"
+                    class="photo-preview-title"
+                >
+                    Photo selected
+                </div>
+
+
+                <div
+                    id="photoPreviewSize"
+                    class="photo-preview-size"
+                >
+                    Ready to send
+                </div>
+
+            </div>
+
+
+            <button
+                id="photoPreviewCancel"
+                class="photo-preview-cancel"
+                type="button"
+                aria-label="Cancel photo"
+            >
+                ×
+            </button>
+
         </div>
-
-    </div>
-
-    <button
-        id="photoPreviewCancel"
-        class="photo-preview-cancel"
-        type="button"
-        aria-label="Cancel photo"
-    >
-        ×
-    </button>
-
-</div>
 
 
         <!-- =================================================
@@ -1999,57 +2413,56 @@
         ================================================= -->
 
         <button
-    id="attachButton"
-    class="attach-button"
-    type="button"
-    aria-label="Send photo"
-    title="Send photo"
->
+            id="attachButton"
+            class="attach-button"
+            type="button"
+            aria-label="Send photo"
+            title="Send photo"
+        >
 
-    <svg
-        class="attach-icon"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-    >
+            <svg
+                class="attach-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
 
-        <rect
-            x="3"
-            y="3"
-            width="18"
-            height="18"
-            rx="3"
-        ></rect>
-
-        <circle
-            cx="8.5"
-            cy="8.5"
-            r="1.5"
-        ></circle>
-
-        <path
-            d="M21 15l-5-5L5 21"
-        ></path>
-
-    </svg>
-
-</button>
+                <rect
+                    x="3"
+                    y="3"
+                    width="18"
+                    height="18"
+                    rx="3"
+                ></rect>
 
 
-<!-- =================================================
-     PHOTO INPUT
-================================================= -->
+                <circle
+                    cx="8.5"
+                    cy="8.5"
+                    r="1.5"
+                ></circle>
 
-<input
-    id="photoInput"
-    type="file"
-    accept="image/jpeg,image/png,image/webp"
-    hidden
->
 
+                <path
+                    d="M21 15l-5-5L5 21"
+                ></path>
+
+            </svg>
+
+        </button>
+
+
+        <!-- PHOTO INPUT -->
+
+        <input
+            id="photoInput"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+        >
 
 
         <!-- =================================================
@@ -2059,7 +2472,6 @@
         <div
             class="input-wrapper"
         >
-
 
             <span
                 class="input-label"
@@ -2077,9 +2489,7 @@
                 aria-label="Type a message"
             ></textarea>
 
-
         </div>
-
 
 
         <!-- =================================================
@@ -2092,7 +2502,6 @@
             type="submit"
             aria-label="Send message"
         >
-
 
             <svg
                 class="send-icon"
@@ -2108,12 +2517,12 @@
                     d="M22 2L11 13"
                 ></path>
 
+
                 <path
                     d="M22 2L15 22L11 13L2 9L22 2Z"
                 ></path>
 
             </svg>
-
 
         </button>
 
@@ -2122,7 +2531,6 @@
 
 
 </div>
-
 
 
 <!-- =========================================================
@@ -2137,4 +2545,4 @@
 
 </body>
 
-    </html>
+</html>
