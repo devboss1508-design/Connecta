@@ -21,10 +21,12 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   orderBy,
   limit,
+  where,
   runTransaction,
   setDoc,
   serverTimestamp
@@ -43,6 +45,10 @@ let currentProfile = null;
 
 let onlineUsers = [];
 let recentChats = [];
+let recentGroups = [];
+
+let groupListeners = [];
+let groupReadListeners = [];
 
 let stopUsers = null;
 let stopChats = null;
@@ -1793,6 +1799,155 @@ async function refreshUserProfile(
 
 }
 
+/* =========================================================
+   FIRESTORE DATE HELPER
+========================================================= */
+
+function timestampToDate(value) {
+
+  if (!value) {
+    return null;
+  }
+
+
+  if (
+    typeof value.toDate === "function"
+  ) {
+
+    return value.toDate();
+
+  }
+
+
+  if (
+    typeof value.seconds === "number"
+  ) {
+
+    return new Date(
+      value.seconds * 1000
+    );
+
+  }
+
+
+  if (
+    typeof value._seconds === "number"
+  ) {
+
+    return new Date(
+      value._seconds * 1000
+    );
+
+  }
+
+
+  const date =
+    new Date(value);
+
+
+  return Number.isNaN(
+    date.getTime()
+  )
+    ? null
+    : date;
+
+}
+
+/* =========================================================
+   COUNT GROUP UNREAD MESSAGES
+========================================================= */
+
+async function getGroupUnreadCount(
+  groupId,
+  lastReadAt
+) {
+
+  if (
+    !groupId ||
+    !lastReadAt
+  ) {
+
+    return 0;
+  }
+
+
+  const readDate =
+    timestampToDate(
+      lastReadAt
+    );
+
+
+  if (!readDate) {
+    return 0;
+  }
+
+
+  try {
+
+    const messagesRef =
+      collection(
+        db,
+        "groups",
+        groupId,
+        "groupMessages"
+      );
+
+
+    const unreadQuery =
+      query(
+
+        messagesRef,
+
+        where(
+          "createdAt",
+          ">",
+          readDate
+        ),
+
+        limit(100)
+
+      );
+
+
+    const snapshot =
+      await getDocs(
+        unreadQuery
+      );
+
+
+    /*
+     * The sender's own message is already
+     * read by the sender, so exclude it.
+     */
+
+    return snapshot.docs.filter(
+      messageDoc => {
+
+        const data =
+          messageDoc.data();
+
+
+        return (
+          data.senderId !==
+          currentUser?.uid
+        );
+
+      }
+    ).length;
+
+  } catch (error) {
+
+    console.warn(
+      "Could not calculate group unread count:",
+      groupId,
+      error
+    );
+
+
+    return 0;
+  }
+
+}
 
 /* =========================================================
    RECENT CHAT RENDERING
@@ -1929,12 +2084,29 @@ function renderChats(
 
 
         const name =
-          chat.name ||
-          (
-            isGroup
-              ? "CONNECTA Group"
-              : "CONNECTA User"
-          );
+  chat.name ||
+  (
+    isGroup
+      ? "CONNECTA Group"
+      : "CONNECTA User"
+  );
+
+
+const verifiedUser =
+  isGroup
+
+    ? {
+        isVerified:
+          chat.lastMessageSenderVerified === true
+      }
+
+    : chat;
+
+
+const verified =
+  verifiedBadge(
+    verifiedUser
+  );
 
 
         /*
@@ -2503,6 +2675,532 @@ async function listenToChats(
 
 }
 
+/* =========================================================
+   LOAD GROUP CHATS
+========================================================= */
+
+async function listenToGroups(
+  uid
+) {
+
+  if (!uid) {
+    return;
+  }
+
+
+  /*
+   * Remove old group listeners.
+   */
+
+  groupListeners.forEach(
+    unsubscribe => {
+
+      try {
+        unsubscribe();
+      } catch {}
+
+    }
+  );
+
+  groupListeners = [];
+
+
+  groupReadListeners.forEach(
+    unsubscribe => {
+
+      try {
+        unsubscribe();
+      } catch {}
+
+    }
+  );
+
+  groupReadListeners = [];
+
+
+  recentGroups = [];
+
+
+  /*
+   * =======================================================
+   * GROUPS WHERE USER IS A MEMBER
+   * =======================================================
+   */
+
+  const memberQuery =
+    query(
+
+      collection(
+        db,
+        "groups"
+      ),
+
+      where(
+        "memberIds",
+        "array-contains",
+        uid
+      ),
+
+      limit(30)
+
+    );
+
+
+  /*
+   * =======================================================
+   * GROUPS WHERE USER IS OWNER
+   * =======================================================
+   */
+
+  const ownerQuery =
+    query(
+
+      collection(
+        db,
+        "groups"
+      ),
+
+      where(
+        "ownerId",
+        "==",
+        uid
+      ),
+
+      limit(30)
+
+    );
+
+
+  let memberGroups = [];
+  let ownerGroups = [];
+
+
+  const processGroups =
+    async () => {
+
+      const groupMap =
+        new Map();
+
+
+      [
+        ...memberGroups,
+        ...ownerGroups
+      ].forEach(
+        group => {
+
+          if (
+            group?.groupId
+          ) {
+
+            groupMap.set(
+              group.groupId,
+              group
+            );
+
+          }
+
+        }
+      );
+
+
+      const groups =
+        [...groupMap.values()];
+
+
+      /*
+       * Load each user's read state.
+       */
+
+      const enriched =
+        await Promise.all(
+
+          groups.map(
+            async group => {
+
+              let readData = null;
+
+
+              try {
+
+                const readSnap =
+                  await getDoc(
+
+                    doc(
+                      db,
+                      "groups",
+                      group.groupId,
+                      "reads",
+                      uid
+                    )
+
+                  );
+
+
+                if (
+                  readSnap.exists()
+                ) {
+
+                  readData =
+                    readSnap.data();
+
+                }
+
+              } catch (error) {
+
+                console.warn(
+                  "Group read state error:",
+                  error
+                );
+
+              }
+
+
+              const unread =
+                await getGroupUnreadCount(
+
+                  group.groupId,
+
+                  readData?.lastReadAt ||
+                  null
+
+                );
+
+
+              const senderUid =
+                group.lastMessageSenderId ||
+                "";
+
+
+              let senderProfile =
+                onlineUsers.find(
+                  user =>
+                    user.uid ===
+                    senderUid
+                );
+
+
+              if (
+                !senderProfile &&
+                senderUid
+              ) {
+
+                senderProfile =
+                  getCachedProfile(
+                    senderUid
+                  );
+
+              }
+
+
+              return {
+
+                id:
+                  `group_${group.groupId}`,
+
+                type:
+                  "group",
+
+                groupId:
+                  group.groupId,
+
+                name:
+                  group.name ||
+                  "CONNECTA Group",
+
+                photoURL:
+                  group.photoURL ||
+                  "",
+
+                lastMessage:
+                  group.lastMessage ||
+                  "",
+
+                lastMessageSenderId:
+                  senderUid,
+
+                lastMessageSenderName:
+                  group.lastMessageSenderName ||
+                  senderProfile
+                    ? getFullName(
+                        senderProfile || {}
+                      )
+                    : "User",
+
+                lastMessageSenderVerified:
+                  senderProfile?.isVerified === true,
+
+                lastMessageAt:
+                  group.lastMessageAt ||
+                  group.updatedAt ||
+                  null,
+
+                time:
+                  formatTimestamp(
+                    group.lastMessageAt ||
+                    group.updatedAt
+                  ),
+
+                unread,
+
+                readData
+
+              };
+
+            }
+          )
+
+        );
+
+
+      recentGroups =
+        enriched;
+
+
+      mergeRecentChats();
+
+
+    };
+
+
+  /*
+   * =======================================================
+   * FIRST LOAD
+   * =======================================================
+   */
+
+  try {
+
+    const [
+      memberSnapshot,
+      ownerSnapshot
+    ] = await Promise.all([
+
+      getDocs(
+        memberQuery
+      ),
+
+      getDocs(
+        ownerQuery
+      )
+
+    ]);
+
+
+    memberGroups =
+      memberSnapshot.docs.map(
+        snap => ({
+
+          groupId:
+            snap.id,
+
+          ...snap.data()
+
+        })
+      );
+
+
+    ownerGroups =
+      ownerSnapshot.docs.map(
+        snap => ({
+
+          groupId:
+            snap.id,
+
+          ...snap.data()
+
+        })
+      );
+
+
+    await processGroups();
+
+
+  } catch (error) {
+
+    console.error(
+      "Could not load groups:",
+      error
+    );
+
+  }
+
+
+  /*
+   * =======================================================
+   * LIVE MEMBER GROUP LISTENER
+   * =======================================================
+   */
+
+  const memberUnsubscribe =
+    onSnapshot(
+
+      memberQuery,
+
+      async snapshot => {
+
+        memberGroups =
+          snapshot.docs.map(
+            snap => ({
+
+              groupId:
+                snap.id,
+
+              ...snap.data()
+
+            })
+          );
+
+
+        await processGroups();
+
+      },
+
+      error => {
+
+        console.warn(
+          "Member groups listener error:",
+          error
+        );
+
+      }
+
+    );
+
+
+  groupListeners.push(
+    memberUnsubscribe
+  );
+
+
+  /*
+   * =======================================================
+   * LIVE OWNER GROUP LISTENER
+   * =======================================================
+   */
+
+  const ownerUnsubscribe =
+    onSnapshot(
+
+      ownerQuery,
+
+      async snapshot => {
+
+        ownerGroups =
+          snapshot.docs.map(
+            snap => ({
+
+              groupId:
+                snap.id,
+
+              ...snap.data()
+
+            })
+          );
+
+
+        await processGroups();
+
+      },
+
+      error => {
+
+        console.warn(
+          "Owner groups listener error:",
+          error
+        );
+
+      }
+
+    );
+
+
+  groupListeners.push(
+    ownerUnsubscribe
+  );
+
+}
+
+/* =========================================================
+   MERGE INDIVIDUAL + GROUP CHATS
+========================================================= */
+
+function mergeRecentChats() {
+
+  const allChats = [
+
+    ...recentChats,
+
+    ...recentGroups
+
+  ];
+
+
+  allChats.sort(
+    (a, b) => {
+
+      const aDate =
+        timestampToDate(
+          a.lastMessageAt
+        );
+
+
+      const bDate =
+        timestampToDate(
+          b.lastMessageAt
+        );
+
+
+      if (
+        aDate &&
+        bDate
+      ) {
+
+        return (
+          bDate.getTime() -
+          aDate.getTime()
+        );
+
+      }
+
+
+      if (aDate) {
+        return -1;
+      }
+
+
+      if (bDate) {
+        return 1;
+      }
+
+
+      /*
+       * Fallback to unread.
+       */
+
+      return (
+        Number(b.unread || 0) -
+        Number(a.unread || 0)
+      );
+
+    }
+  );
+
+
+  renderChats(
+    allChats,
+    $("chatSearch")?.value || ""
+  );
+
+
+  if (currentUser) {
+
+    saveDashboardCache(
+      currentUser.uid
+    );
+
+  }
+
+}
 
 /* =========================================================
    TIME FORMAT
@@ -2647,6 +3345,31 @@ function startPresence() {
 ========================================================= */
 
 function stopDashboardListeners() {
+
+   groupListeners.forEach(
+    unsubscribe => {
+
+      try {
+        unsubscribe();
+      } catch {}
+
+    }
+  );
+
+  groupListeners = [];
+
+
+  groupReadListeners.forEach(
+    unsubscribe => {
+
+      try {
+        unsubscribe();
+      } catch {}
+
+    }
+  );
+
+  groupReadListeners = [];
 
   if (stopUsers) {
 
