@@ -555,6 +555,207 @@ function showToast(message) {
 
 }
 
+/* =========================================================
+   ADMIN ACCOUNT CONTROL
+   Central account-level restriction check.
+
+   Controlled by Admin Panel:
+   - active
+   - suspended
+   - banned
+
+   IMPORTANT:
+   This is a frontend UX/security layer.
+   Firestore/backend rules must also enforce
+   these restrictions server-side.
+========================================================= */
+
+function getAccountControl(profile = {}) {
+
+  const status =
+    String(
+      profile.status || "active"
+    ).toLowerCase().trim();
+
+
+  if (status === "banned") {
+
+    return {
+      blocked: true,
+      status: "banned",
+      message:
+        "Your CONNECTA account has been banned."
+    };
+
+  }
+
+
+  if (status === "suspended") {
+
+    return {
+      blocked: true,
+      status: "suspended",
+      message:
+        "Your CONNECTA account is currently suspended."
+    };
+
+  }
+
+
+  return {
+    blocked: false,
+    status: "active",
+    message: ""
+  };
+
+}
+
+/* =========================================================
+   ACCOUNT BLOCK SCREEN
+========================================================= */
+
+function showAccountBlockedScreen(
+  control
+) {
+
+  stopDashboardListeners();
+
+
+  const message =
+    escapeHtml(
+      control?.message ||
+      "Your CONNECTA account is currently restricted."
+    );
+
+
+  document.body.innerHTML = `
+
+    <div
+      style="
+        min-height:100vh;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:24px;
+        background:#f4faf6;
+        font-family:Arial,sans-serif;
+      "
+    >
+
+      <div
+        style="
+          width:100%;
+          max-width:420px;
+          background:#ffffff;
+          border-radius:22px;
+          padding:30px 24px;
+          text-align:center;
+          box-shadow:0 12px 40px rgba(0,0,0,.08);
+        "
+      >
+
+        <div
+          style="
+            width:64px;
+            height:64px;
+            margin:0 auto 18px;
+            border-radius:50%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            background:#fee2e2;
+            color:#dc2626;
+            font-size:28px;
+            font-weight:800;
+          "
+        >
+          !
+        </div>
+
+        <h1
+          style="
+            margin:0 0 10px;
+            color:#17221b;
+            font-size:22px;
+          "
+        >
+          Account Restricted
+        </h1>
+
+        <p
+          style="
+            margin:0;
+            color:#647067;
+            font-size:14px;
+            line-height:1.6;
+          "
+        >
+          ${message}
+        </p>
+
+        <p
+          style="
+            margin:16px 0 24px;
+            color:#7b857e;
+            font-size:13px;
+            line-height:1.5;
+          "
+        >
+          If you believe this action was made in error,
+          please contact CONNECTA support.
+        </p>
+
+        <button
+          id="restrictedLogoutBtn"
+          type="button"
+          style="
+            width:100%;
+            border:0;
+            border-radius:12px;
+            padding:13px 16px;
+            background:#22c55e;
+            color:#ffffff;
+            font-size:14px;
+            font-weight:800;
+            cursor:pointer;
+          "
+        >
+          Log Out
+        </button>
+
+      </div>
+
+    </div>
+
+  `;
+
+
+  $("restrictedLogoutBtn")
+    ?.addEventListener(
+      "click",
+      async () => {
+
+        try {
+
+          await signOut(auth);
+
+        } catch (error) {
+
+          console.error(
+            "Restricted-account logout failed:",
+            error
+          );
+
+        }
+
+        location.replace(
+          "login.html"
+        );
+
+      }
+    );
+
+}
 
 /* =========================================================
    AVATAR
@@ -2783,18 +2984,46 @@ onAuthStateChanged(
       */
 
       currentProfile =
-        profile;
+    profile;
 
 
-      /*
-      Save only safe profile data
-      to the general profile cache.
-      */
+/* =====================================================
+   ADMIN ACCOUNT CONTROL
+===================================================== */
 
-      saveProfileToCache(
-        user.uid,
+const accountControl =
+    getAccountControl(
         profile
-      );
+    );
+
+
+if (accountControl.blocked) {
+
+    console.warn(
+        "[CONNECTA] Account restricted:",
+        accountControl.status
+    );
+
+
+    showAccountBlockedScreen(
+        accountControl
+    );
+
+
+    return;
+
+}
+
+
+/*
+Save only safe profile data
+to the general profile cache.
+*/
+
+saveProfileToCache(
+    user.uid,
+    profile
+);
 
 
       /*
