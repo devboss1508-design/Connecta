@@ -1,25 +1,14 @@
 /* =========================================================
    CONNECTA — GROUP CHAT
-   frontend/js/group-chat.js
+   File: frontend/js/group-chat.js
 
-   Handles:
-   - Group loading
-   - Membership verification
-   - Private-group verification checks
-   - Approved-group checks
-   - Realtime messages
-   - Sending messages
-   - Typing indicator
-   - Group information
-   - Message caching
-   - Realtime group updates
-   - Safe rendering
+   ADMIN CONTROLS SUPPORTED:
+   - groups/{groupId}.chatLocked
+   - users/{uid}.groupMessagingRestricted
+   - users/{uid}.status = suspended / banned
 ========================================================= */
 
-import {
-    auth,
-    db
-} from "./firebase.js";
+import { auth, db } from "./firebase.js";
 
 import {
     onAuthStateChanged
@@ -36,32 +25,21 @@ import {
     serverTimestamp,
     setDoc,
     updateDoc,
-    arrayUnion,
-    increment
+    arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 
 /* =========================================================
-   CONFIG
+   CONSTANTS
 ========================================================= */
 
 const GROUPS_COLLECTION = "groups";
-
 const GROUP_MESSAGES_COLLECTION = "groupMessages";
 
-const PROFILE_CACHE_KEY =
-    "connectaProfileCache";
-
-const PUBLIC_PROFILE_CACHE_KEY =
-    "connectaPublicProfileCache_v2";
-
-const GROUP_CACHE_PREFIX =
-    "connectaGroupCache_v1_";
-
-const MESSAGE_CACHE_PREFIX =
-    "connectaGroupMessages_v1_";
-
 const MAX_MESSAGES = 100;
+
+const GROUP_CACHE_PREFIX = "connectaGroupCache_v1_";
+const GROUP_MESSAGES_CACHE_PREFIX = "connectaGroupMessagesCache_v1_";
 
 
 /* =========================================================
@@ -69,52 +47,47 @@ const MAX_MESSAGES = 100;
 ========================================================= */
 
 let currentUser = null;
-
 let currentProfile = null;
 
+let groupId = null;
 let currentGroup = null;
 
-let currentGroupId = null;
+let stopGroup = null;
+let stopMessages = null;
+let stopOwnProfile = null;
 
-let currentMembership = false;
+let isGroupListenerReady = false;
+let isProfileListenerReady = false;
 
-let messagesUnsubscribe = null;
+let accountControl = {
+    loaded: false,
+    blocked: false,
+    messagingRestricted: false,
+    groupParticipationRestricted: false,
+    reason: ""
+};
 
-let groupUnsubscribe = null;
+let groupControl = {
+    loaded: false,
+    chatLocked: false,
+    approved: false
+};
 
-let typingUnsubscribe = null;
-
-let typingTimeout = null;
+let messages = [];
 
 let isSending = false;
-
-let lastRenderedMessageIds = [];
+let typingTimer = null;
 
 
 /* =========================================================
    DOM
 ========================================================= */
 
-const groupChatPage =
-    document.getElementById("groupChatPage");
-
-const accessBlock =
-    document.getElementById("accessBlock");
-
-const accessTitle =
-    document.getElementById("accessTitle");
-
-const accessMessage =
-    document.getElementById("accessMessage");
-
 const backBtn =
     document.getElementById("backBtn");
 
-const backToGroupsBtn =
-    document.getElementById("backToGroupsBtn");
-
-const groupHeaderAvatar =
-    document.getElementById("groupHeaderAvatar");
+const groupAvatar =
+    document.getElementById("groupAvatar");
 
 const groupName =
     document.getElementById("groupName");
@@ -122,17 +95,8 @@ const groupName =
 const groupStatus =
     document.getElementById("groupStatus");
 
-const messagesArea =
-    document.getElementById("messagesArea");
-
-const messagesInner =
-    document.getElementById("messagesInner");
-
-const chatLoading =
-    document.getElementById("chatLoading");
-
-const messageForm =
-    document.getElementById("messageForm");
+const messagesContainer =
+    document.getElementById("messagesContainer");
 
 const messageInput =
     document.getElementById("messageInput");
@@ -143,71 +107,135 @@ const sendBtn =
 const emojiBtn =
     document.getElementById("emojiBtn");
 
-const typingArea =
-    document.getElementById("typingArea");
+const infoBtn =
+    document.getElementById("infoBtn");
 
-const groupInfoBtn =
-    document.getElementById("groupInfoBtn");
+const accessBlock =
+    document.getElementById("accessBlock");
 
-const groupInfoOverlay =
-    document.getElementById("groupInfoOverlay");
-
-const closeInfoBtn =
-    document.getElementById("closeInfoBtn");
-
-const infoGroupAvatar =
-    document.getElementById("infoGroupAvatar");
-
-const infoGroupName =
-    document.getElementById("infoGroupName");
-
-const infoGroupMeta =
-    document.getElementById("infoGroupMeta");
-
-const infoGroupDescription =
-    document.getElementById("infoGroupDescription");
-
-const infoGroupType =
-    document.getElementById("infoGroupType");
-
-const infoGroupMembers =
-    document.getElementById("infoGroupMembers");
-
-const infoGroupSubscription =
-    document.getElementById("infoGroupSubscription");
-
-const infoGroupOwner =
-    document.getElementById("infoGroupOwner");
+const groupInfoSheet =
+    document.getElementById("groupInfoSheet");
 
 const toast =
     document.getElementById("toast");
 
 
 /* =========================================================
-   HELPERS
+   GROUP ID
 ========================================================= */
 
-function showToast(message) {
+function getGroupId() {
 
-    if (!toast) return;
+    const params =
+        new URLSearchParams(
+            window.location.search
+        );
 
-    toast.textContent = message;
-
-    toast.classList.add("show");
-
-    clearTimeout(showToast.timer);
-
-    showToast.timer = setTimeout(() => {
-
-        toast.classList.remove("show");
-
-    }, 2600);
+    return (
+        params.get("groupId") ||
+        params.get("id") ||
+        ""
+    ).trim();
 }
 
 
-function escapeHtml(value = "") {
+/* =========================================================
+   CACHE
+========================================================= */
 
-    return String(value)
+function groupCacheKey(id) {
+    return `${GROUP_CACHE_PREFIX}${id}`;
+}
+
+function messagesCacheKey(id) {
+    return `${GROUP_MESSAGES_CACHE_PREFIX}${id}`;
+}
+
+
+function saveGroupCache(group) {
+
+    if (!group?.groupId) {
+        return;
+    }
+
+    try {
+        localStorage.setItem(
+            groupCacheKey(group.groupId),
+            JSON.stringify(group)
+        );
+    } catch (error) {
+        console.warn(
+            "Could not save group cache:",
+            error
+        );
+    }
+}
+
+
+function loadGroupCache(id) {
+
+    try {
+
+        const raw =
+            localStorage.getItem(
+                groupCacheKey(id)
+            );
+
+        return raw
+            ? JSON.parse(raw)
+            : null;
+
+    } catch {
+        return null;
+    }
+}
+
+
+function saveMessagesCache(id, list) {
+
+    try {
+
+        localStorage.setItem(
+            messagesCacheKey(id),
+            JSON.stringify(list)
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "Could not save message cache:",
+            error
+        );
+    }
+}
+
+
+function loadMessagesCache(id) {
+
+    try {
+
+        const raw =
+            localStorage.getItem(
+                messagesCacheKey(id)
+            );
+
+        return raw
+            ? JSON.parse(raw)
+            : [];
+
+    } catch {
+        return [];
+    }
+}
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function escapeHTML(value) {
+
+    return String(value ?? "")
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -216,583 +244,206 @@ function escapeHtml(value = "") {
 }
 
 
-function getInitials(user = {}) {
+function getInitials(name) {
 
-    const first =
-        String(user.firstName || "")
+    const parts =
+        String(name || "User")
             .trim()
-            .charAt(0);
+            .split(/\s+/)
+            .filter(Boolean);
 
-    const last =
-        String(user.lastName || "")
-            .trim()
-            .charAt(0);
-
-    if (first || last) {
-
-        return `${first}${last}`
-            .toUpperCase()
-            .slice(0, 2);
+    if (!parts.length) {
+        return "U";
     }
 
-    const name =
-        String(
-            user.displayName ||
-            user.username ||
-            "U"
-        ).trim();
+    if (parts.length === 1) {
+        return parts[0]
+            .slice(0, 2)
+            .toUpperCase();
+    }
 
-    return name
-        .charAt(0)
-        .toUpperCase();
+    return (
+        parts[0][0] +
+        parts[parts.length - 1][0]
+    ).toUpperCase();
 }
 
 
-function getFullName(user = {}) {
+function formatTime(value) {
 
-    const first =
-        String(user.firstName || "")
-            .trim();
-
-    const last =
-        String(user.lastName || "")
-            .trim();
-
-    const combined =
-        `${first} ${last}`.trim();
-
-    if (combined) {
-        return combined;
-    }
-
-    const displayName =
-        String(user.displayName || "")
-            .trim();
-
-    if (
-        displayName &&
-        displayName.toLowerCase() !==
-            "connecta user"
-    ) {
-        return displayName;
-    }
-
-    const username =
-        String(user.username || "")
-            .trim();
-
-    if (username) {
-        return username;
-    }
-
-    return "CONNECTA User";
-}
-
-
-function verifiedBadge(user = {}) {
-
-    if (user.isVerified !== true) {
-        return "";
-    }
-
-    return `
-        <span
-            class="verified-badge"
-            aria-label="Verified account"
-            title="Verified account"
-        >✓</span>
-    `;
-}
-
-
-function formatMemberCount(count = 0) {
-
-    const number =
-        Number(count) || 0;
-
-    if (number === 1) {
-        return "1 member";
-    }
-
-    return `${number} members`;
-}
-
-
-function formatTime(timestamp) {
-
-    if (!timestamp) {
+    if (!value) {
         return "";
     }
 
     let date = null;
 
-    if (
-        typeof timestamp.toDate ===
-        "function"
-    ) {
-        date = timestamp.toDate();
-    } else if (
-        timestamp instanceof Date
-    ) {
-        date = timestamp;
-    } else if (
-        typeof timestamp === "number"
-    ) {
-        date = new Date(timestamp);
-    } else if (
-        typeof timestamp === "string"
-    ) {
-        date = new Date(timestamp);
+    if (value?.toDate) {
+        date = value.toDate();
+    } else if (value?.seconds) {
+        date =
+            new Date(
+                value.seconds * 1000
+            );
+    } else if (value?._seconds) {
+        date =
+            new Date(
+                value._seconds * 1000
+            );
+    } else {
+        date = new Date(value);
     }
 
-    if (!date || Number.isNaN(date.getTime())) {
+    if (
+        !date ||
+        Number.isNaN(date.getTime())
+    ) {
         return "";
     }
 
-    return new Intl.DateTimeFormat(
-        undefined,
+    return date.toLocaleTimeString(
+        [],
         {
-            hour: "numeric",
+            hour: "2-digit",
             minute: "2-digit"
         }
-    ).format(date);
+    );
 }
 
 
-function formatDate(timestamp) {
+function showToast(message) {
 
-    if (!timestamp) {
-        return "";
+    if (!toast) {
+        console.log(message);
+        return;
     }
 
-    let date = null;
+    toast.textContent = message;
 
-    if (
-        typeof timestamp.toDate ===
-        "function"
-    ) {
-        date = timestamp.toDate();
-    } else if (
-        timestamp instanceof Date
-    ) {
-        date = timestamp;
-    } else if (
-        typeof timestamp === "number"
-    ) {
-        date = new Date(timestamp);
-    } else if (
-        typeof timestamp === "string"
-    ) {
-        date = new Date(timestamp);
-    }
+    toast.classList.add("show");
 
-    if (!date || Number.isNaN(date.getTime())) {
-        return "";
-    }
-
-    const now = new Date();
-
-    const sameDay =
-        date.toDateString() ===
-        now.toDateString();
-
-    if (sameDay) {
-        return "Today";
-    }
-
-    const yesterday =
-        new Date(now);
-
-    yesterday.setDate(
-        yesterday.getDate() - 1
+    clearTimeout(
+        showToast.timer
     );
 
-    if (
-        date.toDateString() ===
-        yesterday.toDateString()
-    ) {
-        return "Yesterday";
-    }
-
-    return new Intl.DateTimeFormat(
-        undefined,
-        {
-            day: "numeric",
-            month: "short",
-            year:
-                date.getFullYear() !==
-                now.getFullYear()
-                    ? "numeric"
-                    : undefined
-        }
-    ).format(date);
-}
-
-
-function getTimestampValue(timestamp) {
-
-    if (!timestamp) {
-        return 0;
-    }
-
-    if (
-        typeof timestamp.toMillis ===
-        "function"
-    ) {
-        return timestamp.toMillis();
-    }
-
-    if (
-        typeof timestamp.toDate ===
-        "function"
-    ) {
-        return timestamp.toDate().getTime();
-    }
-
-    if (timestamp instanceof Date) {
-        return timestamp.getTime();
-    }
-
-    if (typeof timestamp === "number") {
-        return timestamp;
-    }
-
-    const parsed =
-        new Date(timestamp).getTime();
-
-    return Number.isNaN(parsed)
-        ? 0
-        : parsed;
-}
-
-
-/* =========================================================
-   URL / GROUP ID
-========================================================= */
-
-function getGroupIdFromUrl() {
-
-    const params =
-        new URLSearchParams(
-            window.location.search
-        );
-
-    const fromQuery =
-        params.get("groupId");
-
-    if (fromQuery) {
-        return fromQuery.trim();
-    }
-
-    const fromHash =
-        window.location.hash
-            .replace("#", "")
-            .trim();
-
-    if (fromHash) {
-        return fromHash;
-    }
-
-    return "";
-}
-
-
-/* =========================================================
-   CACHE
-========================================================= */
-
-function saveGroupCache(group) {
-
-    if (!group || !group.groupId) {
-        return;
-    }
-
-    try {
-
-        localStorage.setItem(
-            `${GROUP_CACHE_PREFIX}${group.groupId}`,
-            JSON.stringify(group)
-        );
-
-    } catch (error) {
-
-        console.warn(
-            "Could not cache group:",
-            error
-        );
-    }
-}
-
-
-function loadGroupCache(groupId) {
-
-    if (!groupId) {
-        return null;
-    }
-
-    try {
-
-        const raw =
-            localStorage.getItem(
-                `${GROUP_CACHE_PREFIX}${groupId}`
+    showToast.timer =
+        setTimeout(() => {
+            toast.classList.remove(
+                "show"
             );
-
-        if (!raw) {
-            return null;
-        }
-
-        return JSON.parse(raw);
-
-    } catch (error) {
-
-        return null;
-    }
-}
-
-
-function saveMessageCache(
-    groupId,
-    messages
-) {
-
-    if (!groupId) {
-        return;
-    }
-
-    try {
-
-        localStorage.setItem(
-            `${MESSAGE_CACHE_PREFIX}${groupId}`,
-            JSON.stringify(messages.slice(-MAX_MESSAGES))
-        );
-
-    } catch (error) {
-
-        console.warn(
-            "Could not cache group messages:",
-            error
-        );
-    }
-}
-
-
-function loadMessageCache(groupId) {
-
-    if (!groupId) {
-        return [];
-    }
-
-    try {
-
-        const raw =
-            localStorage.getItem(
-                `${MESSAGE_CACHE_PREFIX}${groupId}`
-            );
-
-        if (!raw) {
-            return [];
-        }
-
-        const parsed =
-            JSON.parse(raw);
-
-        return Array.isArray(parsed)
-            ? parsed
-            : [];
-
-    } catch (error) {
-
-        return [];
-    }
+        }, 2800);
 }
 
 
 /* =========================================================
-   PROFILE CACHE
+   ACCOUNT CONTROL
 ========================================================= */
 
-function getCachedCurrentProfile() {
+function getAccountControl(profile) {
 
-    const keys = [
-        PROFILE_CACHE_KEY,
-        PUBLIC_PROFILE_CACHE_KEY
-    ];
+    const status =
+        String(
+            profile?.status || "active"
+        ).toLowerCase();
 
-    for (const key of keys) {
+    const groupMessagingRestricted =
+        profile?.groupMessagingRestricted === true;
 
-        try {
+    const groupParticipationRestricted =
+        profile?.groupParticipationRestricted === true;
 
-            const raw =
-                localStorage.getItem(key);
+    if (
+        status === "banned" ||
+        status === "suspended"
+    ) {
 
-            if (!raw) {
-                continue;
-            }
-
-            const parsed =
-                JSON.parse(raw);
-
-            if (parsed && typeof parsed === "object") {
-                return parsed;
-            }
-
-        } catch (error) {
-            // Continue to next cache.
-        }
+        return {
+            loaded: true,
+            blocked: true,
+            messagingRestricted: true,
+            groupParticipationRestricted: true,
+            reason: status
+        };
     }
 
-    return null;
+    return {
+        loaded: true,
+        blocked: false,
+        messagingRestricted:
+            groupMessagingRestricted,
+        groupParticipationRestricted,
+        reason:
+            groupMessagingRestricted
+                ? "group_messaging_restricted"
+                : groupParticipationRestricted
+                    ? "group_participation_restricted"
+                    : ""
+    };
 }
 
 
 /* =========================================================
-   ACCESS UI
+   GROUP CONTROL
 ========================================================= */
 
-function showGroupPage() {
+function getGroupControl(group) {
 
-    if (groupChatPage) {
-        groupChatPage.style.display = "flex";
-    }
+    const status =
+        String(
+            group?.status || ""
+        ).toLowerCase();
 
-    if (accessBlock) {
-        accessBlock.classList.remove("show");
-    }
-}
+    return {
+        loaded: true,
 
+        chatLocked:
+            group?.chatLocked === true,
 
-function showAccessBlock(
-    title,
-    message
-) {
-
-    if (groupChatPage) {
-        groupChatPage.style.display = "none";
-    }
-
-    if (accessTitle) {
-        accessTitle.textContent =
-            title;
-    }
-
-    if (accessMessage) {
-        accessMessage.textContent =
-            message;
-    }
-
-    if (accessBlock) {
-        accessBlock.classList.add("show");
-    }
+        approved:
+            status === "approved"
+    };
 }
 
 
 /* =========================================================
-   GROUP ACCESS
+   CAN SEND
 ========================================================= */
 
-function userIsMember(group) {
+function canSendMessages() {
 
-    if (!group || !currentUser) {
+    /*
+     * Fail closed until the user's control
+     * document has loaded.
+     */
+    if (!accountControl.loaded) {
         return false;
     }
 
-    const uid =
-        currentUser.uid;
-
-    if (
-        Array.isArray(group.members) &&
-        group.members.includes(uid)
-    ) {
-        return true;
-    }
-
-    if (
-        Array.isArray(group.memberIds) &&
-        group.memberIds.includes(uid)
-    ) {
-        return true;
-    }
-
-    return false;
-}
-
-
-function userCanAccessGroup(group) {
-
-    if (!group || !currentUser) {
+    if (!groupControl.loaded) {
         return false;
     }
 
-    if (group.status !== "approved") {
+    if (accountControl.blocked) {
         return false;
     }
 
-    /*
-       The creator is automatically a member
-       when a group is created.
-    */
     if (
-        group.ownerId ===
-        currentUser.uid
+        accountControl.messagingRestricted
     ) {
-        return true;
-    }
-
-    /*
-       Membership is required before
-       opening the group chat.
-    */
-    if (!userIsMember(group)) {
         return false;
     }
 
-    /*
-       Private groups require verification.
-    */
-    if (group.type === "private") {
-
-        if (
-            currentProfile?.isVerified !== true
-        ) {
-            return false;
-        }
+    if (
+        accountControl.groupParticipationRestricted
+    ) {
+        return false;
     }
 
-    /*
-       Paid groups must already have
-       a successful membership/payment
-       recorded.
+    if (groupControl.chatLocked) {
+        return false;
+    }
 
-       We do NOT trust the frontend to
-       mark a paid user as paid.
-    */
-    if (
-        group.subscriptionEnabled === true &&
-        Number(group.subscriptionFee) > 0
-    ) {
-
-        /*
-           The actual paid-membership
-           verification will be moved
-           to the secure backend.
-
-           For now, require a membership
-           flag if one exists.
-        */
-
-        if (
-            group.paidMembers &&
-            Array.isArray(group.paidMembers)
-        ) {
-
-            if (
-                !group.paidMembers.includes(
-                    currentUser.uid
-                )
-            ) {
-                return false;
-            }
-        }
+    if (!groupControl.approved) {
+        return false;
     }
 
     return true;
@@ -800,565 +451,253 @@ function userCanAccessGroup(group) {
 
 
 /* =========================================================
-   GROUP AVATAR
+   SEND CONTROL UI
 ========================================================= */
 
-function renderGroupAvatar(
-    element,
-    group
-) {
+function updateComposerState() {
 
-    if (!element || !group) {
+    if (!messageInput || !sendBtn) {
         return;
     }
 
-    const photo =
-        String(group.photoURL || "")
-            .trim();
+    const blocked =
+        !canSendMessages();
 
-    if (photo) {
+    messageInput.disabled =
+        blocked;
 
-        element.innerHTML = `
-            <img
-                src="${escapeHtml(photo)}"
-                alt="${escapeHtml(group.name || "Group")}"
-            >
-        `;
+    sendBtn.disabled =
+        blocked;
 
-        return;
-    }
-
-    const initials =
-        String(group.name || "G")
-            .trim()
-            .split(/\s+/)
-            .slice(0, 2)
-            .map(word =>
-                word.charAt(0)
-            )
-            .join("")
-            .toUpperCase();
-
-    element.textContent =
-        initials || "G";
-}
-
-
-/* =========================================================
-   RENDER GROUP HEADER
-========================================================= */
-
-function renderGroupHeader(group) {
-
-    if (!group) {
-        return;
-    }
-
-    if (groupName) {
-
-        groupName.textContent =
-            group.name ||
-            "CONNECTA Group";
-    }
-
-    renderGroupAvatar(
-        groupHeaderAvatar,
-        group
-    );
-
-    const type =
-        group.type === "private"
-            ? "Private"
-            : "Public";
-
-    const members =
-        formatMemberCount(
-            group.memberCount
-        );
-
-    if (groupStatus) {
-
-        groupStatus.textContent =
-            `${type} • ${members}`;
-    }
-}
-
-
-/* =========================================================
-   GROUP INFO
-========================================================= */
-
-function renderGroupInfo(group) {
-
-    if (!group) {
-        return;
-    }
-
-    renderGroupAvatar(
-        infoGroupAvatar,
-        group
-    );
-
-    if (infoGroupName) {
-
-        infoGroupName.textContent =
-            group.name ||
-            "CONNECTA Group";
-    }
-
-    if (infoGroupMeta) {
-
-        const type =
-            group.type === "private"
-                ? "Private group"
-                : "Public group";
-
-        infoGroupMeta.textContent =
-            `${type} • ${formatMemberCount(
-                group.memberCount
-            )}`;
-    }
-
-    if (infoGroupDescription) {
-
-        infoGroupDescription.textContent =
-            group.description ||
-            "No group description available.";
-    }
-
-    if (infoGroupType) {
-
-        infoGroupType.textContent =
-            group.type === "private"
-                ? "Private"
-                : "Public";
-    }
-
-    if (infoGroupMembers) {
-
-        infoGroupMembers.textContent =
-            String(
-                Number(group.memberCount) || 0
-            );
-    }
-
-    if (infoGroupSubscription) {
+    if (blocked) {
 
         if (
-            group.subscriptionEnabled === true &&
-            Number(group.subscriptionFee) > 0
+            accountControl.blocked
         ) {
 
-            infoGroupSubscription.textContent =
-                `KSh ${Number(
-                    group.subscriptionFee
-                ).toLocaleString()}`;
+            messageInput.placeholder =
+                "Your account cannot send messages";
+
+        } else if (
+            accountControl.messagingRestricted
+        ) {
+
+            messageInput.placeholder =
+                "Group messaging has been restricted";
+
+        } else if (
+            accountControl.groupParticipationRestricted
+        ) {
+
+            messageInput.placeholder =
+                "Group participation is restricted";
+
+        } else if (
+            groupControl.chatLocked
+        ) {
+
+            messageInput.placeholder =
+                "Group chat is locked by an admin";
+
+        } else if (
+            !groupControl.approved
+        ) {
+
+            messageInput.placeholder =
+                "This group is not available for messaging";
 
         } else {
 
-            infoGroupSubscription.textContent =
-                "Free";
+            messageInput.placeholder =
+                "Messaging unavailable";
         }
-    }
 
-    if (infoGroupOwner) {
-
-        infoGroupOwner.textContent =
-            group.ownerName ||
-            "CONNECTA";
-    }
-}
-
-
-/* =========================================================
-   GROUP INFO SHEET
-========================================================= */
-
-function openGroupInfo() {
-
-    if (!currentGroup) {
-        return;
-    }
-
-    renderGroupInfo(
-        currentGroup
-    );
-
-    groupInfoOverlay?.classList.add(
-        "open"
-    );
-
-    groupInfoOverlay?.setAttribute(
-        "aria-hidden",
-        "false"
-    );
-}
-
-
-function closeGroupInfo() {
-
-    groupInfoOverlay?.classList.remove(
-        "open"
-    );
-
-    groupInfoOverlay?.setAttribute(
-        "aria-hidden",
-        "true"
-    );
-}
-
-
-/* =========================================================
-   DATE SEPARATOR
-========================================================= */
-
-function getDateKey(timestamp) {
-
-    if (!timestamp) {
-        return "";
-    }
-
-    let date = null;
-
-    if (
-        typeof timestamp.toDate ===
-        "function"
-    ) {
-        date = timestamp.toDate();
-    } else if (
-        timestamp instanceof Date
-    ) {
-        date = timestamp;
     } else {
 
-        const parsed =
-            new Date(timestamp);
-
-        if (!Number.isNaN(parsed.getTime())) {
-            date = parsed;
-        }
+        messageInput.placeholder =
+            "Type a message...";
     }
 
-    if (!date) {
-        return "";
-    }
-
-    return [
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate()
-    ].join("-");
+    updateAccessNotice();
 }
 
 
 /* =========================================================
-   MESSAGE RENDERING
+   ACCESS NOTICE
 ========================================================= */
 
-function renderMessages(
-    messages = [],
-    scrollToBottom = false
-) {
+function updateAccessNotice() {
 
-    if (!messagesInner) {
+    if (!accessBlock) {
         return;
     }
 
-    if (!messages.length) {
+    let message = "";
 
-        messagesInner.innerHTML = `
-            <div class="empty-chat">
-
-                <div class="empty-chat-icon">
-                    💬
-                </div>
-
-                <h3>
-                    Start the conversation
-                </h3>
-
-                <p>
-                    Be the first person to send
-                    a message in this group.
-                </p>
-
-            </div>
-        `;
-
-        lastRenderedMessageIds = [];
-
-        return;
-    }
-
-    const sorted =
-        [...messages]
-            .sort(
-                (a, b) =>
-                    getTimestampValue(
-                        a.createdAt
-                    ) -
-                    getTimestampValue(
-                        b.createdAt
-                    )
-            );
-
-    let html = "";
-
-    let previousDateKey = "";
-
-    for (const message of sorted) {
-
-        if (!message || !message.messageId) {
-            continue;
-        }
-
-        const dateKey =
-            getDateKey(
-                message.createdAt
-            );
+    if (accountControl.blocked) {
 
         if (
-            dateKey &&
-            dateKey !== previousDateKey
+            accountControl.reason === "banned"
         ) {
-
-            html += `
-                <div class="date-separator">
-                    <span>
-                        ${escapeHtml(
-                            formatDate(
-                                message.createdAt
-                            )
-                        )}
-                    </span>
-                </div>
-            `;
-
-            previousDateKey =
-                dateKey;
-        }
-
-        const senderId =
-            message.senderId ||
-            message.userId ||
-            "";
-
-        const mine =
-            senderId ===
-            currentUser?.uid;
-
-        const senderName =
-            message.senderName ||
-            message.displayName ||
-            message.username ||
-            "CONNECTA User";
-
-        const senderUsername =
-            message.senderUsername
-                ? `@${message.senderUsername}`
-                : "";
-
-        const photoURL =
-            String(
-                message.senderPhotoURL ||
-                message.photoURL ||
-                ""
-            ).trim();
-
-        const initials =
-            getInitials({
-                firstName:
-                    message.senderFirstName,
-                lastName:
-                    message.senderLastName,
-                displayName:
-                    senderName,
-                username:
-                    message.senderUsername
-            });
-
-        const verified =
-            message.senderVerified === true;
-
-        const messageText =
-            message.text ??
-            message.message ??
-            "";
-
-        let avatarHTML = "";
-
-        if (photoURL) {
-
-            avatarHTML = `
-                <img
-                    src="${escapeHtml(photoURL)}"
-                    alt="${escapeHtml(senderName)}"
-                >
-            `;
-
+            message =
+                "Your account has been banned.";
         } else {
-
-            avatarHTML =
-                escapeHtml(initials);
+            message =
+                "Your account has been suspended.";
         }
 
-        const senderHTML =
-            mine
-                ? ""
-                : `
-                    <div class="message-sender">
-                        ${escapeHtml(senderName)}
-                        ${verified
-                            ? `
-                                <span
-                                    class="verified-badge"
-                                    aria-label="Verified"
-                                >✓</span>
-                              `
-                            : ""}
-                    </div>
-                  `;
+    } else if (
+        accountControl.messagingRestricted
+    ) {
 
-        const time =
-            formatTime(
-                message.createdAt
-            );
+        message =
+            "Your group messaging access has been restricted by an admin.";
 
-        let statusHTML = "";
+    } else if (
+        accountControl.groupParticipationRestricted
+    ) {
 
-        if (mine) {
+        message =
+            "Your group participation has been restricted by an admin.";
 
-            let status = "";
+    } else if (
+        groupControl.chatLocked
+    ) {
 
-            if (
-                message.readBy &&
-                Array.isArray(
-                    message.readBy
-                ) &&
-                message.readBy.length > 1
-            ) {
+        message =
+            "This group chat has been locked by an admin. You can still read existing messages.";
 
-                status = "✓✓";
+    } else if (
+        !groupControl.approved
+    ) {
 
-            } else if (
-                message.deliveredTo &&
-                Array.isArray(
-                    message.deliveredTo
-                ) &&
-                message.deliveredTo.length > 1
-            ) {
-
-                status = "✓✓";
-
-            } else {
-
-                status = "✓";
-            }
-
-            statusHTML = `
-                <span class="message-status">
-                    ${status}
-                </span>
-            `;
-        }
-
-        html += `
-            <div
-                class="message-row ${
-                    mine
-                        ? "mine"
-                        : "other"
-                }"
-                data-message-id="${escapeHtml(
-                    message.messageId
-                )}"
-            >
-
-                ${
-                    mine
-                        ? ""
-                        : `
-                            <div class="message-avatar">
-                                ${avatarHTML}
-                            </div>
-                          `
-                }
-
-                <div class="message-content">
-
-                    ${senderHTML}
-
-                    <div class="message-bubble">
-
-                        <p class="message-text">
-                            ${escapeHtml(
-                                messageText
-                            )}
-                        </p>
-
-                        <div class="message-meta">
-
-                            <span>
-                                ${escapeHtml(time)}
-                            </span>
-
-                            ${statusHTML}
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-        `;
+        message =
+            "This group is not currently available for messaging.";
     }
 
-    messagesInner.innerHTML =
-        html ||
-        `
-            <div class="empty-chat">
-                <div class="empty-chat-icon">
-                    💬
-                </div>
+    if (message) {
 
-                <h3>
-                    Start the conversation
-                </h3>
+        accessBlock.textContent =
+            message;
 
-                <p>
-                    Be the first person to send
-                    a message in this group.
-                </p>
-            </div>
-        `;
+        accessBlock.style.display =
+            "block";
 
-    lastRenderedMessageIds =
-        sorted.map(
-            message =>
-                message.messageId
-        );
+    } else {
 
-    if (scrollToBottom) {
-        requestAnimationFrame(
-            scrollMessagesToBottom
-        );
+        accessBlock.textContent =
+            "";
+
+        accessBlock.style.display =
+            "none";
     }
 }
 
 
 /* =========================================================
-   SCROLL
+   PROFILE LISTENER
 ========================================================= */
 
-function scrollMessagesToBottom() {
+function listenToOwnProfile() {
 
-    if (!messagesArea) {
+    if (!currentUser) {
         return;
     }
 
-    messagesArea.scrollTop =
-        messagesArea.scrollHeight;
+    if (stopOwnProfile) {
+        stopOwnProfile();
+        stopOwnProfile = null;
+    }
+
+    const userRef =
+        doc(
+            db,
+            "users",
+            currentUser.uid
+        );
+
+    /*
+     * Start in fail-closed state.
+     */
+    accountControl = {
+        loaded: false,
+        blocked: false,
+        messagingRestricted: false,
+        groupParticipationRestricted: false,
+        reason: ""
+    };
+
+    updateComposerState();
+
+    stopOwnProfile =
+        onSnapshot(
+            userRef,
+            (snapshot) => {
+
+                if (!snapshot.exists()) {
+
+                    currentProfile = null;
+
+                    accountControl = {
+                        loaded: true,
+                        blocked: true,
+                        messagingRestricted: true,
+                        groupParticipationRestricted: true,
+                        reason: "profile_missing"
+                    };
+
+                    updateComposerState();
+
+                    return;
+                }
+
+                currentProfile =
+                    snapshot.data();
+
+                accountControl =
+                    getAccountControl(
+                        currentProfile
+                    );
+
+                updateComposerState();
+
+                /*
+                 * If admin suspended/banned the user
+                 * while inside the group, keep the page
+                 * readable but prevent all interaction.
+                 */
+                if (
+                    accountControl.blocked
+                ) {
+
+                    stopTyping();
+                }
+            },
+            (error) => {
+
+                console.error(
+                    "Own profile listener error:",
+                    error
+                );
+
+                /*
+                 * Security-first:
+                 * if we cannot verify the account
+                 * controls, do not allow sending.
+                 */
+                accountControl = {
+                    loaded: true,
+                    blocked: true,
+                    messagingRestricted: true,
+                    groupParticipationRestricted: true,
+                    reason: "control_check_failed"
+                };
+
+                updateComposerState();
+            }
+        );
+
+    isProfileListenerReady = true;
 }
 
 
@@ -1368,40 +707,26 @@ function scrollMessagesToBottom() {
 
 async function loadGroup() {
 
-    if (!currentGroupId) {
-        showAccessBlock(
-            "Group not found",
-            "This group link is missing a valid group ID."
-        );
-        return false;
+    if (!groupId) {
+        return;
     }
 
-    /*
-       Cache-first rendering.
-    */
-    const cachedGroup =
-        loadGroupCache(
-            currentGroupId
-        );
+    const cached =
+        loadGroupCache(groupId);
 
-    if (cachedGroup) {
+    if (cached) {
 
         currentGroup =
-            cachedGroup;
+            cached;
 
-        if (
-            currentUser &&
-            userCanAccessGroup(
-                cachedGroup
-            )
-        ) {
-
-            showGroupPage();
-
-            renderGroupHeader(
-                cachedGroup
+        groupControl =
+            getGroupControl(
+                currentGroup
             );
-        }
+
+        renderGroup();
+
+        updateComposerState();
     }
 
     try {
@@ -1410,7 +735,7 @@ async function loadGroup() {
             doc(
                 db,
                 GROUPS_COLLECTION,
-                currentGroupId
+                groupId
             );
 
         const snapshot =
@@ -1418,73 +743,33 @@ async function loadGroup() {
 
         if (!snapshot.exists()) {
 
-            showAccessBlock(
-                "Group not found",
-                "This group may have been deleted or the link may be incorrect."
+            showToast(
+                "Group not found."
             );
 
-            return false;
+            return;
         }
 
-        const group = {
-            id: snapshot.id,
+        currentGroup = {
+            groupId:
+                snapshot.id,
             ...snapshot.data()
         };
 
-        currentGroup =
-            group;
+        saveGroupCache(
+            currentGroup
+        );
 
-        saveGroupCache(group);
+        groupControl =
+            getGroupControl(
+                currentGroup
+            );
 
-        if (!userCanAccessGroup(group)) {
+        renderGroup();
 
-            if (
-                group.status !==
-                "approved"
-            ) {
+        updateComposerState();
 
-                showAccessBlock(
-                    "Group unavailable",
-                    "This group has not been approved for access yet."
-                );
-
-            } else if (
-                group.type ===
-                    "private" &&
-                currentProfile?.isVerified !== true
-            ) {
-
-                showAccessBlock(
-                    "Verification required",
-                    "Only verified CONNECTA accounts can join and access private groups."
-                );
-
-            } else if (
-                !userIsMember(group)
-            ) {
-
-                showAccessBlock(
-                    "Membership required",
-                    "You need to join this group before you can open its chat."
-                );
-
-            } else {
-
-                showAccessBlock(
-                    "Payment required",
-                    "A successful group subscription is required before accessing this chat."
-                );
-            }
-
-            return false;
-        }
-
-        showGroupPage();
-
-        renderGroupHeader(group);
-        renderGroupInfo(group);
-
-        return true;
+        setupGroupListener();
 
     } catch (error) {
 
@@ -1493,177 +778,198 @@ async function loadGroup() {
             error
         );
 
-        if (cachedGroup) {
+        /*
+         * If we already have cached data,
+         * keep using it.
+         */
+        if (!currentGroup) {
 
-            if (
-                userCanAccessGroup(
-                    cachedGroup
-                )
-            ) {
-
-                showGroupPage();
-
-                renderGroupHeader(
-                    cachedGroup
-                );
-
-                return true;
-            }
+            showToast(
+                "Unable to load this group."
+            );
         }
-
-        showAccessBlock(
-            "Unable to load group",
-            "Please check your connection and try again."
-        );
-
-        return false;
     }
 }
 
 
 /* =========================================================
-   REALTIME GROUP LISTENER
+   LIVE GROUP LISTENER
 ========================================================= */
 
-function listenToGroup() {
+function setupGroupListener() {
 
-    if (!currentGroupId) {
+    if (!groupId) {
         return;
     }
 
-    if (groupUnsubscribe) {
-        groupUnsubscribe();
-        groupUnsubscribe = null;
+    if (stopGroup) {
+        stopGroup();
+        stopGroup = null;
     }
 
     const groupRef =
         doc(
             db,
             GROUPS_COLLECTION,
-            currentGroupId
+            groupId
         );
 
-    groupUnsubscribe =
+    stopGroup =
         onSnapshot(
             groupRef,
-            snapshot => {
+            (snapshot) => {
 
                 if (!snapshot.exists()) {
 
-                    showAccessBlock(
-                        "Group removed",
-                        "This group is no longer available."
+                    showToast(
+                        "This group no longer exists."
                     );
+
+                    groupControl = {
+                        loaded: true,
+                        chatLocked: true,
+                        approved: false
+                    };
+
+                    updateComposerState();
 
                     return;
                 }
 
-                const group = {
-                    id: snapshot.id,
+                currentGroup = {
+                    groupId:
+                        snapshot.id,
                     ...snapshot.data()
                 };
 
-                currentGroup =
-                    group;
+                saveGroupCache(
+                    currentGroup
+                );
 
-                saveGroupCache(group);
-
-                if (
-                    userCanAccessGroup(
-                        group
-                    )
-                ) {
-
-                    showGroupPage();
-
-                    renderGroupHeader(
-                        group
+                groupControl =
+                    getGroupControl(
+                        currentGroup
                     );
 
-                    renderGroupInfo(
-                        group
-                    );
+                renderGroup();
 
-                } else {
-
-                    /*
-                       If access was revoked
-                       while the user is inside
-                       the chat, remove access.
-                    */
-
-                    if (
-                        group.status !==
-                        "approved"
-                    ) {
-
-                        showAccessBlock(
-                            "Group unavailable",
-                            "This group is no longer available."
-                        );
-
-                    } else if (
-                        group.type ===
-                            "private" &&
-                        currentProfile?.isVerified !== true
-                    ) {
-
-                        showAccessBlock(
-                            "Verification required",
-                            "Your account must be verified to access this private group."
-                        );
-
-                    } else if (
-                        !userIsMember(group)
-                    ) {
-
-                        showAccessBlock(
-                            "Membership required",
-                            "You are no longer a member of this group."
-                        );
-
-                    } else {
-
-                        showAccessBlock(
-                            "Payment required",
-                            "Your group subscription must be confirmed before accessing this chat."
-                        );
-                    }
-
-                    stopMessageListener();
-                }
-
+                updateComposerState();
             },
-            error => {
+            (error) => {
 
                 console.error(
                     "Group listener error:",
                     error
                 );
+
+                /*
+                 * Fail closed when admin control
+                 * state cannot be verified.
+                 */
+                groupControl = {
+                    loaded: true,
+                    chatLocked: true,
+                    approved: false
+                };
+
+                updateComposerState();
             }
         );
+
+    isGroupListenerReady = true;
 }
 
 
 /* =========================================================
-   MESSAGE CACHE LOAD
+   RENDER GROUP
+========================================================= */
+
+function renderGroup() {
+
+    if (!currentGroup) {
+        return;
+    }
+
+    const name =
+        currentGroup.name ||
+        "Group";
+
+    const photo =
+        currentGroup.photoURL ||
+        "";
+
+    if (groupName) {
+        groupName.textContent =
+            name;
+    }
+
+    if (groupStatus) {
+
+        if (
+            currentGroup.chatLocked
+        ) {
+
+            groupStatus.textContent =
+                "Chat locked";
+
+        } else {
+
+            groupStatus.textContent =
+                currentGroup.type === "private"
+                    ? "Private group"
+                    : "Public group";
+        }
+    }
+
+    if (groupAvatar) {
+
+        if (photo) {
+
+            groupAvatar.src =
+                photo;
+
+            groupAvatar.style.display =
+                "block";
+
+        } else {
+
+            groupAvatar.removeAttribute(
+                "src"
+            );
+
+            groupAvatar.style.display =
+                "flex";
+
+            groupAvatar.textContent =
+                getInitials(name);
+        }
+    }
+
+    updateComposerState();
+}
+
+
+/* =========================================================
+   LOAD CACHED MESSAGES
 ========================================================= */
 
 function loadCachedMessages() {
 
     const cached =
-        loadMessageCache(
-            currentGroupId
+        loadMessagesCache(
+            groupId
         );
 
-    if (!cached.length) {
-        return;
-    }
+    if (
+        Array.isArray(cached) &&
+        cached.length
+    ) {
 
-    renderMessages(
-        cached,
-        false
-    );
+        messages =
+            cached;
+
+        renderMessages();
+    }
 }
 
 
@@ -1671,28 +977,22 @@ function loadCachedMessages() {
    MESSAGE LISTENER
 ========================================================= */
 
-function listenToMessages() {
+function setupMessageListener() {
 
-    if (
-        !currentGroupId ||
-        !currentUser ||
-        !currentGroup
-    ) {
+    if (!groupId) {
         return;
     }
 
-    if (messagesUnsubscribe) {
-        messagesUnsubscribe();
-        messagesUnsubscribe = null;
+    if (stopMessages) {
+        stopMessages();
+        stopMessages = null;
     }
-
-    loadCachedMessages();
 
     const messagesRef =
         collection(
             db,
             GROUPS_COLLECTION,
-            currentGroupId,
+            groupId,
             GROUP_MESSAGES_COLLECTION
         );
 
@@ -1706,137 +1006,186 @@ function listenToMessages() {
             limit(MAX_MESSAGES)
         );
 
-    messagesUnsubscribe =
+    stopMessages =
         onSnapshot(
             messagesQuery,
-            snapshot => {
+            (snapshot) => {
 
-                const messages =
+                messages =
                     snapshot.docs
-                        .map(
-                            messageDoc => ({
-                                messageId:
-                                    messageDoc.id,
-                                ...messageDoc.data()
-                            })
-                        )
+                        .map((item) => ({
+                            id: item.id,
+                            ...item.data()
+                        }))
                         .reverse();
 
-                saveMessageCache(
-                    currentGroupId,
+                saveMessagesCache(
+                    groupId,
                     messages
                 );
 
-                if (chatLoading) {
-                    chatLoading.style.display =
-                        "none";
-                }
-
-                renderMessages(
-                    messages,
-                    true
-                );
-
-                markMessagesRead(
-                    messages
-                );
-
+                renderMessages();
             },
-            error => {
+            (error) => {
 
                 console.error(
-                    "Group messages listener error:",
+                    "Message listener error:",
                     error
                 );
 
-                if (chatLoading) {
-                    chatLoading.style.display =
-                        "none";
-                }
-
                 /*
-                   If realtime query fails,
-                   retain cached messages.
-                */
-
-                const cached =
-                    loadMessageCache(
-                        currentGroupId
-                    );
-
-                if (cached.length) {
-
-                    renderMessages(
-                        cached,
-                        false
-                    );
-                } else {
-
-                    showToast(
-                        "Unable to load group messages."
-                    );
-                }
+                 * Cached messages remain visible.
+                 */
+                loadCachedMessages();
             }
         );
 }
 
 
 /* =========================================================
-   STOP MESSAGE LISTENER
+   RENDER MESSAGES
 ========================================================= */
 
-function stopMessageListener() {
+function renderMessages() {
 
-    if (messagesUnsubscribe) {
-
-        messagesUnsubscribe();
-
-        messagesUnsubscribe = null;
+    if (!messagesContainer) {
+        return;
     }
 
-    if (typingUnsubscribe) {
+    if (!messages.length) {
 
-        typingUnsubscribe();
+        messagesContainer.innerHTML = `
+            <div class="empty-messages">
+                No messages yet.
+            </div>
+        `;
 
-        typingUnsubscribe = null;
+        return;
     }
+
+    messagesContainer.innerHTML =
+        messages
+            .map(renderMessage)
+            .join("");
+
+    messagesContainer.scrollTop =
+        messagesContainer.scrollHeight;
+}
+
+
+function renderMessage(message) {
+
+    const isMine =
+        message.senderId ===
+        currentUser?.uid;
+
+    const senderName =
+        message.senderName ||
+        message.senderUsername ||
+        "User";
+
+    const photo =
+        message.senderPhotoURL ||
+        "";
+
+    const avatar =
+        photo
+            ? `
+                <img
+                    src="${escapeHTML(photo)}"
+                    alt=""
+                    class="message-avatar"
+                >
+            `
+            : `
+                <div class="message-avatar fallback">
+                    ${escapeHTML(
+                        getInitials(senderName)
+                    )}
+                </div>
+            `;
+
+    const verified =
+        message.senderVerified === true
+            ? `
+                <span
+                    class="verified-badge"
+                    title="Verified"
+                >
+                    ✓
+                </span>
+            `
+            : "";
+
+    const text =
+        message.text || "";
+
+    return `
+        <div
+            class="message-row ${
+                isMine ? "mine" : "other"
+            }"
+        >
+
+            ${!isMine ? avatar : ""}
+
+            <div class="message-content">
+
+                ${
+                    !isMine
+                        ? `
+                            <div class="message-sender">
+                                ${escapeHTML(senderName)}
+                                ${verified}
+                            </div>
+                        `
+                        : ""
+                }
+
+                <div class="message-bubble">
+                    ${escapeHTML(text)}
+                </div>
+
+                <div class="message-time">
+                    ${escapeHTML(
+                        formatTime(
+                            message.createdAt
+                        )
+                    )}
+                </div>
+
+            </div>
+
+            ${
+                isMine
+                    ? avatar
+                    : ""
+            }
+
+        </div>
+    `;
 }
 
 
 /* =========================================================
-   SEND MESSAGE
+   SEND TEXT MESSAGE
 ========================================================= */
 
-async function sendMessage() {
+async function sendTextMessage() {
+
+    /*
+     * First local control check.
+     */
+    if (!canSendMessages()) {
+
+        updateComposerState();
+
+        showBlockedMessage();
+
+        return;
+    }
 
     if (isSending) {
-        return;
-    }
-
-    if (!currentUser) {
-        showToast(
-            "Please log in first."
-        );
-        return;
-    }
-
-    if (!currentGroup) {
-        showToast(
-            "Group is not ready."
-        );
-        return;
-    }
-
-    if (
-        !userCanAccessGroup(
-            currentGroup
-        )
-    ) {
-
-        showToast(
-            "You don't have access to this group."
-        );
-
         return;
     }
 
@@ -1849,158 +1198,202 @@ async function sendMessage() {
         return;
     }
 
-    if (text.length > 2000) {
-
-        showToast(
-            "Message is too long."
-        );
-
+    if (!currentUser || !groupId) {
         return;
     }
 
-    isSending = true;
-
-    if (sendBtn) {
-        sendBtn.disabled = true;
-    }
-
+    /*
+     * Re-read group + user profile immediately
+     * before the financial/security-sensitive write.
+     *
+     * This prevents a stale listener state from
+     * being used after an admin has locked the chat.
+     */
     try {
 
-        /*
-           Re-check the group immediately
-           before sending.
+        isSending = true;
 
-           This protects against a group
-           being suspended while the page
-           remains open.
-        */
-
-        const groupRef =
-            doc(
-                db,
-                GROUPS_COLLECTION,
-                currentGroupId
-            );
-
-        const groupSnapshot =
-            await getDoc(groupRef);
+        const [
+            groupSnapshot,
+            profileSnapshot
+        ] = await Promise.all([
+            getDoc(
+                doc(
+                    db,
+                    GROUPS_COLLECTION,
+                    groupId
+                )
+            ),
+            getDoc(
+                doc(
+                    db,
+                    "users",
+                    currentUser.uid
+                )
+            )
+        ]);
 
         if (!groupSnapshot.exists()) {
 
-            throw new Error(
-                "GROUP_NOT_FOUND"
+            showToast(
+                "This group no longer exists."
             );
+
+            return;
         }
 
         const latestGroup = {
-            id: groupSnapshot.id,
+            groupId:
+                groupSnapshot.id,
             ...groupSnapshot.data()
         };
 
+        const latestProfile =
+            profileSnapshot.exists()
+                ? profileSnapshot.data()
+                : null;
+
+        const latestAccountControl =
+            getAccountControl(
+                latestProfile
+            );
+
+        const latestGroupControl =
+            getGroupControl(
+                latestGroup
+            );
+
+        /*
+         * Update local state with the freshest
+         * admin controls.
+         */
         currentGroup =
             latestGroup;
 
+        currentProfile =
+            latestProfile;
+
+        accountControl =
+            latestAccountControl;
+
+        groupControl =
+            latestGroupControl;
+
+        renderGroup();
+        updateComposerState();
+
         if (
-            !userCanAccessGroup(
-                latestGroup
-            )
+            !latestAccountControl.loaded ||
+            latestAccountControl.blocked ||
+            latestAccountControl.messagingRestricted ||
+            latestAccountControl.groupParticipationRestricted ||
+            latestGroupControl.chatLocked ||
+            !latestGroupControl.approved
         ) {
 
-            throw new Error(
-                "GROUP_ACCESS_DENIED"
-            );
-        }
+            showBlockedMessage();
 
-        /*
-           Create a message document.
-        */
+            return;
+        }
 
         const messageRef =
             doc(
                 collection(
                     db,
                     GROUPS_COLLECTION,
-                    currentGroupId,
+                    groupId,
                     GROUP_MESSAGES_COLLECTION
                 )
             );
 
-        const messageData = {
+        const messageId =
+            messageRef.id;
 
-            messageId:
-                messageRef.id,
-
-            groupId:
-                currentGroupId,
-
-            senderId:
-                currentUser.uid,
-
-            senderName:
-                getFullName(
-                    currentProfile ||
-                    {}
-                ),
-
-            senderUsername:
-                currentProfile?.username ||
-                "",
-
-            senderFirstName:
-                currentProfile?.firstName ||
-                "",
-
-            senderLastName:
-                currentProfile?.lastName ||
-                "",
-
-            senderPhotoURL:
-                currentProfile?.photoURL ||
-                "",
-
-            senderVerified:
-                currentProfile?.isVerified === true,
-
-            text,
-
-            type:
-                "text",
-
-            createdAt:
-                serverTimestamp(),
-
-            readBy: [
-                currentUser.uid
-            ],
-
-            deliveredTo: [
-                currentUser.uid
+        const senderName =
+            latestProfile?.displayName ||
+            [
+                latestProfile?.firstName,
+                latestProfile?.lastName
             ]
-        };
+                .filter(Boolean)
+                .join(" ") ||
+            currentUser.displayName ||
+            "User";
+
+        const senderUsername =
+            latestProfile?.username ||
+            "";
+
+        const senderFirstName =
+            latestProfile?.firstName ||
+            "";
+
+        const senderLastName =
+            latestProfile?.lastName ||
+            "";
+
+        const senderPhotoURL =
+            latestProfile?.photoURL ||
+            currentUser.photoURL ||
+            "";
+
+        const senderVerified =
+            latestProfile?.isVerified === true;
 
         await setDoc(
             messageRef,
-            messageData
+            {
+                messageId,
+                groupId,
+
+                senderId:
+                    currentUser.uid,
+
+                senderName,
+                senderUsername,
+                senderFirstName,
+                senderLastName,
+
+                senderPhotoURL,
+                senderVerified,
+
+                text,
+                type: "text",
+
+                createdAt:
+                    serverTimestamp(),
+
+                readBy: [
+                    currentUser.uid
+                ],
+
+                deliveredTo: [
+                    currentUser.uid
+                ]
+            }
         );
 
         /*
-           Update group preview.
-        */
-
+         * Update the group's latest-message preview.
+         */
         await updateDoc(
-            groupRef,
+            doc(
+                db,
+                GROUPS_COLLECTION,
+                groupId
+            ),
             {
                 lastMessage:
-                    text.slice(0, 200),
+                    text.substring(
+                        0,
+                        200
+                    ),
 
                 lastMessageSenderId:
                     currentUser.uid,
 
                 lastMessageSenderName:
-                    getFullName(
-                        currentProfile ||
-                        {}
-                    ),
+                    senderName,
 
                 lastMessageAt:
                     serverTimestamp(),
@@ -2010,143 +1403,76 @@ async function sendMessage() {
             }
         );
 
-        messageInput.value = "";
-
-        autoResizeInput();
-
-        updateSendButton();
+        if (messageInput) {
+            messageInput.value = "";
+        }
 
         stopTyping();
-
-        requestAnimationFrame(
-            scrollMessagesToBottom
-        );
 
     } catch (error) {
 
         console.error(
-            "Failed to send group message:",
+            "Send group message error:",
             error
         );
 
-        if (
-            error?.message ===
-            "GROUP_ACCESS_DENIED"
-        ) {
-
-            showToast(
-                "You no longer have access to this group."
-            );
-
-        } else if (
-            error?.message ===
-            "GROUP_NOT_FOUND"
-        ) {
-
-            showToast(
-                "This group no longer exists."
-            );
-
-        } else {
-
-            showToast(
-                "Message could not be sent. Please try again."
-            );
-        }
+        showToast(
+            error.message ||
+            "Failed to send message."
+        );
 
     } finally {
 
         isSending = false;
 
-        updateSendButton();
+        updateComposerState();
     }
 }
 
 
 /* =========================================================
-   MARK MESSAGES READ
+   BLOCKED MESSAGE
 ========================================================= */
 
-async function markMessagesRead(
-    messages = []
-) {
+function showBlockedMessage() {
 
     if (
-        !currentUser ||
-        !messages.length
+        accountControl.blocked
     ) {
-        return;
-    }
 
-    /*
-       We intentionally avoid performing
-       one Firestore write per message here.
+        showToast(
+            "Your account cannot send messages."
+        );
 
-       The scalable backend can later handle
-       group read receipts in batches.
-    */
+    } else if (
+        accountControl.messagingRestricted
+    ) {
 
-    const latestMessages =
-        messages.slice(-20);
+        showToast(
+            "Your group messaging access has been restricted."
+        );
 
-    for (const message of latestMessages) {
+    } else if (
+        accountControl.groupParticipationRestricted
+    ) {
 
-        if (
-            !message.messageId ||
-            message.senderId ===
-                currentUser.uid
-        ) {
-            continue;
-        }
+        showToast(
+            "Your group participation has been restricted."
+        );
 
-        const readBy =
-            Array.isArray(
-                message.readBy
-            )
-                ? message.readBy
-                : [];
+    } else if (
+        groupControl.chatLocked
+    ) {
 
-        if (
-            readBy.includes(
-                currentUser.uid
-            )
-        ) {
-            continue;
-        }
+        showToast(
+            "This group chat is locked by an admin."
+        );
 
-        try {
+    } else {
 
-            const messageRef =
-                doc(
-                    db,
-                    GROUPS_COLLECTION,
-                    currentGroupId,
-                    GROUP_MESSAGES_COLLECTION,
-                    message.messageId
-                );
-
-            await updateDoc(
-                messageRef,
-                {
-                    readBy:
-                        arrayUnion(
-                            currentUser.uid
-                        )
-                }
-            );
-
-        } catch (error) {
-
-            /*
-               Don't interrupt the chat
-               if a read receipt fails.
-            */
-
-            console.warn(
-                "Could not mark message read:",
-                error
-            );
-        }
+        showToast(
+            "You cannot send messages here."
+        );
     }
 }
 
@@ -2155,35 +1481,26 @@ async function markMessagesRead(
    TYPING
 ========================================================= */
 
-function getTypingRef() {
+async function setTyping() {
 
-    if (
-        !currentGroupId ||
-        !currentUser
-    ) {
-        return null;
+    if (!canSendMessages()) {
+        return;
     }
 
-    return doc(
-        db,
-        GROUPS_COLLECTION,
-        currentGroupId,
-        "typing",
-        currentUser.uid
-    );
-}
-
-
-async function startTyping() {
-
-    const typingRef =
-        getTypingRef();
-
-    if (!typingRef) {
+    if (!currentUser || !groupId) {
         return;
     }
 
     try {
+
+        const typingRef =
+            doc(
+                db,
+                GROUPS_COLLECTION,
+                groupId,
+                "typing",
+                currentUser.uid
+            );
 
         await setDoc(
             typingRef,
@@ -2192,15 +1509,24 @@ async function startTyping() {
                     currentUser.uid,
 
                 name:
-                    getFullName(
-                        currentProfile ||
-                        {}
-                    ),
+                    currentProfile?.displayName ||
+                    currentUser.displayName ||
+                    "User",
 
                 updatedAt:
                     serverTimestamp()
             }
         );
+
+        clearTimeout(
+            typingTimer
+        );
+
+        typingTimer =
+            setTimeout(
+                stopTyping,
+                2500
+            );
 
     } catch (error) {
 
@@ -2209,243 +1535,112 @@ async function startTyping() {
             error
         );
     }
-
-    clearTimeout(
-        typingTimeout
-    );
-
-    typingTimeout =
-        setTimeout(
-            stopTyping,
-            2500
-        );
 }
 
 
 async function stopTyping() {
 
     clearTimeout(
-        typingTimeout
+        typingTimer
     );
 
-    const typingRef =
-        getTypingRef();
-
-    if (!typingRef) {
+    if (!currentUser || !groupId) {
         return;
     }
 
     try {
 
-        await setDoc(
+        /*
+         * We intentionally use delete through
+         * the Firestore reference if available.
+         *
+         * If your existing rules prevent deletion,
+         * the typing document simply expires from
+         * the UI logic.
+         */
+        const typingRef =
+            doc(
+                db,
+                GROUPS_COLLECTION,
+                groupId,
+                "typing",
+                currentUser.uid
+            );
+
+        /*
+         * Do not perform unnecessary writes when
+         * the user was never allowed to type.
+         */
+        if (
+            !accountControl.loaded ||
+            accountControl.blocked
+        ) {
+            return;
+        }
+
+        /*
+         * The existing implementation can leave
+         * stale typing documents. The listener/UI
+         * should use updatedAt expiry as protection.
+         */
+        await updateDoc(
             typingRef,
             {
-                uid:
-                    currentUser.uid,
-
-                name:
-                    getFullName(
-                        currentProfile ||
-                        {}
-                    ),
-
                 updatedAt:
-                    serverTimestamp(),
+                    serverTimestamp()
+            }
+        ).catch(() => {});
 
-                active: false
+    } catch {
+        // Typing state is non-critical.
+    }
+}
+
+
+/* =========================================================
+   INPUT EVENTS
+========================================================= */
+
+function setupComposer() {
+
+    if (messageInput) {
+
+        messageInput.addEventListener(
+            "input",
+            () => {
+
+                if (!canSendMessages()) {
+                    return;
+                }
+
+                setTyping();
             }
         );
 
-    } catch (error) {
+        messageInput.addEventListener(
+            "keydown",
+            (event) => {
 
-        console.warn(
-            "Typing stop failed:",
-            error
-        );
-    }
-}
+                if (
+                    event.key === "Enter" &&
+                    !event.shiftKey
+                ) {
 
+                    event.preventDefault();
 
-/* =========================================================
-   TYPING LISTENER
-========================================================= */
-
-function listenToTyping() {
-
-    if (
-        !currentGroupId ||
-        !currentUser
-    ) {
-        return;
-    }
-
-    if (typingUnsubscribe) {
-        typingUnsubscribe();
-        typingUnsubscribe = null;
-    }
-
-    /*
-       The typing collection is intentionally
-       listened to directly.
-
-       The backend/rules will later restrict
-       this to group members.
-    */
-
-    const typingRef =
-        collection(
-            db,
-            GROUPS_COLLECTION,
-            currentGroupId,
-            "typing"
-        );
-
-    typingUnsubscribe =
-        onSnapshot(
-            typingRef,
-            snapshot => {
-
-                const names = [];
-
-                const now =
-                    Date.now();
-
-                snapshot.forEach(
-                    typingDoc => {
-
-                        const data =
-                            typingDoc.data();
-
-                        if (
-                            typingDoc.id ===
-                            currentUser.uid
-                        ) {
-                            return;
-                        }
-
-                        if (
-                            data.active === false
-                        ) {
-                            return;
-                        }
-
-                        const updated =
-                            getTimestampValue(
-                                data.updatedAt
-                            );
-
-                        /*
-                           Ignore stale typing
-                           records.
-                        */
-
-                        if (
-                            updated &&
-                            now - updated >
-                                5000
-                        ) {
-                            return;
-                        }
-
-                        if (data.name) {
-                            names.push(
-                                data.name
-                            );
-                        }
-                    }
-                );
-
-                renderTyping(
-                    names
-                );
-            },
-            error => {
-
-                console.warn(
-                    "Typing listener error:",
-                    error
-                );
+                    sendTextMessage();
+                }
             }
         );
-}
-
-
-/* =========================================================
-   TYPING UI
-========================================================= */
-
-function renderTyping(names = []) {
-
-    if (!typingArea) {
-        return;
     }
 
-    if (!names.length) {
+    if (sendBtn) {
 
-        typingArea.textContent = "";
-
-        return;
+        sendBtn.addEventListener(
+            "click",
+            sendTextMessage
+        );
     }
-
-    if (names.length === 1) {
-
-        typingArea.textContent =
-            `${names[0]} is typing...`;
-
-        return;
-    }
-
-    if (names.length === 2) {
-
-        typingArea.textContent =
-            `${names[0]} and ${names[1]} are typing...`;
-
-        return;
-    }
-
-    typingArea.textContent =
-        `${names.length} people are typing...`;
-}
-
-
-/* =========================================================
-   INPUT
-========================================================= */
-
-function autoResizeInput() {
-
-    if (!messageInput) {
-        return;
-    }
-
-    messageInput.style.height =
-        "auto";
-
-    const maxHeight = 110;
-
-    messageInput.style.height =
-        `${Math.min(
-            messageInput.scrollHeight,
-            maxHeight
-        )}px`;
-}
-
-
-function updateSendButton() {
-
-    if (!sendBtn) {
-        return;
-    }
-
-    const text =
-        String(
-            messageInput?.value || ""
-        ).trim();
-
-    sendBtn.disabled =
-        !text ||
-        isSending ||
-        !currentUser;
 }
 
 
@@ -2453,330 +1648,113 @@ function updateSendButton() {
    EMOJI
 ========================================================= */
 
-function addEmoji() {
+function setupEmoji() {
 
-    if (!messageInput) {
+    if (!emojiBtn || !messageInput) {
         return;
     }
 
-    const emoji =
-        "😊";
-
-    const start =
-        messageInput.selectionStart ??
-        messageInput.value.length;
-
-    const end =
-        messageInput.selectionEnd ??
-        messageInput.value.length;
-
-    const current =
-        messageInput.value;
-
-    messageInput.value =
-        current.slice(0, start) +
-        emoji +
-        current.slice(end);
-
-    messageInput.focus();
-
-    const position =
-        start + emoji.length;
-
-    messageInput.setSelectionRange(
-        position,
-        position
-    );
-
-    autoResizeInput();
-
-    updateSendButton();
-}
-
-
-/* =========================================================
-   NAVIGATION
-========================================================= */
-
-function goBackToGroups() {
-
-    window.location.href =
-        "groups.html";
-}
-
-
-function goToLogin() {
-
-    window.location.href =
-        "login.html";
-}
-
-
-/* =========================================================
-   EVENT LISTENERS
-========================================================= */
-
-backBtn?.addEventListener(
-    "click",
-    goBackToGroups
-);
-
-backToGroupsBtn?.addEventListener(
-    "click",
-    goBackToGroups
-);
-
-groupInfoBtn?.addEventListener(
-    "click",
-    openGroupInfo
-);
-
-closeInfoBtn?.addEventListener(
-    "click",
-    closeGroupInfo
-);
-
-groupInfoOverlay?.addEventListener(
-    "click",
-    event => {
-
-        if (
-            event.target ===
-            groupInfoOverlay
-        ) {
-            closeGroupInfo();
-        }
-    }
-);
-
-emojiBtn?.addEventListener(
-    "click",
-    addEmoji
-);
-
-
-messageInput?.addEventListener(
-    "input",
-    () => {
-
-        autoResizeInput();
-
-        updateSendButton();
-
-        if (
-            messageInput.value.trim()
-        ) {
-            startTyping();
-        } else {
-            stopTyping();
-        }
-    }
-);
-
-
-messageInput?.addEventListener(
-    "keydown",
-    event => {
-
-        /*
-           Enter sends.
-           Shift + Enter creates
-           a new line.
-        */
-
-        if (
-            event.key === "Enter" &&
-            !event.shiftKey
-        ) {
-
-            event.preventDefault();
-
-            if (
-                messageInput.value.trim()
-            ) {
-                sendMessage();
-            }
-        }
-    }
-);
-
-
-messageForm?.addEventListener(
-    "submit",
-    event => {
-
-        event.preventDefault();
-
-        sendMessage();
-    }
-);
-
-
-/* =========================================================
-   ESCAPE CLOSES INFO SHEET
-========================================================= */
-
-document.addEventListener(
-    "keydown",
-    event => {
-
-        if (
-            event.key === "Escape"
-        ) {
-            closeGroupInfo();
-        }
-    }
-);
-
-
-/* =========================================================
-   AUTH STARTUP
-========================================================= */
-
-async function startGroupChat(user) {
-
-    currentUser =
-        user;
-
-    if (!currentUser) {
-        goToLogin();
-        return;
-    }
-
-    currentGroupId =
-        getGroupIdFromUrl();
-
-    if (!currentGroupId) {
-
-        showAccessBlock(
-            "Group not found",
-            "No group was selected."
-        );
-
-        return;
-    }
-
-    /*
-       Use cached profile immediately
-       when available.
-    */
-
-    currentProfile =
-        getCachedCurrentProfile();
-
-    /*
-       Load the user's actual profile
-       before checking private-group
-       access.
-    */
-
-    try {
-
-        const profileRef =
-            doc(
-                db,
-                "users",
-                currentUser.uid
-            );
-
-        const profileSnapshot =
-            await getDoc(profileRef);
-
-        if (profileSnapshot.exists()) {
-
-            currentProfile =
-                profileSnapshot.data();
-
-            /*
-               Keep the cache compatible
-               with the existing CONNECTA
-               profile system.
-            */
-
-            try {
-
-                localStorage.setItem(
-                    PROFILE_CACHE_KEY,
-                    JSON.stringify(
-                        currentProfile
-                    )
-                );
-
-            } catch (error) {
-                // Ignore cache errors.
-            }
-        }
-
-    } catch (error) {
-
-        console.warn(
-            "Could not load current profile:",
-            error
-        );
-    }
-
-    const allowed =
-        await loadGroup();
-
-    if (!allowed) {
-        return;
-    }
-
-    /*
-       Start realtime group listener
-       after the initial access check.
-    */
-
-    listenToGroup();
-
-    /*
-       Start message realtime listener.
-    */
-
-    listenToMessages();
-
-    /*
-       Start typing listener.
-    */
-
-    listenToTyping();
-
-    /*
-       Give the browser a moment to
-       calculate the message area before
-       scrolling.
-    */
-
-    setTimeout(
-        scrollMessagesToBottom,
-        150
-    );
-}
-
-
-/* =========================================================
-   AUTH STATE
-========================================================= */
-
-const unsubscribeAuth =
-    onAuthStateChanged(
-        auth,
-        user => {
-
-            if (!user) {
-
-                cleanup();
-
-                goToLogin();
-
+    emojiBtn.addEventListener(
+        "click",
+        () => {
+
+            if (!canSendMessages()) {
                 return;
             }
 
-            startGroupChat(
-                user
-            );
+            const emoji =
+                "😊";
+
+            messageInput.value +=
+                emoji;
+
+            messageInput.focus();
         }
     );
+}
+
+
+/* =========================================================
+   GROUP INFO
+========================================================= */
+
+function openGroupInfo() {
+
+    if (!groupInfoSheet) {
+        return;
+    }
+
+    groupInfoSheet.classList.add(
+        "active"
+    );
+}
+
+
+function closeGroupInfo() {
+
+    if (!groupInfoSheet) {
+        return;
+    }
+
+    groupInfoSheet.classList.remove(
+        "active"
+    );
+}
+
+
+function setupGroupInfo() {
+
+    if (infoBtn) {
+
+        infoBtn.addEventListener(
+            "click",
+            openGroupInfo
+        );
+    }
+
+    const closeInfoBtn =
+        document.getElementById(
+            "closeGroupInfo"
+        );
+
+    if (closeInfoBtn) {
+
+        closeInfoBtn.addEventListener(
+            "click",
+            closeGroupInfo
+        );
+    }
+}
+
+
+/* =========================================================
+   BACK BUTTON
+========================================================= */
+
+function setupBackButton() {
+
+    if (!backBtn) {
+        return;
+    }
+
+    backBtn.addEventListener(
+        "click",
+        () => {
+
+            if (
+                window.history.length > 1
+            ) {
+
+                window.history.back();
+
+            } else {
+
+                window.location.href =
+                    "groups.html";
+            }
+        }
+    );
+}
 
 
 /* =========================================================
@@ -2785,47 +1763,121 @@ const unsubscribeAuth =
 
 function cleanup() {
 
-    if (groupUnsubscribe) {
-
-        groupUnsubscribe();
-
-        groupUnsubscribe = null;
+    if (stopGroup) {
+        stopGroup();
+        stopGroup = null;
     }
 
-    if (messagesUnsubscribe) {
-
-        messagesUnsubscribe();
-
-        messagesUnsubscribe = null;
+    if (stopMessages) {
+        stopMessages();
+        stopMessages = null;
     }
 
-    if (typingUnsubscribe) {
-
-        typingUnsubscribe();
-
-        typingUnsubscribe = null;
+    if (stopOwnProfile) {
+        stopOwnProfile();
+        stopOwnProfile = null;
     }
 
     clearTimeout(
-        typingTimeout
+        typingTimer
     );
+}
 
-    currentUser = null;
-    currentProfile = null;
-    currentGroup = null;
-    currentGroupId = null;
-    currentMembership = false;
+
+window.addEventListener(
+    "beforeunload",
+    cleanup
+);
+
+
+/* =========================================================
+   AUTH
+========================================================= */
+
+function startAuth() {
+
+    return new Promise((resolve) => {
+
+        const unsubscribe =
+            onAuthStateChanged(
+                auth,
+                (user) => {
+
+                    if (!user) {
+
+                        window.location.href =
+                            "login.html";
+
+                        return;
+                    }
+
+                    currentUser = user;
+
+                    unsubscribe();
+
+                    /*
+                     * IMPORTANT:
+                     * Load admin account controls
+                     * before enabling the composer.
+                     */
+                    listenToOwnProfile();
+
+                    resolve(user);
+                }
+            );
+    });
 }
 
 
 /* =========================================================
-   PAGE EXIT
+   INITIALIZATION
 ========================================================= */
 
-window.addEventListener(
-    "pagehide",
-    () => {
+async function init() {
 
-        cleanup();
+    groupId =
+        getGroupId();
+
+    if (!groupId) {
+
+        window.location.href =
+            "groups.html";
+
+        return;
     }
-);
+
+    try {
+
+        await startAuth();
+
+        loadCachedMessages();
+
+        await loadGroup();
+
+        setupMessageListener();
+
+        setupComposer();
+
+        setupEmoji();
+
+        setupGroupInfo();
+
+        setupBackButton();
+
+        updateComposerState();
+
+    } catch (error) {
+
+        console.error(
+            "Group chat initialization error:",
+            error
+        );
+
+        showToast(
+            "Unable to open group chat."
+        );
+    }
+}
+
+
+init();
