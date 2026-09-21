@@ -2088,19 +2088,23 @@ function renderMessage(message) {
 
             ? `
                 <div class="message-avatar">
+
                     <img
                         src="${escapeHTML(photo)}"
                         alt=""
                         loading="lazy"
                     >
+
                 </div>
             `
 
             : `
                 <div class="message-avatar">
+
                     ${escapeHTML(
                         getInitials(senderName)
                     )}
+
                 </div>
             `;
 
@@ -2112,6 +2116,7 @@ function renderMessage(message) {
                 <span
                     class="verified-badge"
                     title="Verified"
+                    aria-label="Verified"
                 >
                     ✓
                 </span>
@@ -2128,6 +2133,10 @@ function renderMessage(message) {
 
     let body = "";
 
+
+    /* =====================================================
+       PHOTO MESSAGE
+    ===================================================== */
 
     if (
         messageType === "image" ||
@@ -2156,31 +2165,30 @@ function renderMessage(message) {
             `
 
             : `
-                <p class="message-text">
+                <span class="message-text">
                     Photo unavailable
-                </p>
+                </span>
             `;
 
-    } else {
-
-        body = `
-            <p class="message-text">
-                ${escapeHTML(
-                    message.text || ""
-                )}
-            </p>
-        `;
     }
 
 
-    /*
-     * IMPORTANT:
-     *
-     * The timestamp uses .message-time,
-     * which matches the CSS in group-chat.html.
-     *
-     * Previously this was .message-meta.
-     */
+    /* =====================================================
+       TEXT MESSAGE
+    ===================================================== */
+
+    else {
+
+        body = `
+            <span class="message-text">
+                ${escapeHTML(
+                    message.text || ""
+                )}
+            </span>
+        `;
+
+    }
+
 
     const timestamp =
         formatTime(
@@ -2188,14 +2196,17 @@ function renderMessage(message) {
         );
 
 
+    /* =====================================================
+       MESSAGE ROW
+    ===================================================== */
+
     return `
 
         <div
-            class="message-row ${
-                isMine
-                    ? "mine"
-                    : "other"
-            }"
+            class="
+                message-row
+                ${isMine ? "mine" : "other"}
+            "
             data-message-id="${escapeHTML(
                 getMessageId(message)
             )}"
@@ -2207,7 +2218,16 @@ function renderMessage(message) {
                     : ""
             }
 
-            <div class="message-content">
+
+            <div
+                class="message-content"
+                style="
+                    flex:0 1 auto;
+                    width:max-content;
+                    max-width:min(78vw,390px);
+                    min-width:0;
+                "
+            >
 
                 ${
                     !isMine
@@ -2225,17 +2245,57 @@ function renderMessage(message) {
                         : ""
                 }
 
-                <div class="message-bubble">
 
-                    ${body}
+                <div
+                    class="
+                        message-bubble
+                        ${messageType === "image" ||
+                          messageType === "photo"
+                            ? "photo-message"
+                            : ""}
+                    "
+                    style="
+                        display:inline-flex;
+                        width:max-content;
+                        max-width:100%;
+                        min-width:0;
+                        flex-direction:column;
+                        align-items:flex-end;
+                    "
+                >
 
-                    <div class="message-time">
-                        ${escapeHTML(timestamp)}
+                    <div
+                        style="
+                            width:max-content;
+                            max-width:100%;
+                            min-width:0;
+                        "
+                    >
+
+                        ${body}
+
+                    </div>
+
+
+                    <div
+                        class="message-time"
+                        style="
+                            width:max-content;
+                            white-space:nowrap;
+                            align-self:flex-end;
+                        "
+                    >
+
+                        ${escapeHTML(
+                            timestamp
+                        )}
+
                     </div>
 
                 </div>
 
             </div>
+
 
             ${
                 isMine
@@ -2244,9 +2304,9 @@ function renderMessage(message) {
             }
 
         </div>
+
     `;
 }
-
 
 /* =========================================================
    SENDER NAME
