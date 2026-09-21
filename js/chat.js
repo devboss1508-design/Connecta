@@ -3761,6 +3761,72 @@ function applyChatMessagingControl(
             profile
         );
 
+  /*
+ * Account permissions are still being verified.
+ * Fail closed.
+ */
+if (
+    control.status === "checking"
+) {
+
+    const input =
+        $("messageInput");
+
+    const sendButton =
+        $("sendButton");
+
+    const attachButton =
+        $("attachButton");
+
+    const photoInput =
+        $("photoInput");
+
+
+    if (input) {
+
+        input.disabled =
+            true;
+
+        input.placeholder =
+            "Checking account permissions...";
+
+    }
+
+
+    if (sendButton) {
+
+        sendButton.disabled =
+            true;
+
+    }
+
+
+    if (attachButton) {
+
+        attachButton.disabled =
+            true;
+
+    }
+
+
+    if (photoInput) {
+
+        photoInput.disabled =
+            true;
+
+    }
+
+
+    showChatRestrictionNotice(
+        "Checking your CONNECTA account permissions...",
+        "checking"
+    );
+
+
+    return control;
+
+}
+
 
     const form =
         $("messageForm");
