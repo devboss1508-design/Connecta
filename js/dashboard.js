@@ -1,9 +1,21 @@
-import { auth, db } from "./firebase.js";
+/* =========================================================
+   CONNECTA — DASHBOARD
+   File: js/dashboard.js
+
+   AUTHENTICATION
+   - Uses globalAuth.js
+   - Firebase Authentication is the source of truth
+   - Same logged-in user is used across CONNECTA pages
+========================================================= */
 
 import {
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+  db
+} from "./firebase.js";
+
+import {
+  getCurrentConnectaUser,
+  logout
+} from "./globalAuth.js";
 
 import {
   collection,
@@ -23,7 +35,8 @@ import {
    BASIC HELPERS
 ========================================================= */
 
-const $ = (id) => document.getElementById(id);
+const $ = (id) =>
+  document.getElementById(id);
 
 let currentUser = null;
 let currentProfile = null;
@@ -50,10 +63,12 @@ const PROFILE_CACHE_KEY =
 
 /* =========================================================
    SAFE PROFILE DATA
-   Only fields needed by dashboard UI are cached.
 ========================================================= */
 
-function publicProfileData(uid, profile = {}) {
+function publicProfileData(
+  uid,
+  profile = {}
+) {
 
   return {
 
@@ -86,10 +101,14 @@ function publicProfileData(uid, profile = {}) {
       profile.isVerified === true,
 
     followersCount:
-      Number(profile.followersCount || 0),
+      Number(
+        profile.followersCount || 0
+      ),
 
     followingCount:
-      Number(profile.followingCount || 0)
+      Number(
+        profile.followingCount || 0
+      )
 
   };
 
@@ -148,12 +167,6 @@ function saveDashboardCache(uid) {
               currentProfile
             ),
 
-            /*
-            The current user's following list
-            is useful for rendering Follow buttons.
-            It is not a secret field.
-            */
-
             following:
               Array.isArray(
                 currentProfile.following
@@ -171,11 +184,12 @@ function saveDashboardCache(uid) {
 
       users:
         Array.isArray(onlineUsers)
-          ? onlineUsers.map(user =>
-              publicProfileData(
-                user.uid,
-                user
-              )
+          ? onlineUsers.map(
+              user =>
+                publicProfileData(
+                  user.uid,
+                  user
+                )
             )
           : [],
 
@@ -227,9 +241,7 @@ function loadDashboardCache(uid) {
   let hasData = false;
 
 
-  /* =====================================================
-     PROFILE
-  ===================================================== */
+  /* PROFILE */
 
   if (
     cache.profile &&
@@ -248,9 +260,7 @@ function loadDashboardCache(uid) {
   }
 
 
-  /* =====================================================
-     USERS
-  ===================================================== */
+  /* USERS */
 
   if (
     Array.isArray(cache.users) &&
@@ -258,11 +268,12 @@ function loadDashboardCache(uid) {
   ) {
 
     onlineUsers =
-      cache.users.map(user =>
-        publicProfileData(
-          user.uid,
-          user
-        )
+      cache.users.map(
+        user =>
+          publicProfileData(
+            user.uid,
+            user
+          )
       );
 
     renderOnline(
@@ -274,9 +285,7 @@ function loadDashboardCache(uid) {
   }
 
 
-  /* =====================================================
-     CHATS
-  ===================================================== */
+  /* CHATS */
 
   if (
     Array.isArray(cache.chats)
@@ -338,16 +347,17 @@ function saveProfileToCache(
       getProfileCache();
 
 
-    cache[uid] =
-      {
-        ...publicProfileData(
-          uid,
-          profile
-        ),
+    cache[uid] = {
 
-        cachedAt:
-          Date.now()
-      };
+      ...publicProfileData(
+        uid,
+        profile
+      ),
+
+      cachedAt:
+        Date.now()
+
+    };
 
 
     localStorage.setItem(
@@ -393,13 +403,17 @@ function getCachedProfile(uid) {
    INITIALS
 ========================================================= */
 
-function initials(name = "U") {
+function initials(
+  name = "U"
+) {
 
   return String(name)
     .trim()
     .split(/\s+/)
     .slice(0, 2)
-    .map(x => x[0])
+    .map(
+      x => x[0]
+    )
     .join("")
     .toUpperCase() || "U";
 
@@ -420,11 +434,6 @@ function getFullName(
       user.displayName || ""
     ).trim();
 
-
-  /*
-  Never show the placeholder
-  as an actual user's name.
-  */
 
   if (
     displayName &&
@@ -555,22 +564,14 @@ function showToast(message) {
 
 }
 
+
 /* =========================================================
    ADMIN ACCOUNT CONTROL
-   Central account-level restriction check.
-
-   Controlled by Admin Panel:
-   - active
-   - suspended
-   - banned
-
-   IMPORTANT:
-   This is a frontend UX/security layer.
-   Firestore/backend rules must also enforce
-   these restrictions server-side.
 ========================================================= */
 
-function getAccountControl(profile = {}) {
+function getAccountControl(
+  profile = {}
+) {
 
   const status =
     String(
@@ -581,10 +582,14 @@ function getAccountControl(profile = {}) {
   if (status === "banned") {
 
     return {
+
       blocked: true,
+
       status: "banned",
+
       message:
         "Your CONNECTA account has been banned."
+
     };
 
   }
@@ -593,22 +598,31 @@ function getAccountControl(profile = {}) {
   if (status === "suspended") {
 
     return {
+
       blocked: true,
+
       status: "suspended",
+
       message:
         "Your CONNECTA account is currently suspended."
+
     };
 
   }
 
 
   return {
+
     blocked: false,
+
     status: "active",
+
     message: ""
+
   };
 
 }
+
 
 /* =========================================================
    ACCOUNT BLOCK SCREEN
@@ -735,27 +749,13 @@ function showAccountBlockedScreen(
       "click",
       async () => {
 
-        try {
-
-          await signOut(auth);
-
-        } catch (error) {
-
-          console.error(
-            "Restricted-account logout failed:",
-            error
-          );
-
-        }
-
-        location.replace(
-          "login.html"
-        );
+        await logout(true);
 
       }
     );
 
 }
+
 
 /* =========================================================
    AVATAR
@@ -767,9 +767,7 @@ function avatarMarkup(
 ) {
 
   const name =
-    getFullName(
-      user
-    );
+    getFullName(user);
 
 
   const photo =
@@ -799,10 +797,11 @@ function avatarMarkup(
 
 /* =========================================================
    VERIFIED BADGE
-   Blue verified badge — same visual style as Profile
 ========================================================= */
 
-function verifiedBadge(user = {}) {
+function verifiedBadge(
+  user = {}
+) {
 
   if (
     user.isVerified !== true
@@ -836,6 +835,7 @@ function verifiedBadge(user = {}) {
   `;
 
 }
+
 
 /* =========================================================
    CURRENT USER PROFILE
@@ -967,11 +967,6 @@ function renderProfile(
   }
 
 
-  /*
-  Balance is intentionally read only
-  from the current user's live profile.
-  */
-
   const balanceAmount =
     $("balanceAmount");
 
@@ -1050,39 +1045,25 @@ function renderOnline(
 
       .sort((a, b) => {
 
-        /*
-        Current user first.
-        */
-
         if (
           a.uid === currentUser?.uid
         ) {
-
           return -1;
-
         }
 
 
         if (
           b.uid === currentUser?.uid
         ) {
-
           return 1;
-
         }
 
-
-        /*
-        Online users before offline users.
-        */
 
         if (
           a.isOnline === true &&
           b.isOnline !== true
         ) {
-
           return -1;
-
         }
 
 
@@ -1090,9 +1071,7 @@ function renderOnline(
           a.isOnline !== true &&
           b.isOnline === true
         ) {
-
           return 1;
-
         }
 
 
@@ -1100,10 +1079,6 @@ function renderOnline(
 
       });
 
-
-  /*
-  ONLINE COUNT
-  */
 
   const onlineCount =
     onlineUsers.filter(
@@ -1220,7 +1195,6 @@ function renderOnline(
 
             </div>
 
-
             ${
               isMe
 
@@ -1260,10 +1234,6 @@ function renderOnline(
     ).join("");
 
 
-  /*
-  FOLLOW BUTTONS
-  */
-
   box
     .querySelectorAll(
       "[data-follow]"
@@ -1277,7 +1247,6 @@ function renderOnline(
 
             event.stopPropagation();
 
-
             await toggleFollow(
               button.dataset.follow
             );
@@ -1288,10 +1257,6 @@ function renderOnline(
       }
     );
 
-
-  /*
-  USER CARD → PROFILE
-  */
 
   box
     .querySelectorAll(
@@ -1309,9 +1274,7 @@ function renderOnline(
                 "[data-follow]"
               )
             ) {
-
               return;
-
             }
 
 
@@ -1351,9 +1314,7 @@ async function toggleFollow(
     !targetUid ||
     targetUid === currentUser.uid
   ) {
-
     return;
-
   }
 
 
@@ -1387,12 +1348,15 @@ async function toggleFollow(
           currentSnap,
           targetSnap
         ] = await Promise.all([
+
           transaction.get(
             currentRef
           ),
+
           transaction.get(
             targetRef
           )
+
         ]);
 
 
@@ -1495,10 +1459,12 @@ async function toggleFollow(
         transaction.update(
           currentRef,
           {
+
             following,
 
             followingCount:
               following.length
+
           }
         );
 
@@ -1506,11 +1472,13 @@ async function toggleFollow(
         transaction.update(
           targetRef,
           {
+
             followers:
               targetFollowers,
 
             followersCount:
               targetFollowers.length
+
           }
         );
 
@@ -1526,10 +1494,6 @@ async function toggleFollow(
 
         };
 
-
-        /*
-        Update local online user copy.
-        */
 
         const targetIndex =
           onlineUsers.findIndex(
@@ -1557,10 +1521,6 @@ async function toggleFollow(
 
         }
 
-
-        /*
-        Save immediately to local cache.
-        */
 
         saveProfileToCache(
           currentUid,
@@ -1628,10 +1588,6 @@ async function getUserProfile(
   }
 
 
-  /*
-  1. Live user list.
-  */
-
   const liveUser =
     onlineUsers.find(
       user =>
@@ -1646,15 +1602,10 @@ async function getUserProfile(
       liveUser
     );
 
-
     return liveUser;
 
   }
 
-
-  /*
-  2. Local cache.
-  */
 
   const cached =
     getCachedProfile(uid);
@@ -1666,15 +1617,10 @@ async function getUserProfile(
       uid
     );
 
-
     return cached;
 
   }
 
-
-  /*
-  3. Firestore.
-  */
 
   try {
 
@@ -1693,11 +1639,14 @@ async function getUserProfile(
     ) {
 
       const profile = {
+
         uid,
+
         ...publicProfileData(
           uid,
           snap.data()
         )
+
       };
 
 
@@ -1791,9 +1740,7 @@ async function refreshUserProfile(
           if (
             chat.otherUid !== uid
           ) {
-
             return chat;
-
           }
 
 
@@ -1918,11 +1865,9 @@ function renderChats(
 
         const href =
           otherUid
-
             ? `chat.html?uid=${encodeURIComponent(
                 otherUid
               )}`
-
             : "#";
 
 
@@ -1964,7 +1909,6 @@ function renderChats(
                 }
               </span>
             `
-
             : "";
 
 
@@ -1988,7 +1932,6 @@ function renderChats(
 
               ${
                 chat.photoURL
-
                   ? `
                     <img
                       src="${escapeHtml(
@@ -2000,10 +1943,7 @@ function renderChats(
                       loading="lazy"
                     >
                   `
-
-                  : initials(
-                      name
-                    )
+                  : initials(name)
               }
 
             </div>
@@ -2102,9 +2042,7 @@ async function listenToChats(
                   data.participants
                 )
               ) {
-
                 return;
-
               }
 
 
@@ -2113,9 +2051,7 @@ async function listenToChats(
                   uid
                 )
               ) {
-
                 return;
-
               }
 
 
@@ -2130,11 +2066,6 @@ async function listenToChats(
                 return;
               }
 
-
-              /*
-              Find profile from live users,
-              cache or chat metadata.
-              */
 
               const knownUser =
                 onlineUsers.find(
@@ -2153,11 +2084,9 @@ async function listenToChats(
 
               const name =
                 cachedUser
-
                   ? getFullName(
                       cachedUser
                     )
-
                   : (
                       data.otherUserName ||
                       "CONNECTA User"
@@ -2274,9 +2203,7 @@ function formatTimestamp(
   if (
     !timestamp?.toDate
   ) {
-
     return "";
-
   }
 
 
@@ -2341,6 +2268,7 @@ async function setPresence(
       ),
 
       {
+
         isOnline:
           online,
 
@@ -2382,20 +2310,10 @@ function startPresence() {
   }
 
 
-  /*
-  Initial presence write
-  does not block dashboard.
-  */
-
   setPresence(
     true
   );
 
-
-  /*
-  Keep user online while
-  dashboard remains open.
-  */
 
   presenceInterval =
     setInterval(
@@ -2455,9 +2373,7 @@ function stopDashboardListeners() {
 
 function setupUI() {
 
-  /*
-  MENU
-  */
+  /* MENU */
 
   const menuBtn =
     $("menuBtn");
@@ -2523,9 +2439,7 @@ function setupUI() {
   }
 
 
-  /*
-  PROFILE BUTTON
-  */
+  /* PROFILE BUTTON */
 
   const profileBtn =
     $("profileBtn");
@@ -2553,9 +2467,7 @@ function setupUI() {
   }
 
 
-  /*
-  CONNECTION BUTTON
-  */
+  /* CONNECTION BUTTON */
 
   const connectionBtn =
     $("connectionBtn");
@@ -2577,9 +2489,7 @@ function setupUI() {
   }
 
 
-  /*
-  ONLINE SEARCH
-  */
+  /* ONLINE SEARCH */
 
   const onlineSearchBtn =
     $("onlineSearchBtn");
@@ -2637,9 +2547,7 @@ function setupUI() {
   }
 
 
-  /*
-  CHAT SEARCH
-  */
+  /* CHAT SEARCH */
 
   const chatSearchBtn =
     $("chatSearchBtn");
@@ -2698,9 +2606,7 @@ function setupUI() {
   }
 
 
-  /*
-  COMING SOON
-  */
+  /* COMING SOON */
 
   document
     .querySelectorAll(
@@ -2715,7 +2621,6 @@ function setupUI() {
 
             event.preventDefault();
 
-
             showToast(
               `${element.dataset.coming} is coming in the next module.`
             );
@@ -2727,9 +2632,7 @@ function setupUI() {
     );
 
 
-  /*
-  LOGOUT
-  */
+  /* LOGOUT */
 
   const logoutBtn =
     $("logoutBtn");
@@ -2755,8 +2658,8 @@ function setupUI() {
           stopDashboardListeners();
 
 
-          await signOut(
-            auth
+          await logout(
+            true
           );
 
 
@@ -2787,536 +2690,410 @@ function setupUI() {
 
 
 /* =========================================================
-   AUTH STATE
+   CONNECTA SESSION START
 ========================================================= */
 
-onAuthStateChanged(
-  auth,
-  async user => {
+async function initializeDashboard() {
 
-    /*
-    If signed out.
-    */
+  /*
+   * globalAuth.js is now the single source
+   * of truth for the logged-in user.
+   *
+   * allowBlocked:true lets the dashboard
+   * display its existing account restriction
+   * screen instead of globalAuth immediately
+   * redirecting the user.
+   */
 
-    if (!user) {
+  const session =
+    await getCurrentConnectaUser({
+      redirect: true,
+      allowBlocked: true
+    });
 
-      stopDashboardListeners();
 
+  /*
+   * No authenticated user.
+   */
 
-      location.replace(
-        "login.html"
-      );
+  if (!session) {
+    return;
+  }
 
 
-      return;
+  /* =======================================================
+     SAME USER USED THROUGHOUT CONNECTA
+  ======================================================= */
 
-    }
+  currentUser =
+    session.authUser;
 
+  currentProfile =
+    session.profile || {
 
-    /*
-    Prevent duplicate listeners.
-    */
+      uid:
+        currentUser.uid,
 
-    stopDashboardListeners();
+      displayName:
+        currentUser.displayName || "",
 
+      photoURL:
+        currentUser.photoURL || "",
 
-    currentUser =
-      user;
+      isOnline:
+        true
 
+    };
 
-    /* =====================================================
-       INSTANT CACHE
-    ===================================================== */
 
-    loadDashboardCache(
-      user.uid
-    );
+  console.log(
+    "[CONNECTA] Logged-in user:",
+    currentUser.uid
+  );
 
 
-    /*
-    Individual profile cache fallback.
-    */
+  /* =======================================================
+     ACCOUNT STATUS
+  ======================================================= */
 
-    if (!currentProfile) {
-
-      const cachedProfile =
-        getCachedProfile(
-          user.uid
-        );
-
-
-      if (cachedProfile) {
-
-        currentProfile =
-          cachedProfile;
-
-
-        renderProfile(
-          cachedProfile
-        );
-
-      }
-
-    }
-
-
-    /* =====================================================
-       CURRENT USER PROFILE
-    ===================================================== */
-
-    try {
-
-      const userRef =
-        doc(
-          db,
-          "users",
-          user.uid
-        );
-
-
-      const snap =
-        await getDoc(
-          userRef
-        );
-
-
-      let profile =
-        snap.exists()
-          ? {
-              uid: user.uid,
-              ...snap.data()
-            }
-          : {
-              uid: user.uid
-            };
-
-
-      /*
-      Synchronize Firebase Auth display name
-      if Firestore profile is missing it.
-      */
-
-      const authDisplayName =
-        String(
-          user.displayName || ""
-        ).trim();
-
-
-      if (
-        !profile.displayName &&
-        authDisplayName
-      ) {
-
-        profile.displayName =
-          authDisplayName;
-
-      }
-
-
-      if (
-        !profile.firstName &&
-        authDisplayName
-      ) {
-
-        const parts =
-          authDisplayName
-            .trim()
-            .split(/\s+/);
-
-
-        profile.firstName =
-          parts.shift() || "";
-
-
-        profile.lastName =
-          parts.join(" ") || "";
-
-      }
-
-
-      /*
-      Repair missing name fields.
-      */
-
-      const originalData =
-        snap.exists()
-          ? snap.data()
-          : {};
-
-
-      if (
-        authDisplayName &&
-        (
-          !snap.exists() ||
-          !originalData.displayName ||
-          !originalData.firstName ||
-          !originalData.lastName
-        )
-      ) {
-
-        await setDoc(
-
-          userRef,
-
-          {
-            displayName:
-              profile.displayName,
-
-            firstName:
-              profile.firstName,
-
-            lastName:
-              profile.lastName
-
-          },
-
-          {
-            merge: true
-          }
-
-        );
-
-      }
-
-
-      /*
-      Keep the LIVE profile in memory.
-      */
-
-      currentProfile =
-    profile;
-
-
-/* =====================================================
-   ADMIN ACCOUNT CONTROL
-===================================================== */
-
-const accountControl =
+  const accountControl =
     getAccountControl(
-        profile
+      currentProfile
     );
 
 
-if (accountControl.blocked) {
+  if (
+    accountControl.blocked
+  ) {
 
     console.warn(
-        "[CONNECTA] Account restricted:",
-        accountControl.status
+      "[CONNECTA] Account restricted:",
+      accountControl.status
     );
 
 
     showAccountBlockedScreen(
-        accountControl
+      accountControl
     );
 
 
     return;
 
-}
+  }
 
 
-/*
-Save only safe profile data
-to the general profile cache.
-*/
+  /* =======================================================
+     INSTANT CACHE
+  ======================================================= */
 
-saveProfileToCache(
-    user.uid,
-    profile
-);
+  loadDashboardCache(
+    currentUser.uid
+  );
 
 
-      /*
-      Render the profile.
-      */
+  /*
+   * If dashboard cache did not contain
+   * the profile, render globalAuth profile.
+   */
 
-      renderProfile(
-        profile
+  if (!currentProfile) {
+
+    const cachedProfile =
+      getCachedProfile(
+        currentUser.uid
       );
 
 
-      /*
-      Update dashboard cache.
-      */
+    if (cachedProfile) {
 
-      saveDashboardCache(
-        user.uid
-      );
-
-
-    } catch (error) {
-
-      console.warn(
-        "Profile read/repair failed:",
-        error
-      );
-
-
-      /*
-      Use Firebase Auth data as
-      emergency fallback.
-      */
-
-      currentProfile = {
-
-        uid:
-          user.uid,
-
-        displayName:
-          user.displayName || "",
-
-        photoURL:
-          user.photoURL || "",
-
-        isOnline:
-          true
-
-      };
-
-
-      renderProfile(
-        currentProfile
-      );
+      currentProfile =
+        cachedProfile;
 
     }
 
-
-    /* =====================================================
-       PRESENCE
-    ===================================================== */
-
-    startPresence();
+  }
 
 
-    /* =====================================================
-       LOAD USERS
-    ===================================================== */
+  /*
+   * Always render the profile belonging
+   * to the authenticated Firebase UID.
+   */
 
-    const usersQuery =
-      query(
-        collection(
-          db,
-          "users"
-        ),
-        limit(100)
-      );
+  renderProfile(
+    currentProfile
+  );
 
 
-    stopUsers =
-      onSnapshot(
-
-        usersQuery,
-
-        snapshot => {
-
-          onlineUsers =
-            snapshot.docs
-              .map(
-                snap => {
-
-                  const data =
-                    snap.data();
+  saveProfileToCache(
+    currentUser.uid,
+    currentProfile
+  );
 
 
-                  const safeUser =
-                    publicProfileData(
-                      snap.id,
-                      data
-                    );
+  saveDashboardCache(
+    currentUser.uid
+  );
 
 
-                  /*
-                  Keep following list only
-                  for current user's own profile.
-                  */
+  /* =======================================================
+     PRESENCE
+  ======================================================= */
 
-                  if (
-                    snap.id ===
-                    currentUser.uid
-                  ) {
-
-                    safeUser.following =
-                      Array.isArray(
-                        data.following
-                      )
-                        ? data.following
-                        : [];
-
-                  }
+  startPresence();
 
 
-                  saveProfileToCache(
+  /* =======================================================
+     USERS
+  ======================================================= */
+
+  const usersQuery =
+    query(
+      collection(
+        db,
+        "users"
+      ),
+      limit(100)
+    );
+
+
+  stopUsers =
+    onSnapshot(
+
+      usersQuery,
+
+      snapshot => {
+
+        onlineUsers =
+          snapshot.docs
+            .map(
+              snap => {
+
+                const data =
+                  snap.data();
+
+
+                const safeUser =
+                  publicProfileData(
                     snap.id,
-                    safeUser
+                    data
                   );
 
 
-                  return safeUser;
+                /*
+                 * Keep following list only
+                 * for current user's own profile.
+                 */
+
+                if (
+                  snap.id ===
+                  currentUser.uid
+                ) {
+
+                  safeUser.following =
+                    Array.isArray(
+                      data.following
+                    )
+                      ? data.following
+                      : [];
 
                 }
-              );
 
 
-          /*
-          Keep current user's
-          following array synchronized.
-          */
+                saveProfileToCache(
+                  snap.id,
+                  safeUser
+                );
 
-          const ownUser =
-            snapshot.docs.find(
-              snap =>
-                snap.id ===
-                currentUser.uid
+
+                return safeUser;
+
+              }
             );
 
 
-          if (ownUser) {
+        /*
+         * Keep current user's profile
+         * synchronized with Firestore.
+         */
 
-            const ownData =
-              ownUser.data();
-
-
-            currentProfile = {
-
-              ...currentProfile,
-
-              ...publicProfileData(
-                currentUser.uid,
-                ownData
-              ),
-
-              following:
-                Array.isArray(
-                  ownData.following
-                )
-                  ? ownData.following
-                  : []
-
-            };
+        const ownUser =
+          snapshot.docs.find(
+            snap =>
+              snap.id ===
+              currentUser.uid
+          );
 
 
-            renderProfile(
+        if (ownUser) {
+
+          const ownData =
+            ownUser.data();
+
+
+          currentProfile = {
+
+            ...currentProfile,
+
+            ...publicProfileData(
+              currentUser.uid,
+              ownData
+            ),
+
+            following:
+              Array.isArray(
+                ownData.following
+              )
+                ? ownData.following
+                : []
+
+          };
+
+
+          /*
+           * Check account status again.
+           */
+
+          const control =
+            getAccountControl(
               currentProfile
             );
 
-          }
-
-
-          /*
-          Render online users.
-          */
-
-          renderOnline(
-            $("onlineSearch")?.value ||
-            ""
-          );
-
-
-          /*
-          Update names/photos in recent chats.
-          */
 
           if (
-            recentChats.length
+            control.blocked
           ) {
 
-            recentChats =
-              recentChats.map(
-                chat => {
-
-                  const profile =
-                    onlineUsers.find(
-                      user =>
-                        user.uid ===
-                        chat.otherUid
-                    );
-
-
-                  if (!profile) {
-                    return chat;
-                  }
-
-
-                  return {
-
-                    ...chat,
-
-                    name:
-                      getFullName(
-                        profile
-                      ),
-
-                    username:
-                      profile.username ||
-                      "",
-
-                    photoURL:
-                      profile.photoURL ||
-                      ""
-
-                  };
-
-                }
-              );
-
-
-            renderChats(
-              recentChats,
-              $("chatSearch")?.value ||
-              ""
+            showAccountBlockedScreen(
+              control
             );
 
-          }
-
-
-          /*
-          Save dashboard state.
-          */
-
-          saveDashboardCache(
-            currentUser.uid
-          );
-
-        },
-
-        error => {
-
-          console.error(
-            "Users listener:",
-            error
-          );
-
-
-          const box =
-            $("onlineUsers");
-
-
-          if (box) {
-
-            box.innerHTML = `
-              <div class="empty-state small">
-                Could not load users.
-                Check Firestore rules.
-              </div>
-            `;
+            return;
 
           }
+
+
+          renderProfile(
+            currentProfile
+          );
 
         }
 
-      );
+
+        /*
+         * Render online users.
+         */
+
+        renderOnline(
+          $("onlineSearch")?.value ||
+          ""
+        );
 
 
-    /* =====================================================
-       LOAD RECENT CHATS
-    ===================================================== */
+        /*
+         * Update names/photos
+         * in recent chats.
+         */
 
-    listenToChats(
-      user.uid
+        if (
+          recentChats.length
+        ) {
+
+          recentChats =
+            recentChats.map(
+              chat => {
+
+                const profile =
+                  onlineUsers.find(
+                    user =>
+                      user.uid ===
+                      chat.otherUid
+                  );
+
+
+                if (!profile) {
+                  return chat;
+                }
+
+
+                return {
+
+                  ...chat,
+
+                  name:
+                    getFullName(
+                      profile
+                    ),
+
+                  username:
+                    profile.username ||
+                    "",
+
+                  photoURL:
+                    profile.photoURL ||
+                    ""
+
+                };
+
+              }
+            );
+
+
+          renderChats(
+            recentChats,
+            $("chatSearch")?.value ||
+            ""
+          );
+
+        }
+
+
+        /*
+         * Save dashboard state.
+         */
+
+        saveDashboardCache(
+          currentUser.uid
+        );
+
+      },
+
+      error => {
+
+        console.error(
+          "Users listener:",
+          error
+        );
+
+
+        const box =
+          $("onlineUsers");
+
+
+        if (box) {
+
+          box.innerHTML = `
+            <div class="empty-state small">
+              Could not load users.
+              Check Firestore rules.
+            </div>
+          `;
+
+        }
+
+      }
+
     );
 
-  }
-);
+
+  /* =======================================================
+     RECENT CHATS
+  ======================================================= */
+
+  listenToChats(
+    currentUser.uid
+  );
+
+}
 
 
 /* =========================================================
@@ -3326,12 +3103,6 @@ saveProfileToCache(
 window.addEventListener(
   "pagehide",
   () => {
-
-    /*
-    This is best-effort only.
-    Firestore writes are not guaranteed
-    during page termination.
-    */
 
     setPresence(
       false
@@ -3346,3 +3117,10 @@ window.addEventListener(
 ========================================================= */
 
 setupUI();
+
+
+/* =========================================================
+   INITIALIZE DASHBOARD
+========================================================= */
+
+initializeDashboard();
