@@ -21,6 +21,7 @@
      • Change group photo
      • Delete messages for everyone
      • Delete group
+   - Group read state / unread support
 ========================================================= */
 
 import {
@@ -63,6 +64,7 @@ import {
 
 const GROUPS_COLLECTION = "groups";
 const GROUP_MESSAGES_COLLECTION = "groupMessages";
+const GROUP_READS_COLLECTION = "reads";
 
 const MAX_MESSAGES = 100;
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024;
@@ -102,6 +104,12 @@ let selectedMessageId = "";
 
 let ownerPhotoFile = null;
 
+/*
+ * Prevent the same file input from being interpreted
+ * as both a group photo and a chat photo.
+ */
+let photoInputMode = "message";
+
 let accountControl = {
     loaded: false,
     blocked: false,
@@ -127,7 +135,7 @@ const backBtn =
     document.getElementById("backBtn");
 
 const groupAvatar =
-    document.getElementById("groupHeaderAvatar");
+    document.getElementById("groupAvatar");
 
 const groupName =
     document.getElementById("groupName");
@@ -154,7 +162,7 @@ const emojiBtn =
     document.getElementById("emojiBtn");
 
 const infoBtn =
-    document.getElementById("groupInfoBtn");
+    document.getElementById("infoBtn");
 
 const accessBlock =
     document.getElementById("accessBlock");
@@ -169,16 +177,13 @@ const backToGroupsBtn =
     document.getElementById("backToGroupsBtn");
 
 const groupInfoOverlay =
-    document.getElementById("groupInfoOverlay");
+    document.getElementById("groupInfoSheet");
 
 const closeInfoBtn =
-    document.getElementById("closeInfoBtn");
+    document.getElementById("closeGroupInfo");
 
 const toast =
     document.getElementById("toast");
-
-const typingArea =
-    document.getElementById("typingArea");
 
 
 /* =========================================================
@@ -335,10 +340,7 @@ function loadGroupCache(id) {
 }
 
 
-function saveMessagesCache(
-    id,
-    list
-) {
+function saveMessagesCache(id, list) {
 
     try {
 
@@ -517,6 +519,16 @@ function showToast(message) {
 }
 
 
+function getMessageId(message) {
+
+    return String(
+        message?.id ||
+        message?.messageId ||
+        ""
+    );
+}
+
+
 /* =========================================================
    LOADING
 ========================================================= */
@@ -563,13 +575,9 @@ function getAccountControl(profile) {
         return {
 
             loaded: true,
-
             blocked: true,
-
             messagingRestricted: true,
-
             groupParticipationRestricted: true,
-
             reason: status
         };
     }
@@ -577,11 +585,8 @@ function getAccountControl(profile) {
     return {
 
         loaded: true,
-
         blocked: false,
-
         messagingRestricted,
-
         groupParticipationRestricted,
 
         reason:
@@ -609,8 +614,7 @@ function isGroupOwner() {
 
     return (
         String(
-            currentGroup.ownerId ||
-            ""
+            currentGroup.ownerId || ""
         ) ===
         String(
             currentUser.uid
@@ -620,50 +624,15 @@ function isGroupOwner() {
 
 
 /* =========================================================
-   OWNER MENU VISIBILITY
-========================================================= */
-
-function updateOwnerControls() {
-
-    const owner =
-        isGroupOwner();
-
-    if (!ownerMenu) {
-        return;
-    }
-
-    /*
-     * Owner controls are never shown to
-     * ordinary group members.
-     */
-    if (owner) {
-
-        ownerMenu.style.display =
-            ownerMenu.classList.contains("open")
-                ? "block"
-                : "";
-
-    } else {
-
-        ownerMenu.classList.remove(
-            "open"
-        );
-
-        ownerMenu.style.display =
-            "none";
-
-        exitDeleteMode();
-    }
-}
-
-
-/* =========================================================
    MEMBERSHIP
 ========================================================= */
 
 function isUserGroupMember(group) {
 
-    if (!currentUser || !group) {
+    if (
+        !currentUser ||
+        !group
+    ) {
         return false;
     }
 
@@ -671,7 +640,8 @@ function isUserGroupMember(group) {
         currentUser.uid;
 
     if (
-        group.ownerId === uid
+        String(group.ownerId || "") ===
+        String(uid)
     ) {
         return true;
     }
@@ -723,6 +693,96 @@ function getGroupControl(group) {
             status === "approved" &&
             member
     };
+}
+
+
+/* =========================================================
+   ACCESS UI
+========================================================= */
+
+function updateAccessUI() {
+
+    if (!accessBlock) {
+        return;
+    }
+
+    let show = false;
+    let title = "";
+    let message = "";
+
+    if (accountControl.blocked) {
+
+        show = true;
+
+        title =
+            accountControl.reason === "banned"
+                ? "Account Banned"
+                : "Account Suspended";
+
+        message =
+            "Your account cannot participate in group conversations.";
+
+    } else if (
+        accountControl.groupParticipationRestricted
+    ) {
+
+        show = true;
+
+        title =
+            "Participation Restricted";
+
+        message =
+            "Your account is currently restricted from participating in groups.";
+
+    } else if (
+        !groupControl.member
+    ) {
+
+        show = true;
+
+        title =
+            "Group Membership Required";
+
+        message =
+            "Join this group to participate in the conversation.";
+
+    } else if (
+        !groupControl.approved
+    ) {
+
+        show = true;
+
+        title =
+            "Group Pending Approval";
+
+        message =
+            "This group is not currently available for conversation.";
+
+    } else if (
+        groupControl.chatLocked
+    ) {
+
+        show = true;
+
+        title =
+            "Chat Locked";
+
+        message =
+            "An administrator has temporarily locked this group chat.";
+    }
+
+    if (accessTitle) {
+        accessTitle.textContent = title;
+    }
+
+    if (accessMessage) {
+        accessMessage.textContent = message;
+    }
+
+    accessBlock.style.display =
+        show
+            ? ""
+            : "none";
 }
 
 
@@ -899,6 +959,7 @@ function listenToOwnProfile() {
                     };
 
                     updateComposerState();
+                    updateAccessUI();
 
                     return;
                 }
@@ -912,6 +973,7 @@ function listenToOwnProfile() {
                     );
 
                 updateComposerState();
+                updateAccessUI();
 
                 if (
                     accountControl.blocked
@@ -941,6 +1003,7 @@ function listenToOwnProfile() {
                 };
 
                 updateComposerState();
+                updateAccessUI();
             }
         );
 }
@@ -974,6 +1037,7 @@ async function loadGroup() {
         renderGroup();
 
         updateOwnerControls();
+        updateAccessUI();
     }
 
     try {
@@ -1020,6 +1084,7 @@ async function loadGroup() {
         renderGroup();
 
         updateOwnerControls();
+        updateAccessUI();
 
         setupGroupListener();
 
@@ -1138,8 +1203,8 @@ function setupGroupListener() {
                     };
 
                     updateOwnerControls();
-
                     updateComposerState();
+                    updateAccessUI();
 
                     showAccessError(
                         "Group no longer exists",
@@ -1169,8 +1234,8 @@ function setupGroupListener() {
                 renderGroup();
 
                 updateOwnerControls();
-
                 updateComposerState();
+                updateAccessUI();
             },
 
             error => {
@@ -1190,6 +1255,7 @@ function setupGroupListener() {
                 };
 
                 updateComposerState();
+                updateAccessUI();
             }
         );
 }
@@ -1364,19 +1430,20 @@ function renderGroupInfo() {
 
     if (infoMembers) {
 
-        infoMembers.textContent =
-            String(
-                Number(
-                    currentGroup.memberCount ||
-                    (
-                        Array.isArray(
-                            currentGroup.members
-                        )
-                            ? currentGroup.members.length
-                            : 0
+        const memberCount =
+            Number(
+                currentGroup.memberCount ||
+                (
+                    Array.isArray(
+                        currentGroup.members
                     )
+                        ? currentGroup.members.length
+                        : 0
                 )
             );
+
+        infoMembers.textContent =
+            String(memberCount);
     }
 
     if (infoSubscription) {
@@ -1412,7 +1479,7 @@ function renderGroupInfo() {
 
 
 /* =========================================================
-   LOAD CACHED MESSAGES
+   CACHED MESSAGES
 ========================================================= */
 
 function loadCachedMessages() {
@@ -1494,6 +1561,12 @@ function setupMessageListener() {
                 renderMessages();
 
                 hideLoading();
+
+                /*
+                 * Opening the group means the user has
+                 * seen the currently loaded conversation.
+                 */
+                markGroupRead();
             },
 
             error => {
@@ -1516,6 +1589,69 @@ function setupMessageListener() {
                 }
             }
         );
+}
+
+
+/* =========================================================
+   MARK GROUP READ
+========================================================= */
+
+async function markGroupRead() {
+
+    if (
+        !currentUser ||
+        !groupId
+    ) {
+        return;
+    }
+
+    const latestMessage =
+        messages.length
+            ? messages[messages.length - 1]
+            : null;
+
+    try {
+
+        await setDoc(
+            doc(
+                db,
+                GROUPS_COLLECTION,
+                groupId,
+                GROUP_READS_COLLECTION,
+                currentUser.uid
+            ),
+            {
+
+                userId:
+                    currentUser.uid,
+
+                groupId,
+
+                lastReadMessageId:
+                    latestMessage
+                        ? getMessageId(
+                            latestMessage
+                        )
+                        : "",
+
+                lastReadAt:
+                    serverTimestamp(),
+
+                updatedAt:
+                    serverTimestamp()
+            },
+            {
+                merge: true
+            }
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "Could not mark group as read:",
+            error
+        );
+    }
 }
 
 
@@ -1562,10 +1698,6 @@ function renderMessages() {
             .map(renderMessage)
             .join("");
 
-    /*
-     * Owner delete mode needs the message
-     * rows after every realtime render.
-     */
     if (
         deleteModeBar?.classList.contains(
             "open"
@@ -1612,30 +1744,23 @@ function renderMessage(message) {
 
             ? `
                 <div class="message-avatar">
-
                     <img
                         src="${escapeHTML(photo)}"
                         alt=""
                     >
-
                 </div>
             `
 
             : `
                 <div class="message-avatar">
-
                     ${escapeHTML(
-                        getInitials(
-                            senderName
-                        )
+                        getInitials(senderName)
                     )}
-
                 </div>
             `;
 
     const verified =
         message.senderVerified === true
-
             ? `
                 <span
                     class="verified-badge"
@@ -1644,7 +1769,6 @@ function renderMessage(message) {
                     ✓
                 </span>
             `
-
             : "";
 
     const messageType =
@@ -1665,44 +1789,33 @@ function renderMessage(message) {
             message.photoURL ||
             "";
 
-        if (imageURL) {
+        body = imageURL
 
-            body = `
-
-                <div
-                    class="message-image-wrap"
-                >
-
+            ? `
+                <div class="message-image-wrap">
                     <img
                         src="${escapeHTML(imageURL)}"
                         alt="Group photo"
                         class="message-image"
                         loading="lazy"
                     >
-
                 </div>
+            `
 
-            `;
-
-        } else {
-
-            body = `
+            : `
                 <p class="message-text">
                     Photo unavailable
                 </p>
             `;
-        }
 
     } else {
 
         body = `
-
             <p class="message-text">
                 ${escapeHTML(
                     message.text || ""
                 )}
             </p>
-
         `;
     }
 
@@ -1715,9 +1828,7 @@ function renderMessage(message) {
                     : "other"
             }"
             data-message-id="${escapeHTML(
-                message.id ||
-                message.messageId ||
-                ""
+                getMessageId(message)
             )}"
         >
 
@@ -1733,13 +1844,8 @@ function renderMessage(message) {
                     !isMine
                         ? `
                             <div class="message-sender">
-
-                                ${escapeHTML(
-                                    senderName
-                                )}
-
+                                ${escapeHTML(senderName)}
                                 ${verified}
-
                             </div>
                         `
                         : ""
@@ -1750,13 +1856,11 @@ function renderMessage(message) {
                     ${body}
 
                     <div class="message-meta">
-
                         ${escapeHTML(
                             formatTime(
                                 message.createdAt
                             )
                         )}
-
                     </div>
 
                 </div>
@@ -1770,8 +1874,30 @@ function renderMessage(message) {
             }
 
         </div>
-
     `;
+}
+
+
+/* =========================================================
+   GET SENDER NAME
+========================================================= */
+
+function getSenderName() {
+
+    return (
+        currentProfile?.displayName ||
+
+        [
+            currentProfile?.firstName,
+            currentProfile?.lastName
+        ]
+            .filter(Boolean)
+            .join(" ") ||
+
+        currentUser?.displayName ||
+
+        "User"
+    );
 }
 
 
@@ -1868,10 +1994,9 @@ async function sendTextMessage() {
             );
 
         renderGroup();
-
         updateOwnerControls();
-
         updateComposerState();
+        updateAccessUI();
 
         if (!canSendMessages()) {
 
@@ -1894,18 +2019,7 @@ async function sendTextMessage() {
             messageRef.id;
 
         const senderName =
-            currentProfile?.displayName ||
-
-            [
-                currentProfile?.firstName,
-                currentProfile?.lastName
-            ]
-                .filter(Boolean)
-                .join(" ") ||
-
-            currentUser.displayName ||
-
-            "User";
+            getSenderName();
 
         await setDoc(
             messageRef,
@@ -1959,6 +2073,7 @@ async function sendTextMessage() {
         );
 
         await updateGroupPreview(
+            messageId,
             text,
             senderName
         );
@@ -2039,13 +2154,6 @@ async function sendPhotoMessage(file) {
         return;
     }
 
-    if (
-        !currentUser ||
-        !groupId
-    ) {
-        return;
-    }
-
     isUploadingPhoto = true;
 
     updateComposerState();
@@ -2080,11 +2188,9 @@ async function sendPhotoMessage(file) {
 
         if (!groupSnapshot.exists()) {
 
-            showToast(
+            throw new Error(
                 "This group no longer exists."
             );
-
-            return;
         }
 
         currentGroup = {
@@ -2110,9 +2216,8 @@ async function sendPhotoMessage(file) {
                 currentGroup
             );
 
-        renderGroup();
-
-        updateOwnerControls();
+        updateComposerState();
+        updateAccessUI();
 
         if (!canSendMessages()) {
 
@@ -2139,13 +2244,10 @@ async function sendPhotoMessage(file) {
         if (
             file.type === "image/png"
         ) {
-
             extension = "png";
-
         } else if (
             file.type === "image/webp"
         ) {
-
             extension = "webp";
         }
 
@@ -2173,18 +2275,7 @@ async function sendPhotoMessage(file) {
             );
 
         const senderName =
-            currentProfile?.displayName ||
-
-            [
-                currentProfile?.firstName,
-                currentProfile?.lastName
-            ]
-                .filter(Boolean)
-                .join(" ") ||
-
-            currentUser.displayName ||
-
-            "User";
+            getSenderName();
 
         await setDoc(
             messageRef,
@@ -2241,6 +2332,7 @@ async function sendPhotoMessage(file) {
         );
 
         await updateGroupPreview(
+            messageId,
             "📷 Photo",
             senderName
         );
@@ -2275,6 +2367,7 @@ async function sendPhotoMessage(file) {
 ========================================================= */
 
 async function updateGroupPreview(
+    messageId,
     previewText,
     senderName
 ) {
@@ -2288,6 +2381,9 @@ async function updateGroupPreview(
                 groupId
             ),
             {
+
+                lastMessageId:
+                    messageId,
 
                 lastMessage:
                     String(
@@ -2407,9 +2503,7 @@ async function setTyping() {
                     currentUser.uid,
 
                 name:
-                    currentProfile?.displayName ||
-                    currentUser.displayName ||
-                    "User",
+                    getSenderName(),
 
                 updatedAt:
                     serverTimestamp()
@@ -2451,17 +2545,14 @@ async function stopTyping() {
 
     try {
 
-        const typingRef =
+        await deleteDoc(
             doc(
                 db,
                 GROUPS_COLLECTION,
                 groupId,
                 "typing",
                 currentUser.uid
-            );
-
-        await deleteDoc(
-            typingRef
+            )
         );
 
     } catch {
@@ -2484,10 +2575,7 @@ function setupComposer() {
         "input",
         () => {
 
-            if (
-                canSendMessages()
-            ) {
-
+            if (canSendMessages()) {
                 setTyping();
             }
         }
@@ -2589,6 +2677,10 @@ function setupPhotoUpload() {
                 return;
             }
 
+            photoInputMode = "message";
+
+            photoInput.value = "";
+
             photoInput.click();
         }
     );
@@ -2606,9 +2698,84 @@ function setupPhotoUpload() {
                 return;
             }
 
-            await sendPhotoMessage(file);
+            /*
+             * Owner group photo mode.
+             */
+            if (
+                photoInputMode === "group"
+            ) {
+
+                handleOwnerPhotoFile(
+                    file
+                );
+
+                photoInputMode =
+                    "message";
+
+                return;
+            }
+
+            /*
+             * Normal chat photo mode.
+             */
+            await sendPhotoMessage(
+                file
+            );
         }
     );
+}
+
+
+/* =========================================================
+   OWNER PHOTO FILE
+========================================================= */
+
+function handleOwnerPhotoFile(file) {
+
+    if (!isGroupOwner()) {
+
+        showToast(
+            "Only the group owner can change the group photo."
+        );
+
+        return;
+    }
+
+    const allowedTypes = [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ];
+
+    if (
+        !allowedTypes.includes(
+            file.type
+        )
+    ) {
+
+        showToast(
+            "Only JPG, PNG and WebP photos are allowed."
+        );
+
+        return;
+    }
+
+    if (
+        file.size >
+        MAX_PHOTO_SIZE
+    ) {
+
+        showToast(
+            "Group photo must be 5MB or smaller."
+        );
+
+        return;
+    }
+
+    ownerPhotoFile =
+        file;
+
+    renderOwnerPhotoPreview();
 }
 
 
@@ -2656,14 +2823,12 @@ function setupGroupInfo() {
 
         infoBtn.addEventListener(
             "click",
-            () => {
+            event => {
+
+                event.stopPropagation();
 
                 if (isGroupOwner()) {
 
-                    /*
-                     * Owner gets the management
-                     * menu from the three-dot button.
-                     */
                     toggleOwnerMenu();
 
                 } else {
@@ -2707,11 +2872,10 @@ function setupGroupInfo() {
 
 function toggleOwnerMenu() {
 
-    if (!ownerMenu) {
-        return;
-    }
-
-    if (!isGroupOwner()) {
+    if (
+        !ownerMenu ||
+        !isGroupOwner()
+    ) {
         return;
     }
 
@@ -2742,7 +2906,7 @@ function closeOwnerMenu() {
 
 
 /* =========================================================
-   OPEN EDIT GROUP
+   EDIT GROUP MODAL
 ========================================================= */
 
 function openEditGroupModal() {
@@ -2822,7 +2986,7 @@ function renderOwnerPhotoPreview() {
         groupPhotoPreview.innerHTML = `
 
             <img
-                src="${previewURL}"
+                src="${escapeHTML(previewURL)}"
                 alt="New group photo"
             >
 
@@ -2863,94 +3027,34 @@ function renderOwnerPhotoPreview() {
 
 function setupOwnerPhotoPicker() {
 
-    if (
-        modalPhotoBtn &&
-        photoInput
-    ) {
+    if (!modalPhotoBtn) {
+        return;
+    }
 
-        modalPhotoBtn.addEventListener(
-            "click",
-            () => {
+    modalPhotoBtn.addEventListener(
+        "click",
+        () => {
 
-                if (!isGroupOwner()) {
-                    return;
-                }
+            if (!isGroupOwner()) {
 
-                /*
-                 * Use the existing photo input.
-                 * It only accepts image files.
-                 */
+                showToast(
+                    "Only the group owner can change the photo."
+                );
+
+                return;
+            }
+
+            photoInputMode =
+                "group";
+
+            if (photoInput) {
+
                 photoInput.value = "";
 
                 photoInput.click();
-
             }
-        );
-
-        photoInput.addEventListener(
-            "change",
-            () => {
-
-                const file =
-                    photoInput.files?.[0];
-
-                /*
-                 * The normal chat photo handler
-                 * also uses this input, so owner
-                 * mode is determined by whether
-                 * the edit modal is open.
-                 */
-                if (
-                    editGroupModal?.classList.contains(
-                        "open"
-                    )
-                ) {
-
-                    photoInput.value = "";
-
-                    if (!file) {
-                        return;
-                    }
-
-                    const allowedTypes = [
-                        "image/jpeg",
-                        "image/png",
-                        "image/webp"
-                    ];
-
-                    if (
-                        !allowedTypes.includes(
-                            file.type
-                        )
-                    ) {
-
-                        showToast(
-                            "Only JPG, PNG and WebP photos are allowed."
-                        );
-
-                        return;
-                    }
-
-                    if (
-                        file.size >
-                        MAX_PHOTO_SIZE
-                    ) {
-
-                        showToast(
-                            "Group photo must be 5MB or smaller."
-                        );
-
-                        return;
-                    }
-
-                    ownerPhotoFile =
-                        file;
-
-                    renderOwnerPhotoPreview();
-                }
-            }
-        );
-    }
+        }
+    );
 }
 
 
@@ -3028,10 +3132,6 @@ async function saveGroupOwnerChanges() {
 
     try {
 
-        /*
-         * Confirm ownership from Firestore
-         * immediately before writing.
-         */
         const groupRef =
             doc(
                 db,
@@ -3039,6 +3139,9 @@ async function saveGroupOwnerChanges() {
                 groupId
             );
 
+        /*
+         * Re-check ownership.
+         */
         const snapshot =
             await getDoc(
                 groupRef
@@ -3055,8 +3158,12 @@ async function saveGroupOwnerChanges() {
             snapshot.data();
 
         if (
-            latestGroup.ownerId !==
-            currentUser.uid
+            String(
+                latestGroup.ownerId || ""
+            ) !==
+            String(
+                currentUser.uid
+            )
         ) {
 
             throw new Error(
@@ -3072,9 +3179,6 @@ async function saveGroupOwnerChanges() {
             latestGroup.photoStoragePath ||
             "";
 
-        /*
-         * Upload new group profile photo.
-         */
         if (ownerPhotoFile) {
 
             const extension =
@@ -3109,6 +3213,10 @@ async function saveGroupOwnerChanges() {
                     storageRef
                 );
 
+            /*
+             * Save the path so it can be removed
+             * when the group is deleted.
+             */
             photoStoragePath =
                 storagePath;
         }
@@ -3265,10 +3373,6 @@ function bindDeleteModeRows() {
                 row.onclick =
                     event => {
 
-                        /*
-                         * Do not trigger if user
-                         * clicked an image itself.
-                         */
                         if (
                             event.target?.tagName ===
                             "IMG"
@@ -3301,6 +3405,113 @@ function bindDeleteModeRows() {
                     };
             }
         );
+}
+
+
+/* =========================================================
+   REFRESH GROUP PREVIEW
+========================================================= */
+
+async function refreshGroupPreview() {
+
+    try {
+
+        const messagesRef =
+            collection(
+                db,
+                GROUPS_COLLECTION,
+                groupId,
+                GROUP_MESSAGES_COLLECTION
+            );
+
+        const latestQuery =
+            query(
+                messagesRef,
+                orderBy(
+                    "createdAt",
+                    "desc"
+                ),
+                limit(1)
+            );
+
+        const snapshot =
+            await getDocs(
+                latestQuery
+            );
+
+        const groupRef =
+            doc(
+                db,
+                GROUPS_COLLECTION,
+                groupId
+            );
+
+        if (snapshot.empty) {
+
+            await updateDoc(
+                groupRef,
+                {
+
+                    lastMessageId: "",
+                    lastMessage: "",
+                    lastMessageSenderId: "",
+                    lastMessageSenderName: "",
+                    lastMessageAt: null,
+                    updatedAt:
+                        serverTimestamp()
+                }
+            );
+
+            return;
+        }
+
+        const latest =
+            snapshot.docs[0];
+
+        const data =
+            latest.data();
+
+        const preview =
+            data.type === "image"
+                ? "📷 Photo"
+                : String(
+                    data.text || ""
+                ).substring(0, 200);
+
+        await updateDoc(
+            groupRef,
+            {
+
+                lastMessageId:
+                    latest.id,
+
+                lastMessage:
+                    preview,
+
+                lastMessageSenderId:
+                    data.senderId ||
+                    "",
+
+                lastMessageSenderName:
+                    data.senderName ||
+                    "User",
+
+                lastMessageAt:
+                    data.createdAt ||
+                    null,
+
+                updatedAt:
+                    serverTimestamp()
+            }
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "Could not refresh group preview:",
+            error
+        );
+    }
 }
 
 
@@ -3339,6 +3550,40 @@ async function deleteGroupMessage() {
 
     try {
 
+        const groupRef =
+            doc(
+                db,
+                GROUPS_COLLECTION,
+                groupId
+            );
+
+        const groupSnapshot =
+            await getDoc(
+                groupRef
+            );
+
+        if (!groupSnapshot.exists()) {
+
+            throw new Error(
+                "Group no longer exists."
+            );
+        }
+
+        if (
+            String(
+                groupSnapshot.data().ownerId ||
+                ""
+            ) !==
+            String(
+                currentUser.uid
+            )
+        ) {
+
+            throw new Error(
+                "Only the group owner can delete messages."
+            );
+        }
+
         const messageRef =
             doc(
                 db,
@@ -3363,50 +3608,11 @@ async function deleteGroupMessage() {
         const message =
             snapshot.data();
 
-        /*
-         * Confirm the group still belongs
-         * to the current user.
-         */
-        const groupSnapshot =
-            await getDoc(
-                doc(
-                    db,
-                    GROUPS_COLLECTION,
-                    groupId
-                )
-            );
-
-        if (!groupSnapshot.exists()) {
-
-            throw new Error(
-                "Group no longer exists."
-            );
-        }
-
-        if (
-            groupSnapshot.data().ownerId !==
-            currentUser.uid
-        ) {
-
-            throw new Error(
-                "Only the group owner can delete messages."
-            );
-        }
-
-        /*
-         * Delete the message document.
-         */
         await deleteDoc(
             messageRef
         );
 
-        /*
-         * Delete the associated photo from
-         * Storage when this is an image message.
-         */
-        if (
-            message.storagePath
-        ) {
+        if (message.storagePath) {
 
             try {
 
@@ -3426,46 +3632,12 @@ async function deleteGroupMessage() {
             }
         }
 
-        /*
-         * If this was the latest group message,
-         * clear the group preview.
-         */
-        if (
-            currentGroup?.lastMessageId ===
-            selectedMessageId
-        ) {
-
-            await updateDoc(
-                doc(
-                    db,
-                    GROUPS_COLLECTION,
-                    groupId
-                ),
-                {
-
-                    lastMessage: "",
-
-                    lastMessageSenderId: "",
-
-                    lastMessageSenderName: "",
-
-                    lastMessageAt: null,
-
-                    lastMessageId: "",
-
-                    updatedAt:
-                        serverTimestamp()
-                }
-            );
-        }
+        await refreshGroupPreview();
 
         messages =
             messages.filter(
                 item =>
-                    (
-                        item.id ||
-                        item.messageId
-                    ) !==
+                    getMessageId(item) !==
                     selectedMessageId
             );
 
@@ -3539,7 +3711,7 @@ function closeDeleteMessageModal() {
 
 
 /* =========================================================
-   DELETE GROUP
+   DELETE GROUP MODAL
 ========================================================= */
 
 function openDeleteGroupModal() {
@@ -3576,7 +3748,60 @@ function closeDeleteGroupModal() {
 
 
 /* =========================================================
-   DELETE GROUP — FIRESTORE CLEANUP
+   DELETE SUBCOLLECTION
+========================================================= */
+
+async function deleteSubcollection(
+    collectionName
+) {
+
+    const collectionRef =
+        collection(
+            db,
+            GROUPS_COLLECTION,
+            groupId,
+            collectionName
+        );
+
+    while (true) {
+
+        const snapshot =
+            await getDocs(
+                query(
+                    collectionRef,
+                    limit(450)
+                )
+            );
+
+        if (snapshot.empty) {
+            break;
+        }
+
+        const batch =
+            writeBatch(db);
+
+        snapshot.docs.forEach(
+            item => {
+
+                batch.delete(
+                    item.ref
+                );
+            }
+        );
+
+        await batch.commit();
+
+        if (
+            snapshot.size < 450
+        ) {
+            break;
+        }
+    }
+}
+
+
+/* =========================================================
+   DELETE ALL GROUP MESSAGES
 ========================================================= */
 
 async function deleteAllGroupMessages() {
@@ -3589,10 +3814,6 @@ async function deleteAllGroupMessages() {
             GROUP_MESSAGES_COLLECTION
         );
 
-    /*
-     * Delete in batches of <= 450 so we stay
-     * below Firestore's 500-operation batch limit.
-     */
     while (true) {
 
         const snapshot =
@@ -3603,9 +3824,7 @@ async function deleteAllGroupMessages() {
                 )
             );
 
-        if (
-            snapshot.empty
-        ) {
+        if (snapshot.empty) {
             break;
         }
 
@@ -3637,10 +3856,6 @@ async function deleteAllGroupMessages() {
 
         await batch.commit();
 
-        /*
-         * Delete message photos after the
-         * Firestore batch succeeds.
-         */
         for (
             const path
             of storagePaths
@@ -3705,9 +3920,6 @@ async function deleteGroup() {
 
     try {
 
-        /*
-         * Re-check ownership from Firestore.
-         */
         const groupRef =
             doc(
                 db,
@@ -3727,9 +3939,16 @@ async function deleteGroup() {
             );
         }
 
+        const groupData =
+            snapshot.data();
+
         if (
-            snapshot.data().ownerId !==
-            currentUser.uid
+            String(
+                groupData.ownerId || ""
+            ) !==
+            String(
+                currentUser.uid
+            )
         ) {
 
             throw new Error(
@@ -3738,17 +3957,27 @@ async function deleteGroup() {
         }
 
         /*
-         * Remove all group messages first.
+         * Delete messages.
          */
         await deleteAllGroupMessages();
 
         /*
-         * Remove group profile photo if
-         * the document has a Storage path.
+         * Delete typing documents.
          */
-        const groupData =
-            snapshot.data();
+        await deleteSubcollection(
+            "typing"
+        );
 
+        /*
+         * Delete read-state documents.
+         */
+        await deleteSubcollection(
+            "reads"
+        );
+
+        /*
+         * Delete group profile photo.
+         */
         if (
             groupData.photoStoragePath
         ) {
@@ -3772,461 +4001,7 @@ async function deleteGroup() {
         }
 
         /*
-         * Delete the group document.
+         * Delete the group itself.
          */
         await deleteDoc(
-            groupRef
-        );
-
-        clearGroupCache(
-            groupId
-        );
-
-        closeDeleteGroupModal();
-
-        showToast(
-            "Group deleted successfully."
-        );
-
-        /*
-         * Give the toast a moment to display,
-         * then return to Groups.
-         */
-        setTimeout(
-            () => {
-
-                window.location.href =
-                    "groups.html";
-
-            },
-            700
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Delete group error:",
-            error
-        );
-
-        showToast(
-            error?.message ||
-            "Could not delete the group."
-        );
-
-    } finally {
-
-        isDeletingGroup = false;
-
-        if (confirmDeleteGroup) {
-
-            confirmDeleteGroup.disabled =
-                false;
-
-            confirmDeleteGroup.textContent =
-                "Delete Group";
-        }
-    }
-}
-
-
-/* =========================================================
-   OWNER EVENT LISTENERS
-========================================================= */
-
-function setupOwnerControls() {
-
-    /*
-     * Edit group.
-     */
-    if (editGroupBtn) {
-
-        editGroupBtn.addEventListener(
-            "click",
-            openEditGroupModal
-        );
-    }
-
-    /*
-     * Change photo opens edit modal.
-     */
-    if (changeGroupPhotoBtn) {
-
-        changeGroupPhotoBtn.addEventListener(
-            "click",
-            openEditGroupModal
-        );
-    }
-
-    /*
-     * Delete messages.
-     */
-    if (deleteMessagesBtn) {
-
-        deleteMessagesBtn.addEventListener(
-            "click",
-            enterDeleteMode
-        );
-    }
-
-    /*
-     * Delete group.
-     */
-    if (deleteGroupBtn) {
-
-        deleteGroupBtn.addEventListener(
-            "click",
-            openDeleteGroupModal
-        );
-    }
-
-    /*
-     * Edit modal.
-     */
-    if (cancelEditGroup) {
-
-        cancelEditGroup.addEventListener(
-            "click",
-            closeEditGroupModal
-        );
-    }
-
-    if (saveGroupChanges) {
-
-        saveGroupChanges.addEventListener(
-            "click",
-            saveGroupOwnerChanges
-        );
-    }
-
-    /*
-     * Delete group modal.
-     */
-    if (cancelDeleteGroup) {
-
-        cancelDeleteGroup.addEventListener(
-            "click",
-            closeDeleteGroupModal
-        );
-    }
-
-    if (confirmDeleteGroup) {
-
-        confirmDeleteGroup.addEventListener(
-            "click",
-            deleteGroup
-        );
-    }
-
-    /*
-     * Delete message modal.
-     */
-    if (cancelDeleteMessage) {
-
-        cancelDeleteMessage.addEventListener(
-            "click",
-            closeDeleteMessageModal
-        );
-    }
-
-    if (confirmDeleteMessage) {
-
-        confirmDeleteMessage.addEventListener(
-            "click",
-            deleteGroupMessage
-        );
-    }
-
-    /*
-     * Delete mode cancel.
-     */
-    if (cancelDeleteMode) {
-
-        cancelDeleteMode.addEventListener(
-            "click",
-            exitDeleteMode
-        );
-    }
-
-    /*
-     * Edit group photo picker.
-     */
-    setupOwnerPhotoPicker();
-
-    /*
-     * Close modals by clicking outside.
-     */
-    if (editGroupModal) {
-
-        editGroupModal.addEventListener(
-            "click",
-            event => {
-
-                if (
-                    event.target ===
-                    editGroupModal
-                ) {
-
-                    closeEditGroupModal();
-                }
-            }
-        );
-    }
-
-    if (deleteGroupModal) {
-
-        deleteGroupModal.addEventListener(
-            "click",
-            event => {
-
-                if (
-                    event.target ===
-                    deleteGroupModal
-                ) {
-
-                    closeDeleteGroupModal();
-                }
-            }
-        );
-    }
-
-    if (deleteMessageModal) {
-
-        deleteMessageModal.addEventListener(
-            "click",
-            event => {
-
-                if (
-                    event.target ===
-                    deleteMessageModal
-                ) {
-
-                    closeDeleteMessageModal();
-                }
-            }
-        );
-    }
-
-    /*
-     * Close owner menu when clicking elsewhere.
-     */
-    document.addEventListener(
-        "click",
-        event => {
-
-            if (!ownerMenu) {
-                return;
-            }
-
-            if (
-                !ownerMenu.contains(
-                    event.target
-                ) &&
-                event.target !== infoBtn
-            ) {
-
-                closeOwnerMenu();
-            }
-        }
-    );
-}
-
-
-/* =========================================================
-   BACK BUTTON
-========================================================= */
-
-function setupBackButton() {
-
-    if (backBtn) {
-
-        backBtn.addEventListener(
-            "click",
-            () => {
-
-                if (
-                    window.history.length > 1
-                ) {
-
-                    window.history.back();
-
-                } else {
-
-                    window.location.href =
-                        "groups.html";
-                }
-            }
-        );
-    }
-
-    if (backToGroupsBtn) {
-
-        backToGroupsBtn.addEventListener(
-            "click",
-            () => {
-
-                window.location.href =
-                    "groups.html";
-            }
-        );
-    }
-}
-
-
-/* =========================================================
-   CLEANUP
-========================================================= */
-
-function cleanup() {
-
-    if (stopGroup) {
-
-        stopGroup();
-
-        stopGroup = null;
-    }
-
-    if (stopMessages) {
-
-        stopMessages();
-
-        stopMessages = null;
-    }
-
-    if (stopOwnProfile) {
-
-        stopOwnProfile();
-
-        stopOwnProfile = null;
-    }
-
-    clearTimeout(
-        typingTimer
-    );
-}
-
-
-window.addEventListener(
-    "beforeunload",
-    cleanup
-);
-
-
-/* =========================================================
-   AUTH
-========================================================= */
-
-function startAuth() {
-
-    return new Promise(
-        resolve => {
-
-            let finished = false;
-
-            const unsubscribe =
-                onAuthStateChanged(
-                    auth,
-                    user => {
-
-                        if (!user) {
-
-                            window.location.href =
-                                "login.html";
-
-                            return;
-                        }
-
-                        if (finished) {
-                            return;
-                        }
-
-                        finished = true;
-
-                        currentUser =
-                            user;
-
-                        unsubscribe();
-
-                        listenToOwnProfile();
-
-                        resolve(user);
-                    }
-                );
-        }
-    );
-}
-
-
-/* =========================================================
-   INITIALIZATION
-========================================================= */
-
-async function init() {
-
-    groupId =
-        getGroupId();
-
-    if (!groupId) {
-
-        window.location.href =
-            "groups.html";
-
-        return;
-    }
-
-    showLoading();
-
-    try {
-
-        await startAuth();
-
-        loadCachedMessages();
-
-        const loaded =
-            await loadGroup();
-
-        if (!loaded) {
-            return;
-        }
-
-        setupMessageListener();
-
-        setupComposer();
-
-        setupEmoji();
-
-        setupPhotoUpload();
-
-        setupGroupInfo();
-
-        setupOwnerControls();
-
-        setupBackButton();
-
-        updateOwnerControls();
-
-        updateComposerState();
-
-    } catch (error) {
-
-        console.error(
-            "Group chat initialization error:",
-            error
-        );
-
-        hideLoading();
-
-        showAccessError(
-            "Unable to open group",
-            error?.message ||
-            "Please try again."
-        );
-    }
-}
-
-
-/* =========================================================
-   START
-========================================================= */
-
-init();
+           
