@@ -16,24 +16,26 @@
    - GROUP UNREAD COUNTS
    - Per-user read state
    - New-message badge
+   - ADMIN ACCOUNT CONTROL
+   - Suspended / banned account handling
+   - groupParticipationRestricted handling
 ========================================================= */
 
 import {
-  auth,
   db
 } from "./firebase.js";
 
 import {
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+  getCurrentConnectaUser,
+  logout
+} from "./globalAuth.js";
 
 import {
-  collection,
   doc,
   getDoc,
   getCountFromServer,
   onSnapshot,
+  collection,
   query,
   where,
   orderBy,
@@ -52,12 +54,16 @@ const $ = id =>
 
 let currentUser = null;
 let currentProfile = null;
+let currentAccountStatus = null;
+
+let accountControlLoaded = false;
 
 let allGroups = [];
 let myGroups = [];
 
 let stopPublicGroups = null;
 let stopMyGroups = null;
+let stopOwnProfile = null;
 
 let unreadCounts = {};
 
@@ -375,6 +381,461 @@ function subscriptionLabel(
 
 
 /* =========================================================
+   ACCOUNT CONTROL
+========================================================= */
+
+function getGroupAccountControl(
+  profile = null
+) {
+
+  /*
+   * Fail closed while the profile/control state
+   * is still being loaded.
+   */
+
+  if (
+    !accountControlLoaded ||
+    !profile
+  ) {
+
+    return {
+
+      blocked: false,
+
+      status:
+        "checking",
+
+      groupParticipationRestricted:
+        true,
+
+      message:
+        "Checking your CONNECTA account permissions..."
+    };
+  }
+
+
+  const status =
+    String(
+      profile.status ||
+      "active"
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const restricted =
+    profile.groupParticipationRestricted ===
+    true;
+
+
+  if (
+    status === "banned"
+  ) {
+
+    return {
+
+      blocked: true,
+
+      status,
+
+      groupParticipationRestricted:
+        true,
+
+      message:
+        "Your CONNECTA account is banned. Group participation is unavailable."
+    };
+  }
+
+
+  if (
+    status === "suspended"
+  ) {
+
+    return {
+
+      blocked: true,
+
+      status,
+
+      groupParticipationRestricted:
+        true,
+
+      message:
+        "Your CONNECTA account is suspended. Group participation is temporarily unavailable."
+    };
+  }
+
+
+  if (
+    restricted
+  ) {
+
+    return {
+
+      blocked: false,
+
+      status: "active",
+
+      groupParticipationRestricted:
+        true,
+
+      message:
+        "Group participation has been restricted by CONNECTA administration."
+    };
+  }
+
+
+  return {
+
+    blocked: false,
+
+    status: "active",
+
+    groupParticipationRestricted:
+      false,
+
+    message: ""
+  };
+}
+
+
+/* =========================================================
+   APPLY ACCOUNT CONTROL TO UI
+========================================================= */
+
+function applyGroupAccountControl() {
+
+  const control =
+    getGroupAccountControl(
+      currentProfile
+    );
+
+
+  const createButton =
+    $("createGroupBtn");
+
+
+  if (createButton) {
+
+    if (
+      control.status ===
+      "checking"
+    ) {
+
+      createButton.disabled =
+        true;
+
+      createButton.title =
+        "Checking account permissions";
+
+    } else if (
+      control.blocked ||
+      control.groupParticipationRestricted
+    ) {
+
+      createButton.disabled =
+        true;
+
+      createButton.title =
+        control.message;
+
+    } else {
+
+      createButton.disabled =
+        false;
+
+      createButton.title =
+        "Create group";
+    }
+  }
+
+
+  /*
+   * Re-render cards so Join buttons immediately
+   * reflect the new admin restriction.
+   */
+
+  refreshGroupRenders();
+
+
+  /*
+   * Show an account-control notice when applicable.
+   */
+
+  showGroupRestrictionNotice(
+    control
+  );
+}
+
+
+/* =========================================================
+   GROUP RESTRICTION NOTICE
+========================================================= */
+
+function showGroupRestrictionNotice(
+  control
+) {
+
+  const existing =
+    $("groupRestrictionNotice");
+
+
+  if (
+    !control ||
+    (
+      !control.blocked &&
+      !control.groupParticipationRestricted &&
+      control.status !== "checking"
+    )
+  ) {
+
+    if (existing) {
+
+      existing.remove();
+    }
+
+    return;
+  }
+
+
+  const target =
+    $("groupsPage") ||
+    $("groupsContainer") ||
+    $("main") ||
+    document.body;
+
+
+  if (!target) {
+    return;
+  }
+
+
+  if (existing) {
+
+    existing.innerHTML = `
+      <span>
+        ${escapeHtml(
+          control.message
+        )}
+      </span>
+    `;
+
+    return;
+  }
+
+
+  const notice =
+    document.createElement(
+      "div"
+    );
+
+
+  notice.id =
+    "groupRestrictionNotice";
+
+
+  notice.style.cssText = `
+    margin:12px 16px;
+    padding:12px 14px;
+    border-radius:12px;
+    background:#fff4e5;
+    border:1px solid #ffd8a8;
+    color:#8a4b00;
+    font-size:13px;
+    line-height:1.4;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  `;
+
+
+  notice.innerHTML = `
+    <span
+      style="
+        font-size:16px;
+        flex-shrink:0;
+      "
+    >🔒</span>
+
+    <span>
+      ${escapeHtml(
+        control.message
+      )}
+    </span>
+  `;
+
+
+  /*
+   * Put the notice at the beginning of the page.
+   */
+
+  target.prepend(
+    notice
+  );
+}
+
+
+/* =========================================================
+   REALTIME OWN PROFILE / ADMIN CONTROL
+========================================================= */
+
+function listenToOwnProfile(
+  uid
+) {
+
+  if (
+    stopOwnProfile
+  ) {
+
+    stopOwnProfile();
+
+    stopOwnProfile =
+      null;
+  }
+
+
+  accountControlLoaded =
+    false;
+
+
+  currentProfile =
+    currentProfile || {
+      uid
+    };
+
+
+  applyGroupAccountControl();
+
+
+  const profileRef =
+    doc(
+      db,
+      "users",
+      uid
+    );
+
+
+  stopOwnProfile =
+    onSnapshot(
+
+      profileRef,
+
+      snapshot => {
+
+        if (
+          !snapshot.exists()
+        ) {
+
+          accountControlLoaded =
+            true;
+
+          currentProfile = {
+
+            uid,
+
+            status:
+              "suspended",
+
+            groupParticipationRestricted:
+              true,
+
+            isVerified:
+              false
+          };
+
+          currentAccountStatus =
+            {
+              status:
+                "suspended",
+
+              blocked:
+                true
+            };
+
+
+          applyGroupAccountControl();
+
+          return;
+        }
+
+
+        currentProfile = {
+
+          uid,
+
+          ...snapshot.data()
+        };
+
+
+        currentAccountStatus =
+          getGroupAccountControl(
+            currentProfile
+          );
+
+
+        accountControlLoaded =
+          true;
+
+
+        renderHeaderProfile(
+          currentProfile
+        );
+
+
+        applyGroupAccountControl();
+
+      },
+
+      error => {
+
+        console.error(
+          "Groups profile listener:",
+          error
+        );
+
+
+        /*
+         * Fail closed if the permission state
+         * cannot be verified.
+         */
+
+        accountControlLoaded =
+          true;
+
+
+        currentProfile = {
+
+          ...(currentProfile || {}),
+
+          uid,
+
+          groupParticipationRestricted:
+            true
+        };
+
+
+        currentAccountStatus =
+          {
+            status:
+              "checking",
+
+            blocked:
+              false
+          };
+
+
+        applyGroupAccountControl();
+
+
+        showToast(
+          "Could not verify your group permissions."
+        );
+      }
+    );
+}
+
+
+/* =========================================================
    MEMBERSHIP
 ========================================================= */
 
@@ -390,9 +851,11 @@ function isMember(
     return false;
   }
 
+
   /*
    * Owner is always treated as a member.
    */
+
   if (
     String(group.ownerId || "") ===
     String(currentUser.uid)
@@ -400,6 +863,7 @@ function isMember(
 
     return true;
   }
+
 
   const members =
     Array.isArray(
@@ -411,6 +875,7 @@ function isMember(
         )
         ? group.memberIds
         : [];
+
 
   return members.includes(
     currentUser.uid
@@ -429,11 +894,63 @@ function canJoinGroup(
   if (!currentUser) {
 
     return {
+
       allowed: false,
+
       reason:
         "Please log in first."
     };
   }
+
+
+  const control =
+    getGroupAccountControl(
+      currentProfile
+    );
+
+
+  if (
+    control.status ===
+    "checking"
+  ) {
+
+    return {
+
+      allowed: false,
+
+      reason:
+        "Checking your CONNECTA account permissions..."
+    };
+  }
+
+
+  if (
+    control.blocked
+  ) {
+
+    return {
+
+      allowed: false,
+
+      reason:
+        control.message
+    };
+  }
+
+
+  if (
+    control.groupParticipationRestricted
+  ) {
+
+    return {
+
+      allowed: false,
+
+      reason:
+        control.message
+    };
+  }
+
 
   if (
     group.status !==
@@ -441,11 +958,14 @@ function canJoinGroup(
   ) {
 
     return {
+
       allowed: false,
+
       reason:
         "This group has not been approved yet."
     };
   }
+
 
   if (
     group.type ===
@@ -453,6 +973,7 @@ function canJoinGroup(
   ) {
 
     return {
+
       allowed: true,
 
       requiresPayment:
@@ -462,6 +983,7 @@ function canJoinGroup(
         ) > 0
     };
   }
+
 
   if (
     group.type ===
@@ -473,13 +995,17 @@ function canJoinGroup(
     ) {
 
       return {
+
         allowed: false,
+
         reason:
           "Only verified CONNECTA users can join private groups."
       };
     }
 
+
     return {
+
       allowed: true,
 
       requiresPayment:
@@ -490,8 +1016,11 @@ function canJoinGroup(
     };
   }
 
+
   return {
+
     allowed: false,
+
     reason:
       "Invalid group type."
   };
@@ -510,7 +1039,9 @@ function formatGroupTime(
     return "";
   }
 
+
   let date = null;
+
 
   if (
     typeof value?.toDate ===
@@ -544,6 +1075,7 @@ function formatGroupTime(
       new Date(value);
   }
 
+
   if (
     !date ||
     Number.isNaN(
@@ -554,12 +1086,15 @@ function formatGroupTime(
     return "";
   }
 
+
   const now =
     new Date();
+
 
   const sameDay =
     date.toDateString() ===
     now.toDateString();
+
 
   if (sameDay) {
 
@@ -572,15 +1107,18 @@ function formatGroupTime(
     );
   }
 
+
   const difference =
     now.getTime() -
     date.getTime();
+
 
   const days =
     Math.floor(
       difference /
       86400000
     );
+
 
   if (
     days < 7 &&
@@ -594,6 +1132,7 @@ function formatGroupTime(
       }
     );
   }
+
 
   return date.toLocaleDateString(
     [],
@@ -618,6 +1157,7 @@ function groupLastMessage(
       group.lastMessage || ""
     ).trim();
 
+
   if (!text) {
 
     return `
@@ -626,6 +1166,7 @@ function groupLastMessage(
       </span>
     `;
   }
+
 
   return escapeHtml(
     text
@@ -662,19 +1203,23 @@ function unreadBadge(
       ""
     );
 
+
   const count =
     getUnreadCount(
       groupId
     );
 
+
   if (count <= 0) {
     return "";
   }
+
 
   const display =
     count > 99
       ? "99+"
       : String(count);
+
 
   return `
     <span
@@ -717,20 +1262,26 @@ function renderGroupCard(
   const mine =
     options.mine === true;
 
+
   const member =
     isMember(group);
+
 
   const access =
     canJoinGroup(group);
 
+
   let actionText =
     "Join";
+
 
   let actionClass =
     "";
 
+
   let disabled =
     false;
+
 
   /*
    * Creator.
@@ -779,6 +1330,7 @@ function renderGroupCard(
     }
   }
 
+
   /*
    * Existing member.
    */
@@ -792,7 +1344,42 @@ function renderGroupCard(
 
     actionClass =
       "secondary";
+
+
+    /*
+     * A restricted account must not be
+     * allowed to enter group participation.
+     */
+
+    if (
+      access.allowed === false &&
+      (
+        access.reason?.includes(
+          "restricted"
+        ) ||
+        access.reason?.includes(
+          "suspended"
+        ) ||
+        access.reason?.includes(
+          "banned"
+        ) ||
+        access.reason?.includes(
+          "permissions"
+        )
+      )
+    ) {
+
+      actionText =
+        "Locked";
+
+      actionClass =
+        "secondary";
+
+      disabled =
+        true;
+    }
   }
+
 
   /*
    * Cannot join.
@@ -811,6 +1398,7 @@ function renderGroupCard(
     disabled =
       true;
   }
+
 
   /*
    * Paid group.
@@ -1057,14 +1645,17 @@ function renderPublicGroups(
   const box =
     $("publicGroups");
 
+
   if (!box) {
     return;
   }
+
 
   const term =
     String(filter || "")
       .trim()
       .toLowerCase();
+
 
   const groups =
     allGroups.filter(
@@ -1078,6 +1669,7 @@ function renderPublicGroups(
           return false;
         }
 
+
         if (
           group.type !==
           "public"
@@ -1086,15 +1678,18 @@ function renderPublicGroups(
           return false;
         }
 
+
         if (!term) {
           return true;
         }
+
 
         const searchText =
           `${group.name || ""}
            ${group.description || ""}
            ${group.ownerName || ""}`
             .toLowerCase();
+
 
         return searchText.includes(
           term
@@ -1105,6 +1700,7 @@ function renderPublicGroups(
 
   const count =
     $("publicGroupCount");
+
 
   if (count) {
 
@@ -1145,6 +1741,7 @@ function renderPublicGroups(
       </div>
     `;
 
+
     return;
   }
 
@@ -1175,14 +1772,17 @@ function renderMyGroups(
   const box =
     $("myGroups");
 
+
   if (!box) {
     return;
   }
+
 
   const term =
     String(filter || "")
       .trim()
       .toLowerCase();
+
 
   const groups =
     myGroups.filter(
@@ -1192,10 +1792,12 @@ function renderMyGroups(
           return true;
         }
 
+
         const searchText =
           `${group.name || ""}
            ${group.description || ""}`
             .toLowerCase();
+
 
         return searchText.includes(
           term
@@ -1206,6 +1808,7 @@ function renderMyGroups(
 
   const count =
     $("myGroupCount");
+
 
   if (count) {
 
@@ -1246,6 +1849,7 @@ function renderMyGroups(
       </div>
     `;
 
+
     return;
   }
 
@@ -1280,9 +1884,11 @@ function refreshGroupRenders() {
     $("groupSearch")?.value ||
     "";
 
+
   renderPublicGroups(
     search
   );
+
 
   renderMyGroups(
     search
@@ -1312,9 +1918,11 @@ function attachGroupActions(
             const groupId =
               button.dataset.groupAction;
 
+
             if (!groupId) {
               return;
             }
+
 
             const group =
               [...allGroups, ...myGroups]
@@ -1327,6 +1935,7 @@ function attachGroupActions(
                     groupId
                 );
 
+
             if (!group) {
 
               showToast(
@@ -1335,6 +1944,7 @@ function attachGroupActions(
 
               return;
             }
+
 
             await handleGroupAction(
               group
@@ -1354,6 +1964,49 @@ async function handleGroupAction(
   group
 ) {
 
+  const control =
+    getGroupAccountControl(
+      currentProfile
+    );
+
+
+  if (
+    control.status ===
+    "checking"
+  ) {
+
+    showToast(
+      control.message
+    );
+
+    return;
+  }
+
+
+  if (
+    control.blocked
+  ) {
+
+    showToast(
+      control.message
+    );
+
+    return;
+  }
+
+
+  if (
+    control.groupParticipationRestricted
+  ) {
+
+    showToast(
+      control.message
+    );
+
+    return;
+  }
+
+
   if (
     group.ownerId ===
     currentUser?.uid
@@ -1372,12 +2025,14 @@ async function handleGroupAction(
       return;
     }
 
+
     showToast(
       group.status ===
       "pending_review"
         ? "This group is waiting for admin review."
         : "This group cannot be opened."
     );
+
 
     return;
   }
@@ -1392,12 +2047,14 @@ async function handleGroupAction(
         group.groupId
       )}`;
 
+
     return;
   }
 
 
   const access =
     canJoinGroup(group);
+
 
   if (
     !access.allowed
@@ -1441,6 +2098,33 @@ async function joinFreeGroup(
     return;
   }
 
+
+  /*
+   * Re-check immediately before writing.
+   */
+
+  const control =
+    getGroupAccountControl(
+      currentProfile
+    );
+
+
+  if (
+    control.status ===
+    "checking" ||
+    control.blocked ||
+    control.groupParticipationRestricted
+  ) {
+
+    showToast(
+      control.message ||
+      "Group participation is currently unavailable."
+    );
+
+    return;
+  }
+
+
   try {
 
     const groupRef =
@@ -1450,12 +2134,14 @@ async function joinFreeGroup(
         group.groupId
       );
 
+
     const userRef =
       doc(
         db,
         "users",
         currentUser.uid
       );
+
 
     await runTransaction(
       db,
@@ -1473,6 +2159,7 @@ async function joinFreeGroup(
           )
         ]);
 
+
         if (
           !groupSnap.exists()
         ) {
@@ -1481,6 +2168,7 @@ async function joinFreeGroup(
             "Group no longer exists."
           );
         }
+
 
         if (
           !userSnap.exists()
@@ -1491,11 +2179,60 @@ async function joinFreeGroup(
           );
         }
 
+
         const groupData =
           groupSnap.data();
 
+
         const userData =
           userSnap.data();
+
+
+        /*
+         * Re-check account restrictions
+         * from Firestore immediately before
+         * changing membership.
+         */
+
+        const status =
+          String(
+            userData.status ||
+            "active"
+          )
+            .trim()
+            .toLowerCase();
+
+
+        if (
+          status === "banned"
+        ) {
+
+          throw new Error(
+            "Your CONNECTA account is banned. You cannot join groups."
+          );
+        }
+
+
+        if (
+          status === "suspended"
+        ) {
+
+          throw new Error(
+            "Your CONNECTA account is suspended. You cannot join groups."
+          );
+        }
+
+
+        if (
+          userData.groupParticipationRestricted ===
+          true
+        ) {
+
+          throw new Error(
+            "Group participation has been restricted by CONNECTA administration."
+          );
+        }
+
 
         if (
           groupData.status !==
@@ -1507,6 +2244,7 @@ async function joinFreeGroup(
           );
         }
 
+
         if (
           groupData.type ===
           "private" &&
@@ -1517,6 +2255,7 @@ async function joinFreeGroup(
             "Only verified users can join private groups."
           );
         }
+
 
         if (
           groupData.subscriptionEnabled ===
@@ -1531,6 +2270,7 @@ async function joinFreeGroup(
           );
         }
 
+
         const members =
           Array.isArray(
             groupData.members
@@ -1539,6 +2279,7 @@ async function joinFreeGroup(
                 ...groupData.members
               ]
             : [];
+
 
         if (
           members.includes(
@@ -1549,9 +2290,11 @@ async function joinFreeGroup(
           return;
         }
 
+
         members.push(
           currentUser.uid
         );
+
 
         transaction.update(
           groupRef,
@@ -1595,6 +2338,7 @@ async function joinFreeGroup(
       error
     );
 
+
     showToast(
       error.message ||
       "Could not join group."
@@ -1610,6 +2354,27 @@ async function joinFreeGroup(
 async function startPaidGroupJoin(
   group
 ) {
+
+  const control =
+    getGroupAccountControl(
+      currentProfile
+    );
+
+
+  if (
+    control.status ===
+    "checking" ||
+    control.blocked ||
+    control.groupParticipationRestricted
+  ) {
+
+    showToast(
+      control.message
+    );
+
+    return;
+  }
+
 
   if (
     group.type ===
@@ -1685,12 +2450,6 @@ async function getGroupUnreadCount(
   }
 
 
-  /*
-   * The group must have a newer message than
-   * the user's last-read timestamp before we
-   * perform the count query.
-   */
-
   const lastMessageAt =
     group.lastMessageAt;
 
@@ -1718,14 +2477,6 @@ async function getGroupUnreadCount(
       );
 
 
-    /*
-     * No read record means the user has never
-     * opened this group.
-     *
-     * If there is a latest message, count
-     * the messages currently in the group.
-     */
-
     if (
       !readSnap.exists()
     ) {
@@ -1738,10 +2489,12 @@ async function getGroupUnreadCount(
           GROUP_MESSAGES_COLLECTION
         );
 
+
       const countSnapshot =
         await getCountFromServer(
           messagesRef
         );
+
 
       return Number(
         countSnapshot.data().count || 0
@@ -1767,10 +2520,12 @@ async function getGroupUnreadCount(
           GROUP_MESSAGES_COLLECTION
         );
 
+
       const countSnapshot =
         await getCountFromServer(
           messagesRef
         );
+
 
       return Number(
         countSnapshot.data().count || 0
@@ -1778,17 +2533,11 @@ async function getGroupUnreadCount(
     }
 
 
-    /*
-     * If the latest group message is not newer
-     * than lastReadAt, there are no unread messages.
-     *
-     * This is an optimization to avoid a count query.
-     */
-
     const latestMillis =
       getTimestampMillis(
         lastMessageAt
       );
+
 
     const readMillis =
       getTimestampMillis(
@@ -1805,10 +2554,6 @@ async function getGroupUnreadCount(
       return 0;
     }
 
-
-    /*
-     * Exact unread count.
-     */
 
     const messagesRef =
       collection(
@@ -1847,6 +2592,7 @@ async function getGroupUnreadCount(
       `Could not calculate unread count for group ${groupId}:`,
       error
     );
+
 
     return 0;
   }
@@ -1942,6 +2688,11 @@ function getTimestampMillis(
 
 /* =========================================================
    REFRESH UNREAD COUNTS
+   IMPORTANT:
+   Only MY GROUPS are queried.
+   Public discovery groups should not generate
+   unread-count queries unless the user belongs
+   to them.
 ========================================================= */
 
 async function refreshUnreadCounts(
@@ -1981,6 +2732,11 @@ async function refreshUnreadCounts(
 
 
   if (!uniqueGroups.length) {
+
+    unreadCounts = {};
+
+    refreshGroupRenders();
+
     return;
   }
 
@@ -1998,10 +2754,12 @@ async function refreshUnreadCounts(
             group.groupId ||
             group.id;
 
+
           const count =
             await getGroupUnreadCount(
               group
             );
+
 
           return {
             id,
@@ -2012,11 +2770,6 @@ async function refreshUnreadCounts(
     );
 
 
-  /*
-   * Ignore old results if another refresh
-   * started while this one was running.
-   */
-
   if (
     token !==
     unreadRefreshToken
@@ -2024,6 +2777,35 @@ async function refreshUnreadCounts(
 
     return;
   }
+
+
+  /*
+   * Remove stale unread IDs first.
+   */
+
+  const activeIds =
+    new Set(
+      uniqueGroups.map(
+        group =>
+          group.groupId ||
+          group.id
+      )
+    );
+
+
+  Object.keys(
+    unreadCounts
+  ).forEach(
+    id => {
+
+      if (
+        !activeIds.has(id)
+      ) {
+
+        delete unreadCounts[id];
+      }
+    }
+  );
 
 
   results.forEach(
@@ -2052,15 +2834,18 @@ function scheduleUnreadRefresh() {
     unreadRefreshTimer
   );
 
+
   unreadRefreshTimer =
     setTimeout(
       () => {
 
+        /*
+         * IMPORTANT:
+         * Only joined groups.
+         */
+
         refreshUnreadCounts(
-          [
-            ...allGroups,
-            ...myGroups
-          ]
+          myGroups
         );
 
       },
@@ -2075,7 +2860,9 @@ function scheduleUnreadRefresh() {
 
 function listenToPublicGroups() {
 
-  if (stopPublicGroups) {
+  if (
+    stopPublicGroups
+  ) {
 
     stopPublicGroups();
 
@@ -2154,7 +2941,12 @@ function listenToPublicGroups() {
         }
 
 
-        scheduleUnreadRefresh();
+        /*
+         * Do NOT calculate unread counts
+         * for public discovery groups.
+         */
+
+        refreshGroupRenders();
       },
 
       error => {
@@ -2200,7 +2992,9 @@ function listenToPublicGroups() {
 
 function listenToMyGroups() {
 
-  if (stopMyGroups) {
+  if (
+    stopMyGroups
+  ) {
 
     stopMyGroups();
 
@@ -2253,33 +3047,12 @@ function listenToMyGroups() {
 
 
         /*
-         * Merge public and personal groups
-         * without duplicate group IDs.
+         * Keep allGroups as discovery groups only.
+         *
+         * Do not merge myGroups into allGroups,
+         * otherwise private groups can accidentally
+         * appear in public discovery rendering.
          */
-
-        const map =
-          new Map();
-
-
-        [
-          ...allGroups,
-          ...myGroups
-        ].forEach(
-          group => {
-
-            map.set(
-              group.groupId ||
-              group.id,
-              group
-            );
-          }
-        );
-
-
-        allGroups =
-          [
-            ...map.values()
-          ];
 
 
         renderMyGroups(
@@ -2334,8 +3107,41 @@ function listenToMyGroups() {
 
 function openCreateGroupModal() {
 
+  const control =
+    getGroupAccountControl(
+      currentProfile
+    );
+
+
+  if (
+    control.status ===
+    "checking"
+  ) {
+
+    showToast(
+      control.message
+    );
+
+    return;
+  }
+
+
+  if (
+    control.blocked ||
+    control.groupParticipationRestricted
+  ) {
+
+    showToast(
+      control.message
+    );
+
+    return;
+  }
+
+
   const modal =
     $("groupModal");
+
 
   if (!modal) {
     return;
@@ -2358,10 +3164,12 @@ function openCreateGroupModal() {
     "open"
   );
 
+
   modal.setAttribute(
     "aria-hidden",
     "false"
   );
+
 
   $("groupName")?.focus();
 }
@@ -2376,13 +3184,16 @@ function closeCreateGroupModal() {
   const modal =
     $("groupModal");
 
+
   if (!modal) {
     return;
   }
 
+
   modal.classList.remove(
     "open"
   );
+
 
   modal.setAttribute(
     "aria-hidden",
@@ -2401,20 +3212,25 @@ function updateSubscriptionUI() {
     $("subscriptionEnabled")?.value ===
     "true";
 
+
   const box =
     $("subscriptionBox");
+
 
   if (!box) {
     return;
   }
+
 
   box.classList.toggle(
     "show",
     enabled
   );
 
+
   const feeInput =
     $("subscriptionFee");
+
 
   if (feeInput) {
 
@@ -2439,6 +3255,42 @@ async function createGroup(
 
     showToast(
       "Please log in first."
+    );
+
+    return;
+  }
+
+
+  /*
+   * Account-control check.
+   */
+
+  const control =
+    getGroupAccountControl(
+      currentProfile
+    );
+
+
+  if (
+    control.status ===
+    "checking"
+  ) {
+
+    showToast(
+      control.message
+    );
+
+    return;
+  }
+
+
+  if (
+    control.blocked ||
+    control.groupParticipationRestricted
+  ) {
+
+    showToast(
+      control.message
     );
 
     return;
@@ -2578,6 +3430,50 @@ async function createGroup(
       userSnap.data();
 
 
+    /*
+     * Final server-side Firestore profile check.
+     */
+
+    const status =
+      String(
+        userData.status ||
+        "active"
+      )
+        .trim()
+        .toLowerCase();
+
+
+    if (
+      status === "banned"
+    ) {
+
+      throw new Error(
+        "Your CONNECTA account is banned. You cannot create groups."
+      );
+    }
+
+
+    if (
+      status === "suspended"
+    ) {
+
+      throw new Error(
+        "Your CONNECTA account is suspended. You cannot create groups."
+      );
+    }
+
+
+    if (
+      userData.groupParticipationRestricted ===
+      true
+    ) {
+
+      throw new Error(
+        "Group participation has been restricted by CONNECTA administration."
+      );
+    }
+
+
     if (
       userData.isVerified !== true
     ) {
@@ -2707,7 +3603,9 @@ async function createGroup(
     const publicRadio =
       $("publicGroup");
 
+
     if (publicRadio) {
+
       publicRadio.checked =
         true;
     }
@@ -2715,6 +3613,7 @@ async function createGroup(
 
     const subscription =
       $("subscriptionEnabled");
+
 
     if (subscription) {
 
@@ -2774,11 +3673,14 @@ function switchTab(
   const discoverTab =
     $("discoverTab");
 
+
   const myGroupsTab =
     $("myGroupsTab");
 
+
   const discoverSection =
     $("discoverSection");
+
 
   const mineSection =
     $("mineSection");
@@ -2792,16 +3694,21 @@ function switchTab(
       "active"
     );
 
+
     myGroupsTab?.classList.add(
       "active"
     );
 
+
     if (discoverSection) {
+
       discoverSection.hidden =
         true;
     }
 
+
     if (mineSection) {
+
       mineSection.hidden =
         false;
     }
@@ -2818,16 +3725,21 @@ function switchTab(
       "active"
     );
 
+
     discoverTab?.classList.add(
       "active"
     );
 
+
     if (mineSection) {
+
       mineSection.hidden =
         true;
     }
 
+
     if (discoverSection) {
+
       discoverSection.hidden =
         false;
     }
@@ -2850,8 +3762,10 @@ function setupMenu() {
   const menuBtn =
     $("menuBtn");
 
+
   const sideMenu =
     $("sideMenu");
+
 
   const overlay =
     $("menuOverlay");
@@ -2875,10 +3789,12 @@ function setupMenu() {
         "open"
       );
 
+
       sideMenu.setAttribute(
         "aria-hidden",
         "false"
       );
+
 
       overlay.classList.add(
         "open"
@@ -2899,10 +3815,12 @@ function setupMenu() {
       "open"
     );
 
+
     sideMenu.setAttribute(
       "aria-hidden",
       "true"
     );
+
 
     overlay.classList.remove(
       "open"
@@ -3092,13 +4010,8 @@ function setupLogout() {
 
       try {
 
-        await signOut(
-          auth
-        );
-
-
-        location.replace(
-          "login.html"
+        await logout(
+          true
         );
 
 
@@ -3204,17 +4117,22 @@ function setupCreateGroup() {
   const openButton =
     $("createGroupBtn");
 
+
   const closeButton =
     $("closeGroupModal");
+
 
   const cancelButton =
     $("cancelGroupBtn");
 
+
   const modal =
     $("groupModal");
 
+
   const form =
     $("createGroupForm");
+
 
   const subscription =
     $("subscriptionEnabled");
@@ -3304,7 +4222,9 @@ function setupTabs() {
 
 function cleanup() {
 
-  if (stopPublicGroups) {
+  if (
+    stopPublicGroups
+  ) {
 
     stopPublicGroups();
 
@@ -3313,7 +4233,9 @@ function cleanup() {
   }
 
 
-  if (stopMyGroups) {
+  if (
+    stopMyGroups
+  ) {
 
     stopMyGroups();
 
@@ -3322,9 +4244,23 @@ function cleanup() {
   }
 
 
+  if (
+    stopOwnProfile
+  ) {
+
+    stopOwnProfile();
+
+    stopOwnProfile =
+      null;
+  }
+
+
   clearTimeout(
     unreadRefreshTimer
   );
+
+
+  unreadRefreshToken++;
 }
 
 
@@ -3335,80 +4271,89 @@ window.addEventListener(
 
 
 /* =========================================================
-   AUTH
+   AUTH / INITIALIZATION
 ========================================================= */
 
-onAuthStateChanged(
-  auth,
-  async user => {
+async function initializeGroups() {
 
-    if (!user) {
+  /*
+   * Centralized CONNECTA authentication.
+   *
+   * allowBlocked:true allows this page to remain
+   * open so the UI can react to admin restrictions.
+   */
 
-      location.replace(
-        "login.html"
-      );
+  const session =
+    await getCurrentConnectaUser({
 
-      return;
-    }
+      redirect:
+        true,
 
-
-    currentUser =
-      user;
-
-
-    try {
-
-      const userSnap =
-        await getDoc(
-          doc(
-            db,
-            "users",
-            user.uid
-          )
-        );
+      allowBlocked:
+        true
+    });
 
 
-      if (
-        !userSnap.exists()
-      ) {
-
-        throw new Error(
-          "CONNECTA profile not found."
-        );
-      }
-
-
-      currentProfile =
-        {
-          uid: user.uid,
-          ...userSnap.data()
-        };
-
-
-      renderHeaderProfile(
-        currentProfile
-      );
-
-
-      listenToPublicGroups();
-
-      listenToMyGroups();
-
-
-    } catch (error) {
-
-      console.error(
-        "Groups initialization error:",
-        error
-      );
-
-
-      showToast(
-        "Could not load your CONNECTA profile."
-      );
-    }
+  if (!session) {
+    return;
   }
-);
+
+
+  currentUser =
+    session.authUser;
+
+
+  currentProfile =
+    session.profile || {
+
+      uid:
+        currentUser.uid,
+
+      status:
+        "active"
+    };
+
+
+  currentAccountStatus =
+    session.accountStatus;
+
+
+  /*
+   * The profile returned by globalAuth is the
+   * initial permission state.
+   */
+
+  accountControlLoaded =
+    true;
+
+
+  renderHeaderProfile(
+    currentProfile
+  );
+
+
+  applyGroupAccountControl();
+
+
+  /*
+   * Keep listening for admin changes.
+   *
+   * This means an admin can suspend/restrict/
+   * restore the user while this page is open.
+   */
+
+  listenToOwnProfile(
+    currentUser.uid
+  );
+
+
+  listenToPublicGroups();
+
+  listenToMyGroups();
+}
+
+
+initializeGroups();
 
 
 /* =========================================================
