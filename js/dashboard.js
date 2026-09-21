@@ -2,20 +2,55 @@
    CONNECTA — DASHBOARD
    File: js/dashboard.js
 
-   AUTHENTICATION
-   - Uses globalAuth.js
-   - Firebase Authentication is the source of truth
-   - Same logged-in user is used across CONNECTA pages
+   FEATURES
+   - Firebase Authentication via globalAuth.js
+   - Instant cache-first dashboard
+   - Background Firestore synchronization
+   - Private chats
+   - Group chats
+   - Group unread counts
+   - members + memberIds group membership
+   - Online/offline users
+   - Follow / unfollow
+   - Profile cache
+   - Presence
+   - Chat search
+   - Online-user search
+   - Account restriction handling
+   - Private message status ticks
+   - Verified badges
+   - Mobile-friendly app behaviour
+
+   IMPORTANT
+   - No blocking "Loading..." screen
+   - Cached content renders immediately
+   - First visit uses lightweight skeleton animation
+   - Firestore updates happen silently in background
+========================================================= */
+
+
+/* =========================================================
+   FIREBASE
 ========================================================= */
 
 import {
   db
 } from "./firebase.js";
 
+
+/* =========================================================
+   GLOBAL AUTH
+========================================================= */
+
 import {
   getCurrentConnectaUser,
   logout
 } from "./globalAuth.js";
+
+
+/* =========================================================
+   FIRESTORE
+========================================================= */
 
 import {
   collection,
@@ -37,38 +72,58 @@ import {
    BASIC HELPERS
 ========================================================= */
 
-const $ = (id) =>
+const $ = id =>
   document.getElementById(id);
+
+
+/* =========================================================
+   GLOBAL STATE
+========================================================= */
 
 let currentUser = null;
 let currentProfile = null;
 
 let onlineUsers = [];
+
 let recentChats = [];
+
 let recentGroups = [];
 
 let groupListeners = [];
+
 let groupReadListeners = [];
 
 let stopUsers = null;
+
 let stopChats = null;
 
 let presenceInterval = null;
 
 
 /* =========================================================
-   DASHBOARD CACHE
+   CACHE
 ========================================================= */
 
 const DASHBOARD_CACHE_PREFIX =
-  "connectaDashboardCache_v2_";
+  "connectaDashboardCache_v3_";
 
 const PROFILE_CACHE_KEY =
   "connectaProfileCache";
 
 
 /* =========================================================
-   SAFE PROFILE DATA
+   CACHE VERSION
+========================================================= */
+
+function getCacheKey(uid) {
+
+  return `${DASHBOARD_CACHE_PREFIX}${uid}`;
+
+}
+
+
+/* =========================================================
+   PUBLIC PROFILE DATA
 ========================================================= */
 
 function publicProfileData(
@@ -122,324 +177,6 @@ function publicProfileData(
 
 
 /* =========================================================
-   DASHBOARD CACHE
-========================================================= */
-
-function getDashboardCache(uid) {
-
-  if (!uid) {
-    return null;
-  }
-
-  try {
-
-    const raw =
-      localStorage.getItem(
-        `${DASHBOARD_CACHE_PREFIX}${uid}`
-      );
-
-    if (!raw) {
-      return null;
-    }
-
-    return JSON.parse(raw);
-
-  } catch (error) {
-
-    console.warn(
-      "Dashboard cache read failed:",
-      error
-    );
-
-    return null;
-  }
-
-}
-
-
-function saveDashboardCache(uid) {
-
-  if (!uid) {
-    return;
-  }
-
-  try {
-
-    const safeProfile =
-      currentProfile
-        ? {
-            ...publicProfileData(
-              uid,
-              currentProfile
-            ),
-
-            following:
-              Array.isArray(
-                currentProfile.following
-              )
-                ? currentProfile.following
-                : []
-          }
-        : null;
-
-
-    const cache = {
-
-      profile:
-        safeProfile,
-
-      users:
-        Array.isArray(onlineUsers)
-          ? onlineUsers.map(
-              user =>
-                publicProfileData(
-                  user.uid,
-                  user
-                )
-            )
-          : [],
-
-      chats:
-        Array.isArray(recentChats)
-          ? recentChats
-          : [],
-
-      cachedAt:
-        Date.now()
-
-    };
-
-
-    localStorage.setItem(
-
-      `${DASHBOARD_CACHE_PREFIX}${uid}`,
-
-      JSON.stringify(cache)
-
-    );
-
-  } catch (error) {
-
-    console.warn(
-      "Dashboard cache save failed:",
-      error
-    );
-
-  }
-
-}
-
-
-/* =========================================================
-   LOAD DASHBOARD CACHE
-========================================================= */
-
-function loadDashboardCache(uid) {
-
-  const cache =
-    getDashboardCache(uid);
-
-  if (!cache) {
-    return false;
-  }
-
-
-  let hasData = false;
-
-
-  /* PROFILE */
-
-  if (
-    cache.profile &&
-    typeof cache.profile === "object"
-  ) {
-
-    currentProfile =
-      cache.profile;
-
-    renderProfile(
-      currentProfile
-    );
-
-    hasData = true;
-
-  }
-
-
-  /* USERS */
-
-  if (
-    Array.isArray(cache.users) &&
-    cache.users.length
-  ) {
-
-    onlineUsers =
-      cache.users.map(
-        user =>
-          publicProfileData(
-            user.uid,
-            user
-          )
-      );
-
-    renderOnline(
-      $("onlineSearch")?.value || ""
-    );
-
-    hasData = true;
-
-  }
-
-
-  /* CHATS */
-
-  if (
-    Array.isArray(cache.chats)
-  ) {
-
-    recentChats =
-      cache.chats;
-
-    renderChats(
-      recentChats,
-      $("chatSearch")?.value || ""
-    );
-
-    hasData = true;
-
-  }
-
-
-  return hasData;
-
-}
-
-/* GROUPS */
-
-if (
-  Array.isArray(cache.groups)
-) {
-
-  recentGroups =
-    cache.groups;
-
-  mergeRecentChats();
-
-}
-
-
-/* =========================================================
-   PROFILE CACHE
-========================================================= */
-
-function getProfileCache() {
-
-  try {
-
-    return JSON.parse(
-      localStorage.getItem(
-        PROFILE_CACHE_KEY
-      ) || "{}"
-    );
-
-  } catch {
-
-    return {};
-
-  }
-
-}
-
-
-function saveProfileToCache(
-  uid,
-  profile
-) {
-
-  if (!uid || !profile) {
-    return;
-  }
-
-  try {
-
-    const cache =
-      getProfileCache();
-
-
-    cache[uid] = {
-
-      ...publicProfileData(
-        uid,
-        profile
-      ),
-
-      cachedAt:
-        Date.now()
-
-    };
-
-
-    localStorage.setItem(
-      PROFILE_CACHE_KEY,
-      JSON.stringify(cache)
-    );
-
-  } catch (error) {
-
-    console.warn(
-      "Profile cache save failed:",
-      error
-    );
-
-  }
-
-}
-
-
-function getCachedProfile(uid) {
-
-  if (!uid) {
-    return null;
-  }
-
-  try {
-
-    const cache =
-      getProfileCache();
-
-    return cache[uid] || null;
-
-  } catch {
-
-    return null;
-
-  }
-
-}
-
-
-/* =========================================================
-   INITIALS
-========================================================= */
-
-function initials(
-  name = "U"
-) {
-
-  return String(name)
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(
-      x => x[0]
-    )
-    .join("")
-    .toUpperCase() || "U";
-
-}
-
-
-/* =========================================================
    FULL NAME
 ========================================================= */
 
@@ -482,7 +219,9 @@ function getFullName(
 
 
   if (fullName) {
+
     return fullName;
+
   }
 
 
@@ -506,12 +245,15 @@ function getFullName(
   const username =
     String(
       user.username || ""
-    ).trim()
-    .replace(/^@/, "");
+    )
+      .trim()
+      .replace(/^@/, "");
 
 
   if (username) {
+
     return username;
+
   }
 
 
@@ -521,12 +263,38 @@ function getFullName(
 
 
 /* =========================================================
+   INITIALS
+========================================================= */
+
+function initials(
+  name = "U"
+) {
+
+  return String(name)
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(
+      part =>
+        part[0]
+    )
+    .join("")
+    .toUpperCase() || "U";
+
+}
+
+
+/* =========================================================
    ESCAPE HTML
 ========================================================= */
 
-function escapeHtml(value) {
+function escapeHtml(
+  value
+) {
 
-  return String(value ?? "")
+  return String(
+    value ?? ""
+  )
     .replace(
       /[&<>"']/g,
       character => ({
@@ -542,16 +310,137 @@ function escapeHtml(value) {
 
 
 /* =========================================================
+   FIRESTORE DATE
+========================================================= */
+
+function timestampToDate(
+  value
+) {
+
+  if (!value) {
+
+    return null;
+
+  }
+
+
+  if (
+    typeof value.toDate ===
+    "function"
+  ) {
+
+    return value.toDate();
+
+  }
+
+
+  if (
+    typeof value.seconds ===
+    "number"
+  ) {
+
+    return new Date(
+      value.seconds * 1000
+    );
+
+  }
+
+
+  if (
+    typeof value._seconds ===
+    "number"
+  ) {
+
+    return new Date(
+      value._seconds * 1000
+    );
+
+  }
+
+
+  const date =
+    new Date(value);
+
+
+  return Number.isNaN(
+    date.getTime()
+  )
+    ? null
+    : date;
+
+}
+
+
+/* =========================================================
+   FORMAT TIME
+========================================================= */
+
+function formatTimestamp(
+  timestamp
+) {
+
+  const date =
+    timestampToDate(
+      timestamp
+    );
+
+
+  if (!date) {
+
+    return "";
+
+  }
+
+
+  const now =
+    new Date();
+
+
+  const sameDay =
+    date.toDateString() ===
+    now.toDateString();
+
+
+  if (sameDay) {
+
+    return date.toLocaleTimeString(
+      [],
+      {
+        hour: "numeric",
+        minute: "2-digit"
+      }
+    );
+
+  }
+
+
+  return date.toLocaleDateString(
+    [],
+    {
+      day: "numeric",
+      month: "short"
+    }
+  );
+
+}
+
+
+/* =========================================================
    TOAST
 ========================================================= */
 
-function showToast(message) {
+function showToast(
+  message
+) {
 
   const toast =
     $("toast");
 
+
   if (!toast) {
+
     return;
+
   }
 
 
@@ -585,7 +474,767 @@ function showToast(message) {
 
 
 /* =========================================================
-   ADMIN ACCOUNT CONTROL
+   VERIFIED BADGE
+========================================================= */
+
+function verifiedBadge(
+  user = {}
+) {
+
+  if (
+    user.isVerified !== true
+  ) {
+
+    return "";
+
+  }
+
+
+  return `
+    <span
+      class="verified-badge"
+      aria-label="Verified account"
+      title="Verified account"
+      style="
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:18px;
+        height:18px;
+        margin-left:5px;
+        border-radius:50%;
+        background:#2196F3;
+        color:#fff;
+        font-size:11px;
+        font-weight:800;
+        line-height:1;
+        vertical-align:middle;
+        flex-shrink:0;
+      "
+    >✓</span>
+  `;
+
+}
+
+
+/* =========================================================
+   AVATAR
+========================================================= */
+
+function avatarMarkup(
+  user = {},
+  extra = ""
+) {
+
+  const name =
+    getFullName(user);
+
+
+  const photo =
+    user.photoURL ||
+    user.photoUrl ||
+    "";
+
+
+  return `
+    <div class="avatar large ${extra}">
+      ${
+        photo
+          ? `
+            <img
+              src="${escapeHtml(photo)}"
+              alt="${escapeHtml(name)}"
+              loading="lazy"
+            >
+          `
+          : initials(name)
+      }
+    </div>
+  `;
+
+}
+
+
+/* =========================================================
+   DASHBOARD CACHE
+========================================================= */
+
+function getDashboardCache(
+  uid
+) {
+
+  if (!uid) {
+
+    return null;
+
+  }
+
+
+  try {
+
+    const raw =
+      localStorage.getItem(
+        getCacheKey(uid)
+      );
+
+
+    if (!raw) {
+
+      return null;
+
+    }
+
+
+    return JSON.parse(
+      raw
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Dashboard cache read failed:",
+      error
+    );
+
+
+    return null;
+
+  }
+
+}
+
+
+/* =========================================================
+   SAVE DASHBOARD CACHE
+========================================================= */
+
+function saveDashboardCache(
+  uid
+) {
+
+  if (!uid) {
+
+    return;
+
+  }
+
+
+  try {
+
+    const safeProfile =
+      currentProfile
+        ? {
+            ...publicProfileData(
+              uid,
+              currentProfile
+            ),
+
+            following:
+              Array.isArray(
+                currentProfile.following
+              )
+                ? currentProfile.following
+                : []
+          }
+        : null;
+
+
+    const cache = {
+
+      profile:
+        safeProfile,
+
+      users:
+        Array.isArray(
+          onlineUsers
+        )
+          ? onlineUsers.map(
+              user =>
+                publicProfileData(
+                  user.uid,
+                  user
+                )
+            )
+          : [],
+
+      chats:
+        Array.isArray(
+          recentChats
+        )
+          ? recentChats
+          : [],
+
+      groups:
+        Array.isArray(
+          recentGroups
+        )
+          ? recentGroups
+          : [],
+
+      cachedAt:
+        Date.now()
+
+    };
+
+
+    localStorage.setItem(
+
+      getCacheKey(uid),
+
+      JSON.stringify(
+        cache
+      )
+
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Dashboard cache save failed:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   PROFILE CACHE
+========================================================= */
+
+function getProfileCache() {
+
+  try {
+
+    return JSON.parse(
+      localStorage.getItem(
+        PROFILE_CACHE_KEY
+      ) || "{}"
+    );
+
+  } catch {
+
+    return {};
+
+  }
+
+}
+
+
+/* =========================================================
+   SAVE PROFILE CACHE
+========================================================= */
+
+function saveProfileToCache(
+  uid,
+  profile
+) {
+
+  if (
+    !uid ||
+    !profile
+  ) {
+
+    return;
+
+  }
+
+
+  try {
+
+    const cache =
+      getProfileCache();
+
+
+    cache[uid] = {
+
+      ...publicProfileData(
+        uid,
+        profile
+      ),
+
+      cachedAt:
+        Date.now()
+
+    };
+
+
+    localStorage.setItem(
+      PROFILE_CACHE_KEY,
+      JSON.stringify(
+        cache
+      )
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Profile cache save failed:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   GET PROFILE CACHE
+========================================================= */
+
+function getCachedProfile(
+  uid
+) {
+
+  if (!uid) {
+
+    return null;
+
+  }
+
+
+  try {
+
+    const cache =
+      getProfileCache();
+
+
+    return (
+      cache[uid] ||
+      null
+    );
+
+  } catch {
+
+    return null;
+
+  }
+
+}
+
+
+/* =========================================================
+   SKELETON
+========================================================= */
+
+function injectDashboardSkeletonStyle() {
+
+  if (
+    document.getElementById(
+      "connectaDashboardSkeletonStyle"
+    )
+  ) {
+
+    return;
+
+  }
+
+
+  const style =
+    document.createElement(
+      "style"
+    );
+
+
+  style.id =
+    "connectaDashboardSkeletonStyle";
+
+
+  style.textContent = `
+
+    @keyframes connectaSkeletonPulse {
+
+      0% {
+        opacity:.45;
+      }
+
+      50% {
+        opacity:.9;
+      }
+
+      100% {
+        opacity:.45;
+      }
+
+    }
+
+    .connecta-skeleton {
+      background:
+        linear-gradient(
+          90deg,
+          rgba(226,232,240,.7),
+          rgba(241,245,249,.95),
+          rgba(226,232,240,.7)
+        );
+
+      background-size:200% 100%;
+
+      animation:
+        connectaSkeletonPulse 1.3s ease-in-out infinite;
+
+      border-radius:12px;
+    }
+
+    .connecta-dashboard-skeleton {
+      padding:10px 0;
+    }
+
+    .connecta-skeleton-chat {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:12px 4px;
+    }
+
+    .connecta-skeleton-avatar {
+      width:48px;
+      height:48px;
+      border-radius:50%;
+      flex-shrink:0;
+    }
+
+    .connecta-skeleton-lines {
+      flex:1;
+      min-width:0;
+    }
+
+    .connecta-skeleton-line {
+      height:11px;
+      margin-bottom:8px;
+      max-width:75%;
+    }
+
+    .connecta-skeleton-line.short {
+      max-width:45%;
+    }
+
+    .connecta-skeleton-online {
+      display:flex;
+      gap:10px;
+      overflow:hidden;
+      padding:8px 0;
+    }
+
+    .connecta-skeleton-user {
+      width:78px;
+      flex:0 0 78px;
+      text-align:center;
+    }
+
+    .connecta-skeleton-user .connecta-skeleton-avatar {
+      width:58px;
+      height:58px;
+      margin:0 auto 7px;
+    }
+
+  `;
+
+
+  document.head.appendChild(
+    style
+  );
+
+}
+
+
+/* =========================================================
+   SHOW NON-BLOCKING SKELETON
+========================================================= */
+
+function showDashboardSkeleton() {
+
+  injectDashboardSkeletonStyle();
+
+
+  const onlineBox =
+    $("onlineUsers");
+
+
+  if (
+    onlineBox &&
+    !onlineBox.children.length
+  ) {
+
+    onlineBox.innerHTML = `
+
+      <div class="connecta-dashboard-skeleton">
+
+        <div class="connecta-skeleton-online">
+
+          ${Array.from(
+            {
+              length: 5
+            }
+          )
+            .map(
+              () => `
+                <div
+                  class="connecta-skeleton-user"
+                >
+
+                  <div
+                    class="
+                      connecta-skeleton
+                      connecta-skeleton-avatar
+                    "
+                  ></div>
+
+                  <div
+                    class="
+                      connecta-skeleton
+                      connecta-skeleton-line
+                      short
+                    "
+                    style="
+                      margin:0 auto;
+                    "
+                  ></div>
+
+                </div>
+              `
+            )
+            .join("")}
+
+        </div>
+
+      </div>
+
+    `;
+
+  }
+
+
+  const chatBox =
+    $("chatList");
+
+
+  if (
+    chatBox &&
+    !chatBox.children.length
+  ) {
+
+    chatBox.innerHTML = `
+
+      <div class="connecta-dashboard-skeleton">
+
+        ${Array.from(
+          {
+            length: 4
+          }
+        )
+          .map(
+            () => `
+              <div
+                class="connecta-skeleton-chat"
+              >
+
+                <div
+                  class="
+                    connecta-skeleton
+                    connecta-skeleton-avatar
+                  "
+                ></div>
+
+                <div
+                  class="
+                    connecta-skeleton-lines
+                  "
+                >
+
+                  <div
+                    class="
+                      connecta-skeleton
+                      connecta-skeleton-line
+                    "
+                  ></div>
+
+                  <div
+                    class="
+                      connecta-skeleton
+                      connecta-skeleton-line
+                      short
+                    "
+                  ></div>
+
+                </div>
+
+              </div>
+            `
+          )
+          .join("")}
+
+      </div>
+
+    `;
+
+  }
+
+}
+
+
+/* =========================================================
+   REMOVE SKELETON IF REAL DATA EXISTS
+========================================================= */
+
+function removeDashboardSkeleton(
+  element
+) {
+
+  if (!element) {
+
+    return;
+
+  }
+
+
+  const skeleton =
+    element.querySelector(
+      ".connecta-dashboard-skeleton"
+    );
+
+
+  if (skeleton) {
+
+    skeleton.remove();
+
+  }
+
+}
+
+
+/* =========================================================
+   LOAD DASHBOARD CACHE
+========================================================= */
+
+function loadDashboardCache(
+  uid
+) {
+
+  const cache =
+    getDashboardCache(uid);
+
+
+  if (!cache) {
+
+    return false;
+
+  }
+
+
+  let hasData =
+    false;
+
+
+  /* PROFILE */
+
+  if (
+    cache.profile &&
+    typeof cache.profile ===
+      "object"
+  ) {
+
+    currentProfile =
+      cache.profile;
+
+
+    renderProfile(
+      currentProfile
+    );
+
+
+    hasData =
+      true;
+
+  }
+
+
+  /* USERS */
+
+  if (
+    Array.isArray(
+      cache.users
+    ) &&
+    cache.users.length
+  ) {
+
+    onlineUsers =
+      cache.users.map(
+        user =>
+          publicProfileData(
+            user.uid,
+            user
+          )
+      );
+
+
+    renderOnline(
+      $("onlineSearch")?.value ||
+      ""
+    );
+
+
+    hasData =
+      true;
+
+  }
+
+
+  /* PRIVATE CHATS */
+
+  if (
+    Array.isArray(
+      cache.chats
+    )
+  ) {
+
+    recentChats =
+      cache.chats;
+
+
+    hasData =
+      true;
+
+  }
+
+
+  /* GROUP CHATS */
+
+  if (
+    Array.isArray(
+      cache.groups
+    )
+  ) {
+
+    recentGroups =
+      cache.groups;
+
+
+    hasData =
+      true;
+
+  }
+
+
+  /* RENDER EVERYTHING TOGETHER */
+
+  if (
+    recentChats.length ||
+    recentGroups.length
+  ) {
+
+    mergeRecentChats();
+
+  }
+
+
+  return hasData;
+
+}
+
+
+/* =========================================================
+   ACCOUNT CONTROL
 ========================================================= */
 
 function getAccountControl(
@@ -594,17 +1243,24 @@ function getAccountControl(
 
   const status =
     String(
-      profile.status || "active"
-    ).toLowerCase().trim();
+      profile.status ||
+      "active"
+    )
+      .toLowerCase()
+      .trim();
 
 
-  if (status === "banned") {
+  if (
+    status === "banned"
+  ) {
 
     return {
 
-      blocked: true,
+      blocked:
+        true,
 
-      status: "banned",
+      status:
+        "banned",
 
       message:
         "Your CONNECTA account has been banned."
@@ -614,13 +1270,17 @@ function getAccountControl(
   }
 
 
-  if (status === "suspended") {
+  if (
+    status === "suspended"
+  ) {
 
     return {
 
-      blocked: true,
+      blocked:
+        true,
 
-      status: "suspended",
+      status:
+        "suspended",
 
       message:
         "Your CONNECTA account is currently suspended."
@@ -632,11 +1292,14 @@ function getAccountControl(
 
   return {
 
-    blocked: false,
+    blocked:
+      false,
 
-    status: "active",
+    status:
+      "active",
 
-    message: ""
+    message:
+      ""
 
   };
 
@@ -679,7 +1342,7 @@ function showAccountBlockedScreen(
         style="
           width:100%;
           max-width:420px;
-          background:#ffffff;
+          background:#fff;
           border-radius:22px;
           padding:30px 24px;
           text-align:center;
@@ -747,7 +1410,7 @@ function showAccountBlockedScreen(
             border-radius:12px;
             padding:13px 16px;
             background:#22c55e;
-            color:#ffffff;
+            color:#fff;
             font-size:14px;
             font-weight:800;
             cursor:pointer;
@@ -768,7 +1431,9 @@ function showAccountBlockedScreen(
       "click",
       async () => {
 
-        await logout(true);
+        await logout(
+          true
+        );
 
       }
     );
@@ -777,87 +1442,7 @@ function showAccountBlockedScreen(
 
 
 /* =========================================================
-   AVATAR
-========================================================= */
-
-function avatarMarkup(
-  user = {},
-  extra = ""
-) {
-
-  const name =
-    getFullName(user);
-
-
-  const photo =
-    user.photoURL ||
-    user.photoUrl ||
-    "";
-
-
-  return `
-    <div class="avatar large ${extra}">
-      ${
-        photo
-          ? `
-            <img
-              src="${escapeHtml(photo)}"
-              alt="${escapeHtml(name)}"
-              loading="lazy"
-            >
-          `
-          : initials(name)
-      }
-    </div>
-  `;
-
-}
-
-
-/* =========================================================
-   VERIFIED BADGE
-========================================================= */
-
-function verifiedBadge(
-  user = {}
-) {
-
-  if (
-    user.isVerified !== true
-  ) {
-    return "";
-  }
-
-
-  return `
-    <span
-      class="verified-badge"
-      aria-label="Verified account"
-      title="Verified account"
-      style="
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        width:18px;
-        height:18px;
-        margin-left:5px;
-        border-radius:50%;
-        background:#2196F3;
-        color:#ffffff;
-        font-size:11px;
-        font-weight:800;
-        line-height:1;
-        vertical-align:middle;
-        flex-shrink:0;
-      "
-    >✓</span>
-  `;
-
-}
-
-
-/* =========================================================
-   CURRENT USER PROFILE
+   CURRENT PROFILE
 ========================================================= */
 
 function renderProfile(
@@ -877,9 +1462,11 @@ function renderProfile(
 
   const username =
     currentProfile.username
+
       ? `@${String(
           currentProfile.username
         ).replace(/^@/, "")}`
+
       : "@username";
 
 
@@ -889,6 +1476,7 @@ function renderProfile(
 
   const welcomeName =
     $("welcomeName");
+
 
   if (welcomeName) {
 
@@ -901,9 +1489,11 @@ function renderProfile(
   const welcomeAvatar =
     $("welcomeAvatar");
 
+
   if (welcomeAvatar) {
 
     welcomeAvatar.innerHTML =
+
       currentProfile.photoURL
 
         ? `
@@ -923,9 +1513,11 @@ function renderProfile(
   const profileBtn =
     $("profileBtn");
 
+
   if (profileBtn) {
 
     profileBtn.innerHTML =
+
       currentProfile.photoURL
 
         ? `
@@ -945,9 +1537,11 @@ function renderProfile(
   const menuAvatar =
     $("menuAvatar");
 
+
   if (menuAvatar) {
 
     menuAvatar.innerHTML =
+
       currentProfile.photoURL
 
         ? `
@@ -967,6 +1561,7 @@ function renderProfile(
   const menuName =
     $("menuName");
 
+
   if (menuName) {
 
     menuName.textContent =
@@ -977,6 +1572,7 @@ function renderProfile(
 
   const menuUsername =
     $("menuUsername");
+
 
   if (menuUsername) {
 
@@ -989,11 +1585,13 @@ function renderProfile(
   const balanceAmount =
     $("balanceAmount");
 
+
   if (balanceAmount) {
 
     const balance =
       Number(
-        currentProfile.balance || 0
+        currentProfile.balance ||
+        0
       );
 
 
@@ -1001,8 +1599,8 @@ function renderProfile(
       balance.toLocaleString(
         "en-KE",
         {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
+          minimumFractionDigits:2,
+          maximumFractionDigits:2
         }
       );
 
@@ -1022,81 +1620,103 @@ function renderOnline(
   const box =
     $("onlineUsers");
 
+
   if (!box) {
+
     return;
+
   }
 
 
+  removeDashboardSkeleton(
+    box
+  );
+
+
   const term =
-    String(filter || "")
+    String(
+      filter || ""
+    )
       .trim()
       .toLowerCase();
 
 
   const list =
     [...onlineUsers]
+      .filter(
+        user => {
 
-      .filter(user => {
+          const fullName =
+            getFullName(
+              user,
+              user.uid ===
+                currentUser?.uid
+                ? currentUser
+                : null
+            );
 
-        const fullName =
-          getFullName(
-            user,
-            user.uid === currentUser?.uid
-              ? currentUser
-              : null
+
+          const haystack =
+            `${fullName}
+             ${user.username || ""}
+             ${user.bio || ""}`
+              .toLowerCase();
+
+
+          return (
+            !term ||
+            haystack.includes(term)
           );
 
-
-        const haystack =
-          `${fullName}
-           ${user.username || ""}
-           ${user.bio || ""}`
-            .toLowerCase();
-
-
-        return (
-          !term ||
-          haystack.includes(term)
-        );
-
-      })
-
-
-      .sort((a, b) => {
-
-        if (
-          a.uid === currentUser?.uid
-        ) {
-          return -1;
         }
+      )
+      .sort(
+        (a,b) => {
+
+          if (
+            a.uid ===
+            currentUser?.uid
+          ) {
+
+            return -1;
+
+          }
 
 
-        if (
-          b.uid === currentUser?.uid
-        ) {
-          return 1;
+          if (
+            b.uid ===
+            currentUser?.uid
+          ) {
+
+            return 1;
+
+          }
+
+
+          if (
+            a.isOnline === true &&
+            b.isOnline !== true
+          ) {
+
+            return -1;
+
+          }
+
+
+          if (
+            a.isOnline !== true &&
+            b.isOnline === true
+          ) {
+
+            return 1;
+
+          }
+
+
+          return 0;
+
         }
-
-
-        if (
-          a.isOnline === true &&
-          b.isOnline !== true
-        ) {
-          return -1;
-        }
-
-
-        if (
-          a.isOnline !== true &&
-          b.isOnline === true
-        ) {
-          return 1;
-        }
-
-
-        return 0;
-
-      });
+      );
 
 
   const onlineCount =
@@ -1121,9 +1741,11 @@ function renderOnline(
   if (!list.length) {
 
     box.innerHTML = `
+
       <div class="empty-state small">
         No users found.
       </div>
+
     `;
 
     return;
@@ -1177,6 +1799,7 @@ function renderOnline(
 
 
         return `
+
           <article
             class="user-card"
             data-user-profile="${escapeHtml(
@@ -1194,8 +1817,15 @@ function renderOnline(
               )}
 
               <strong>
-                ${escapeHtml(name)}
-                ${verifiedBadge(user)}
+
+                ${escapeHtml(
+                  name
+                )}
+
+                ${verifiedBadge(
+                  user
+                )}
+
               </strong>
 
               <small
@@ -1218,15 +1848,18 @@ function renderOnline(
               isMe
 
                 ? `
+
                   <button
                     class="following"
                     disabled
                   >
                     You
                   </button>
+
                 `
 
                 : `
+
                   <button
                     class="${
                       following
@@ -1243,10 +1876,12 @@ function renderOnline(
                         : "Follow"
                     }
                   </button>
+
                 `
             }
 
           </article>
+
         `;
 
       }
@@ -1265,6 +1900,7 @@ function renderOnline(
           async event => {
 
             event.stopPropagation();
+
 
             await toggleFollow(
               button.dataset.follow
@@ -1293,7 +1929,9 @@ function renderOnline(
                 "[data-follow]"
               )
             ) {
+
               return;
+
             }
 
 
@@ -1302,7 +1940,9 @@ function renderOnline(
 
 
             if (!uid) {
+
               return;
+
             }
 
 
@@ -1331,9 +1971,12 @@ async function toggleFollow(
   if (
     !currentUser ||
     !targetUid ||
-    targetUid === currentUser.uid
+    targetUid ===
+      currentUser.uid
   ) {
+
     return;
+
   }
 
 
@@ -1436,18 +2079,16 @@ async function toggleFollow(
             );
 
 
-          const followerIndex =
+          const index =
             targetFollowers.indexOf(
               currentUid
             );
 
 
-          if (
-            followerIndex >= 0
-          ) {
+          if (index >= 0) {
 
             targetFollowers.splice(
-              followerIndex,
+              index,
               1
             );
 
@@ -1517,7 +2158,8 @@ async function toggleFollow(
         const targetIndex =
           onlineUsers.findIndex(
             user =>
-              user.uid === targetUid
+              user.uid ===
+              targetUid
           );
 
 
@@ -1540,13 +2182,13 @@ async function toggleFollow(
 
         }
 
-
-        saveProfileToCache(
-          currentUid,
-          currentProfile
-        );
-
       }
+    );
+
+
+    saveProfileToCache(
+      currentUid,
+      currentProfile
     );
 
 
@@ -1556,7 +2198,8 @@ async function toggleFollow(
 
 
     renderOnline(
-      $("onlineSearch")?.value || ""
+      $("onlineSearch")?.value ||
+      ""
     );
 
 
@@ -1566,16 +2209,19 @@ async function toggleFollow(
 
 
     showToast(
+
       Array.isArray(
         currentProfile.following
       ) &&
       currentProfile.following.includes(
         targetUid
       )
-        ? "Following user"
-        : "Unfollowed user"
-    );
 
+        ? "Following user"
+
+        : "Unfollowed user"
+
+    );
 
   } catch (error) {
 
@@ -1595,7 +2241,7 @@ async function toggleFollow(
 
 
 /* =========================================================
-   GET USER PROFILE
+   PROFILE LOOKUP
 ========================================================= */
 
 async function getUserProfile(
@@ -1603,7 +2249,9 @@ async function getUserProfile(
 ) {
 
   if (!uid) {
+
     return {};
+
   }
 
 
@@ -1621,6 +2269,7 @@ async function getUserProfile(
       liveUser
     );
 
+
     return liveUser;
 
   }
@@ -1635,6 +2284,7 @@ async function getUserProfile(
     refreshUserProfile(
       uid
     );
+
 
     return cached;
 
@@ -1714,8 +2364,12 @@ async function refreshUserProfile(
       );
 
 
-    if (!snap.exists()) {
+    if (
+      !snap.exists()
+    ) {
+
       return;
+
     }
 
 
@@ -1759,7 +2413,9 @@ async function refreshUserProfile(
           if (
             chat.otherUid !== uid
           ) {
+
             return chat;
+
           }
 
 
@@ -1768,13 +2424,21 @@ async function refreshUserProfile(
             ...chat,
 
             name:
-              getFullName(profile),
+              getFullName(
+                profile
+              ),
 
             username:
-              profile.username || "",
+              profile.username ||
+              "",
 
             photoURL:
-              profile.photoURL || ""
+              profile.photoURL ||
+              "",
+
+            isVerified:
+              profile.isVerified ===
+              true
 
           };
 
@@ -1783,14 +2447,12 @@ async function refreshUserProfile(
 
 
     renderOnline(
-      $("onlineSearch")?.value || ""
+      $("onlineSearch")?.value ||
+      ""
     );
 
 
-    renderChats(
-      recentChats,
-      $("chatSearch")?.value || ""
-    );
+    mergeRecentChats();
 
 
     if (currentUser) {
@@ -1812,62 +2474,9 @@ async function refreshUserProfile(
 
 }
 
-/* =========================================================
-   FIRESTORE DATE HELPER
-========================================================= */
-
-function timestampToDate(value) {
-
-  if (!value) {
-    return null;
-  }
-
-
-  if (
-    typeof value.toDate === "function"
-  ) {
-
-    return value.toDate();
-
-  }
-
-
-  if (
-    typeof value.seconds === "number"
-  ) {
-
-    return new Date(
-      value.seconds * 1000
-    );
-
-  }
-
-
-  if (
-    typeof value._seconds === "number"
-  ) {
-
-    return new Date(
-      value._seconds * 1000
-    );
-
-  }
-
-
-  const date =
-    new Date(value);
-
-
-  return Number.isNaN(
-    date.getTime()
-  )
-    ? null
-    : date;
-
-}
 
 /* =========================================================
-   COUNT GROUP UNREAD MESSAGES
+   GROUP UNREAD COUNT
 ========================================================= */
 
 async function getGroupUnreadCount(
@@ -1881,6 +2490,7 @@ async function getGroupUnreadCount(
   ) {
 
     return 0;
+
   }
 
 
@@ -1891,7 +2501,9 @@ async function getGroupUnreadCount(
 
 
   if (!readDate) {
+
     return 0;
+
   }
 
 
@@ -1928,11 +2540,6 @@ async function getGroupUnreadCount(
       );
 
 
-    /*
-     * The sender's own message is already
-     * read by the sender, so exclude it.
-     */
-
     return snapshot.docs.filter(
       messageDoc => {
 
@@ -1958,12 +2565,14 @@ async function getGroupUnreadCount(
 
 
     return 0;
+
   }
 
 }
 
+
 /* =========================================================
-   RECENT CHAT RENDERING
+   PRIVATE + GROUP CHAT RENDERER
 ========================================================= */
 
 function renderChats(
@@ -1974,13 +2583,23 @@ function renderChats(
   const box =
     $("chatList");
 
+
   if (!box) {
+
     return;
+
   }
 
 
+  removeDashboardSkeleton(
+    box
+  );
+
+
   const term =
-    String(filter || "")
+    String(
+      filter || ""
+    )
       .trim()
       .toLowerCase();
 
@@ -1999,7 +2618,9 @@ function renderChats(
 
         return (
           !term ||
-          searchText.includes(term)
+          searchText.includes(
+            term
+          )
         );
 
       }
@@ -2009,13 +2630,17 @@ function renderChats(
   if (!filtered.length) {
 
     box.innerHTML = `
+
       <div class="empty-state">
+
         ${
           term
             ? "No matching chats."
             : "No conversations yet."
         }
+
       </div>
+
     `;
 
     return;
@@ -2024,374 +2649,461 @@ function renderChats(
 
 
   box.innerHTML =
-    filtered.map(
-      chat => {
+    filtered
+      .map(
+        chat => {
 
-        const isGroup =
-          chat.type === "group";
-
-
-        const otherUid =
-          chat.otherUid || "";
+          const isGroup =
+            chat.type ===
+            "group";
 
 
-        const groupId =
-          chat.groupId || "";
+          const otherUid =
+            chat.otherUid ||
+            "";
 
 
-        const href =
-          isGroup
+          const groupId =
+            chat.groupId ||
+            "";
 
-            ? `group-chat.html?groupId=${encodeURIComponent(
-                groupId
-              )}`
 
-            : otherUid
+          const href =
+            isGroup
 
-              ? `chat.html?uid=${encodeURIComponent(
-                  otherUid
+              ? `group-chat.html?groupId=${encodeURIComponent(
+                  groupId
                 )}`
 
-              : "#";
+              : otherUid
+
+                ? `chat.html?uid=${encodeURIComponent(
+                    otherUid
+                  )}`
+
+                : "#";
 
 
-        const unread =
-          Number(
-            chat.unread || 0
-          );
+          const unread =
+            Number(
+              chat.unread ||
+              0
+            );
 
 
-        const unreadBadge =
-          unread > 0
+          const unreadBadge =
+            unread > 0
 
-            ? `
-              <span
-                class="unread"
-                aria-label="${unread} unread messages"
-                style="
-                  min-width:22px;
-                  height:22px;
-                  padding:0 7px;
-                  margin-top:5px;
-                  border-radius:999px;
-                  background:#22c55e;
-                  color:#ffffff;
-                  display:flex;
-                  align-items:center;
-                  justify-content:center;
-                  font-size:11px;
-                  line-height:22px;
-                  font-weight:800;
-                  flex-shrink:0;
-                  box-sizing:border-box;
-                "
-              >
-                ${
-                  unread > 99
-                    ? "99+"
-                    : unread
-                }
-              </span>
-            `
-            : "";
+              ? `
 
+                <span
+                  class="unread"
+                  aria-label="${unread} unread messages"
+                  style="
+                    min-width:22px;
+                    height:22px;
+                    padding:0 7px;
+                    margin-top:5px;
+                    border-radius:999px;
+                    background:#22c55e;
+                    color:#fff;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    font-size:11px;
+                    line-height:22px;
+                    font-weight:800;
+                    flex-shrink:0;
+                    box-sizing:border-box;
+                  "
+                >
+                  ${
+                    unread > 99
+                      ? "99+"
+                      : unread
+                  }
+                </span>
 
-        const name =
-  chat.name ||
-  (
-    isGroup
-      ? "CONNECTA Group"
-      : "CONNECTA User"
-  );
+              `
+
+              : "";
 
 
-const verifiedUser =
-  isGroup
-
-    ? {
-        isVerified:
-          chat.lastMessageSenderVerified === true
-      }
-
-    : chat;
+          const name =
+            chat.name ||
+            (
+              isGroup
+                ? "CONNECTA Group"
+                : "CONNECTA User"
+            );
 
 
-const verified =
-  verifiedBadge(
-    verifiedUser
-  );
+          let preview =
+            chat.lastMessage ||
+            "No messages yet";
 
-
-        /*
-         * =====================================================
-         * MESSAGE STATUS TICKS
-         *
-         * Only show these for messages sent BY the
-         * currently logged-in user.
-         * =====================================================
-         */
-
-        let messageStatus = "";
-
-
-        if (
-          !isGroup &&
-          chat.lastMessageSenderId ===
-            currentUser?.uid
-        ) {
 
           if (
-            chat.lastMessageRead === true
+            chat.lastMessageType ===
+              "image" ||
+            chat.lastMessageType ===
+              "photo"
           ) {
 
-            messageStatus = `
-              <span
-                class="message-status message-status-read"
-                aria-label="Read"
-                title="Read"
-                style="
-                  margin-left:4px;
-                  font-size:13px;
-                  font-weight:900;
-                  color:#2196F3;
-                  letter-spacing:-4px;
-                  display:inline-block;
-                "
-              >
-                ✓✓
-              </span>
-            `;
+            preview =
+              "📷 Photo";
 
           } else if (
-            chat.lastMessageDelivered === true
+            chat.lastMessageType ===
+            "video"
           ) {
 
-            messageStatus = `
-              <span
-                class="message-status message-status-delivered"
-                aria-label="Delivered"
-                title="Delivered"
-                style="
-                  margin-left:4px;
-                  font-size:13px;
-                  font-weight:900;
-                  color:#8b949e;
-                  letter-spacing:-4px;
-                  display:inline-block;
-                "
-              >
-                ✓✓
-              </span>
-            `;
+            preview =
+              "🎥 Video";
 
-          } else {
+          } else if (
+            chat.lastMessageType ===
+            "file"
+          ) {
 
-            messageStatus = `
-              <span
-                class="message-status message-status-sent"
-                aria-label="Sent"
-                title="Sent"
-                style="
-                  margin-left:4px;
-                  font-size:13px;
-                  font-weight:900;
-                  color:#8b949e;
-                  display:inline-block;
-                "
-              >
-                ✓
-              </span>
-            `;
+            preview =
+              "📎 File";
 
           }
 
-        }
+
+          if (
+            isGroup &&
+            chat.lastMessageSenderName &&
+            chat.lastMessage
+          ) {
+
+            preview =
+              `${chat.lastMessageSenderName}: ${preview}`;
+
+          }
 
 
-        /*
-         * =====================================================
-         * LAST MESSAGE PREVIEW
-         * =====================================================
-         */
-
-        let preview =
-          chat.lastMessage ||
-          "No messages yet";
+          let messageStatus =
+            "";
 
 
-        if (
-          chat.lastMessageType === "image" ||
-          chat.lastMessageType === "photo"
-        ) {
+          if (
+            !isGroup &&
+            chat.lastMessageSenderId ===
+              currentUser?.uid
+          ) {
 
-          preview =
-            "📷 Photo";
+            if (
+              chat.lastMessageRead ===
+              true
+            ) {
 
-        } else if (
-          chat.lastMessageType === "video"
-        ) {
-
-          preview =
-            "🎥 Video";
-
-        } else if (
-          chat.lastMessageType === "file"
-        ) {
-
-          preview =
-            "📎 File";
-
-        }
-
-
-        /*
-         * Group preview:
-         *
-         * John Chumo: Hello everyone
-         */
-
-        if (
-          isGroup &&
-          chat.lastMessageSenderName &&
-          chat.lastMessage
-        ) {
-
-          preview =
-            `${chat.lastMessageSenderName}: ${preview}`;
-
-        }
-
-
-        return `
-          <a
-            class="chat-item"
-            href="${href}"
-            data-chat-id="${escapeHtml(
-              chat.id || groupId || ""
-            )}"
-            data-chat-type="${escapeHtml(
-              chat.type || "individual"
-            )}"
-          >
-
-            <div class="avatar ${
-              chat.color || ""
-            }">
-
-              ${
-                chat.photoURL
-                  ? `
-                    <img
-                      src="${escapeHtml(
-                        chat.photoURL
-                      )}"
-                      alt="${escapeHtml(
-                        name
-                      )}"
-                      loading="lazy"
-                    >
-                  `
-                  : initials(name)
-              }
-
-            </div>
-
-
-            <div
-              class="chat-copy"
-              style="
-                min-width:0;
-                flex:1;
-              "
-            >
-
-              <strong
-                style="
-                  display:flex;
-                  align-items:center;
-                  min-width:0;
-                "
-              >
+              messageStatus = `
 
                 <span
+                  class="message-status"
+                  aria-label="Read"
+                  title="Read"
                   style="
-                    white-space:nowrap;
-                    overflow:hidden;
-                    text-overflow:ellipsis;
+                    margin-left:4px;
+                    font-size:13px;
+                    font-weight:900;
+                    color:#2196F3;
+                    letter-spacing:-4px;
+                    display:inline-block;
                   "
                 >
-                  ${escapeHtml(name)}
+                  ✓✓
                 </span>
+
+              `;
+
+            } else if (
+              chat.lastMessageDelivered ===
+              true
+            ) {
+
+              messageStatus = `
+
+                <span
+                  class="message-status"
+                  aria-label="Delivered"
+                  title="Delivered"
+                  style="
+                    margin-left:4px;
+                    font-size:13px;
+                    font-weight:900;
+                    color:#8b949e;
+                    letter-spacing:-4px;
+                    display:inline-block;
+                  "
+                >
+                  ✓✓
+                </span>
+
+              `;
+
+            } else {
+
+              messageStatus = `
+
+                <span
+                  class="message-status"
+                  aria-label="Sent"
+                  title="Sent"
+                  style="
+                    margin-left:4px;
+                    font-size:13px;
+                    font-weight:900;
+                    color:#8b949e;
+                    display:inline-block;
+                  "
+                >
+                  ✓
+                </span>
+
+              `;
+
+            }
+
+          }
+
+
+          return `
+
+            <a
+              class="chat-item"
+              href="${href}"
+              data-chat-id="${escapeHtml(
+                chat.id ||
+                groupId ||
+                ""
+              )}"
+              data-chat-type="${escapeHtml(
+                chat.type ||
+                "individual"
+              )}"
+            >
+
+              <div class="avatar ${
+                chat.color || ""
+              }">
 
                 ${
-                  !isGroup
-                    ? verifiedBadge(chat)
-                    : ""
+                  chat.photoURL
+
+                    ? `
+
+                      <img
+                        src="${escapeHtml(
+                          chat.photoURL
+                        )}"
+                        alt="${escapeHtml(
+                          name
+                        )}"
+                        loading="lazy"
+                      >
+
+                    `
+
+                    : initials(name)
+
                 }
 
-              </strong>
+              </div>
 
 
-              <p
+              <div
+                class="chat-copy"
                 style="
-                  display:flex;
-                  align-items:center;
                   min-width:0;
-                  margin:3px 0 0;
+                  flex:1;
                 "
               >
 
-                <span
+                <strong
                   style="
+                    display:flex;
+                    align-items:center;
                     min-width:0;
-                    overflow:hidden;
-                    text-overflow:ellipsis;
-                    white-space:nowrap;
                   "
                 >
-                  ${escapeHtml(preview)}
-                </span>
 
-                ${messageStatus}
+                  <span
+                    style="
+                      white-space:nowrap;
+                      overflow:hidden;
+                      text-overflow:ellipsis;
+                    "
+                  >
+                    ${escapeHtml(name)}
+                  </span>
 
-              </p>
+                  ${
+                    !isGroup
+                      ? verifiedBadge(
+                          chat
+                        )
+                      : ""
+                  }
 
-            </div>
+                </strong>
 
 
-            <div
-              class="chat-meta"
-              style="
-                margin-left:auto;
-                display:flex;
-                flex-direction:column;
-                align-items:flex-end;
-                justify-content:center;
-                min-width:40px;
-              "
-            >
+                <p
+                  style="
+                    display:flex;
+                    align-items:center;
+                    min-width:0;
+                    margin:3px 0 0;
+                  "
+                >
 
-              <time>
-                ${escapeHtml(
-                  chat.time || ""
-                )}
-              </time>
+                  <span
+                    style="
+                      min-width:0;
+                      overflow:hidden;
+                      text-overflow:ellipsis;
+                      white-space:nowrap;
+                    "
+                  >
+                    ${escapeHtml(
+                      preview
+                    )}
+                  </span>
 
-              ${unreadBadge}
+                  ${messageStatus}
 
-            </div>
+                </p>
 
-          </a>
-        `;
+              </div>
 
-      }
-    ).join("");
+
+              <div
+                class="chat-meta"
+                style="
+                  margin-left:auto;
+                  display:flex;
+                  flex-direction:column;
+                  align-items:flex-end;
+                  justify-content:center;
+                  min-width:40px;
+                "
+              >
+
+                <time>
+                  ${escapeHtml(
+                    chat.time ||
+                    ""
+                  )}
+                </time>
+
+                ${unreadBadge}
+
+              </div>
+
+            </a>
+
+          `;
+
+        }
+      )
+      .join("");
 
 }
 
 
 /* =========================================================
-   LOAD RECENT INDIVIDUAL CHATS
+   MERGE PRIVATE + GROUP CHATS
+========================================================= */
+
+function mergeRecentChats() {
+
+  const allChats = [
+
+    ...recentChats,
+
+    ...recentGroups
+
+  ];
+
+
+  allChats.sort(
+    (a,b) => {
+
+      const aDate =
+        timestampToDate(
+          a.lastMessageAt
+        );
+
+
+      const bDate =
+        timestampToDate(
+          b.lastMessageAt
+        );
+
+
+      if (
+        aDate &&
+        bDate
+      ) {
+
+        return (
+          bDate.getTime() -
+          aDate.getTime()
+        );
+
+      }
+
+
+      if (aDate) {
+
+        return -1;
+
+      }
+
+
+      if (bDate) {
+
+        return 1;
+
+      }
+
+
+      return (
+        Number(
+          b.unread || 0
+        ) -
+        Number(
+          a.unread || 0
+        )
+      );
+
+    }
+  );
+
+
+  renderChats(
+    allChats,
+    $("chatSearch")?.value ||
+    ""
+  );
+
+
+  if (currentUser) {
+
+    saveDashboardCache(
+      currentUser.uid
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   LISTEN TO PRIVATE CHATS
 ========================================================= */
 
 async function listenToChats(
@@ -2400,24 +3112,28 @@ async function listenToChats(
 
   try {
 
-    const q =
+    const chatsQuery =
       query(
+
         collection(
           db,
           "chats"
         ),
+
         orderBy(
           "updatedAt",
           "desc"
         ),
+
         limit(50)
+
       );
 
 
     stopChats =
       onSnapshot(
 
-        q,
+        chatsQuery,
 
         snapshot => {
 
@@ -2436,7 +3152,9 @@ async function listenToChats(
                   data.participants
                 )
               ) {
+
                 return;
+
               }
 
 
@@ -2445,19 +3163,24 @@ async function listenToChats(
                   uid
                 )
               ) {
+
                 return;
+
               }
 
 
               const otherUid =
                 data.participants.find(
                   participantUid =>
-                    participantUid !== uid
+                    participantUid !==
+                    uid
                 );
 
 
               if (!otherUid) {
+
                 return;
+
               }
 
 
@@ -2478,9 +3201,11 @@ async function listenToChats(
 
               const name =
                 cachedUser
+
                   ? getFullName(
                       cachedUser
                     )
+
                   : (
                       data.otherUserName ||
                       "CONNECTA User"
@@ -2494,12 +3219,6 @@ async function listenToChats(
                 "";
 
 
-              /*
-               * =================================================
-               * UNREAD COUNT
-               * =================================================
-               */
-
               const unreadCount =
                 Number(
                   data.unreadCount?.[uid] ??
@@ -2508,12 +3227,6 @@ async function listenToChats(
                 );
 
 
-              /*
-               * =================================================
-               * LAST MESSAGE SENDER
-               * =================================================
-               */
-
               const lastMessageSenderId =
                 data.lastMessageSenderId ||
                 data.senderId ||
@@ -2521,32 +3234,19 @@ async function listenToChats(
                 "";
 
 
-              /*
-               * =================================================
-               * DELIVERY / READ STATUS
-               *
-               * Support the common field names already used
-               * by CONNECTA chat data.
-               * =================================================
-               */
-
               const lastMessageDelivered =
-                data.lastMessageDelivered === true ||
+                data.lastMessageDelivered ===
+                  true ||
                 data.delivered === true ||
                 data.lastDelivered === true;
 
 
               const lastMessageRead =
-                data.lastMessageRead === true ||
+                data.lastMessageRead ===
+                  true ||
                 data.read === true ||
                 data.lastRead === true;
 
-
-              /*
-               * =================================================
-               * MESSAGE TYPE
-               * =================================================
-               */
 
               const lastMessageType =
                 data.lastMessageType ||
@@ -2574,7 +3274,8 @@ async function listenToChats(
                 photoURL,
 
                 isVerified:
-                  cachedUser?.isVerified === true,
+                  cachedUser?.isVerified ===
+                  true,
 
                 lastMessage:
                   data.lastMessage ||
@@ -2594,18 +3295,19 @@ async function listenToChats(
                   name,
 
                 lastMessageAt:
-  data.lastMessageAt ||
-  data.updatedAt ||
-  null,
+                  data.lastMessageAt ||
+                  data.updatedAt ||
+                  null,
 
-time:
-  formatTimestamp(
-    data.lastMessageAt ||
-    data.updatedAt
-  ),
+                time:
+                  formatTimestamp(
+                    data.lastMessageAt ||
+                    data.updatedAt
+                  ),
 
-unread:
-  unreadCount,
+                unread:
+                  unreadCount,
+
                 href:
                   `chat.html?uid=${encodeURIComponent(
                     otherUid
@@ -2618,19 +3320,20 @@ unread:
 
 
           /*
-           * =====================================================
-           * SORT
-           *
-           * Unread conversations first, then newest.
-           * =====================================================
+           * Keep unread conversations
+           * visible near the top.
            */
 
           chats.sort(
-            (a, b) => {
+            (a,b) => {
 
               const unreadDifference =
-                Number(b.unread || 0) -
-                Number(a.unread || 0);
+                Number(
+                  b.unread || 0
+                ) -
+                Number(
+                  a.unread || 0
+                );
 
 
               if (
@@ -2638,6 +3341,31 @@ unread:
               ) {
 
                 return unreadDifference;
+
+              }
+
+
+              const aDate =
+                timestampToDate(
+                  a.lastMessageAt
+                );
+
+
+              const bDate =
+                timestampToDate(
+                  b.lastMessageAt
+                );
+
+
+              if (
+                aDate &&
+                bDate
+              ) {
+
+                return (
+                  bDate.getTime() -
+                  aDate.getTime()
+                );
 
               }
 
@@ -2652,16 +3380,7 @@ unread:
             chats;
 
 
-          saveDashboardCache(
-            uid
-          );
-
-
-          renderChats(
-            recentChats,
-            $("chatSearch")?.value ||
-            ""
-          );
+          mergeRecentChats();
 
         },
 
@@ -2671,9 +3390,6 @@ unread:
             "Chats listener error:",
             error
           );
-
-
-          renderChats([]);
 
         }
 
@@ -2686,15 +3402,13 @@ unread:
       error
     );
 
-
-    renderChats([]);
-
   }
 
 }
 
+
 /* =========================================================
-   LOAD GROUP CHATS
+   LISTEN TO GROUPS
 ========================================================= */
 
 async function listenToGroups(
@@ -2702,23 +3416,28 @@ async function listenToGroups(
 ) {
 
   if (!uid) {
+
     return;
+
   }
 
 
   /*
-   * Remove old group listeners.
+   * Clean previous listeners.
    */
 
   groupListeners.forEach(
     unsubscribe => {
 
       try {
+
         unsubscribe();
+
       } catch {}
 
     }
   );
+
 
   groupListeners = [];
 
@@ -2727,11 +3446,14 @@ async function listenToGroups(
     unsubscribe => {
 
       try {
+
         unsubscribe();
+
       } catch {}
 
     }
   );
+
 
   groupReadListeners = [];
 
@@ -2739,13 +3461,11 @@ async function listenToGroups(
   recentGroups = [];
 
 
-  /*
-   * =======================================================
-   * GROUPS WHERE USER IS A MEMBER
-   * =======================================================
-   */
+  /* =======================================================
+     GROUP MEMBERSHIP
+  ======================================================= */
 
-  const memberQuery =
+  const memberIdsQuery =
     query(
 
       collection(
@@ -2764,11 +3484,24 @@ async function listenToGroups(
     );
 
 
-  /*
-   * =======================================================
-   * GROUPS WHERE USER IS OWNER
-   * =======================================================
-   */
+  const membersQuery =
+    query(
+
+      collection(
+        db,
+        "groups"
+      ),
+
+      where(
+        "members",
+        "array-contains",
+        uid
+      ),
+
+      limit(30)
+
+    );
+
 
   const ownerQuery =
     query(
@@ -2789,9 +3522,16 @@ async function listenToGroups(
     );
 
 
-  let memberGroups = [];
+  let memberIdsGroups = [];
+
+  let membersGroups = [];
+
   let ownerGroups = [];
 
+
+  /* =======================================================
+     PROCESS GROUPS
+  ======================================================= */
 
   const processGroups =
     async () => {
@@ -2801,8 +3541,13 @@ async function listenToGroups(
 
 
       [
-        ...memberGroups,
+
+        ...memberIdsGroups,
+
+        ...membersGroups,
+
         ...ownerGroups
+
       ].forEach(
         group => {
 
@@ -2822,12 +3567,10 @@ async function listenToGroups(
 
 
       const groups =
-        [...groupMap.values()];
+        [
+          ...groupMap.values()
+        ];
 
-
-      /*
-       * Load each user's read state.
-       */
 
       const enriched =
         await Promise.all(
@@ -2835,7 +3578,8 @@ async function listenToGroups(
           groups.map(
             async group => {
 
-              let readData = null;
+              let readData =
+                null;
 
 
               try {
@@ -2933,19 +3677,26 @@ async function listenToGroups(
                   group.lastMessage ||
                   "",
 
+                lastMessageType:
+                  group.lastMessageType ||
+                  "",
+
                 lastMessageSenderId:
                   senderUid,
 
                 lastMessageSenderName:
-  group.lastMessageSenderName ||
-  (
-    senderProfile
-      ? getFullName(senderProfile)
-      : "User"
-  ),
+                  group.lastMessageSenderName ||
+                  (
+                    senderProfile
+                      ? getFullName(
+                          senderProfile
+                        )
+                      : "User"
+                  ),
 
                 lastMessageSenderVerified:
-                  senderProfile?.isVerified === true,
+                  senderProfile?.isVerified ===
+                  true,
 
                 lastMessageAt:
                   group.lastMessageAt ||
@@ -2976,25 +3727,31 @@ async function listenToGroups(
 
       mergeRecentChats();
 
-
     };
 
 
-  /*
-   * =======================================================
-   * FIRST LOAD
-   * =======================================================
-   */
+  /* =======================================================
+     FIRST LOAD
+  ======================================================= */
 
   try {
 
     const [
-      memberSnapshot,
+
+      memberIdsSnapshot,
+
+      membersSnapshot,
+
       ownerSnapshot
+
     ] = await Promise.all([
 
       getDocs(
-        memberQuery
+        memberIdsQuery
+      ),
+
+      getDocs(
+        membersQuery
       ),
 
       getDocs(
@@ -3004,8 +3761,21 @@ async function listenToGroups(
     ]);
 
 
-    memberGroups =
-      memberSnapshot.docs.map(
+    memberIdsGroups =
+      memberIdsSnapshot.docs.map(
+        snap => ({
+
+          groupId:
+            snap.id,
+
+          ...snap.data()
+
+        })
+      );
+
+
+    membersGroups =
+      membersSnapshot.docs.map(
         snap => ({
 
           groupId:
@@ -3032,7 +3802,6 @@ async function listenToGroups(
 
     await processGroups();
 
-
   } catch (error) {
 
     console.error(
@@ -3043,20 +3812,18 @@ async function listenToGroups(
   }
 
 
-  /*
-   * =======================================================
-   * LIVE MEMBER GROUP LISTENER
-   * =======================================================
-   */
+  /* =======================================================
+     LIVE MEMBERIDS LISTENER
+  ======================================================= */
 
-  const memberUnsubscribe =
+  const memberIdsUnsubscribe =
     onSnapshot(
 
-      memberQuery,
+      memberIdsQuery,
 
       async snapshot => {
 
-        memberGroups =
+        memberIdsGroups =
           snapshot.docs.map(
             snap => ({
 
@@ -3076,7 +3843,7 @@ async function listenToGroups(
       error => {
 
         console.warn(
-          "Member groups listener error:",
+          "MemberIds groups listener error:",
           error
         );
 
@@ -3086,15 +3853,58 @@ async function listenToGroups(
 
 
   groupListeners.push(
-    memberUnsubscribe
+    memberIdsUnsubscribe
   );
 
 
-  /*
-   * =======================================================
-   * LIVE OWNER GROUP LISTENER
-   * =======================================================
-   */
+  /* =======================================================
+     LIVE MEMBERS LISTENER
+  ======================================================= */
+
+  const membersUnsubscribe =
+    onSnapshot(
+
+      membersQuery,
+
+      async snapshot => {
+
+        membersGroups =
+          snapshot.docs.map(
+            snap => ({
+
+              groupId:
+                snap.id,
+
+              ...snap.data()
+
+            })
+          );
+
+
+        await processGroups();
+
+      },
+
+      error => {
+
+        console.warn(
+          "Members groups listener error:",
+          error
+        );
+
+      }
+
+    );
+
+
+  groupListeners.push(
+    membersUnsubscribe
+  );
+
+
+  /* =======================================================
+     LIVE OWNER LISTENER
+  ======================================================= */
 
   const ownerUnsubscribe =
     onSnapshot(
@@ -3138,139 +3948,6 @@ async function listenToGroups(
 
 }
 
-/* =========================================================
-   MERGE INDIVIDUAL + GROUP CHATS
-========================================================= */
-
-function mergeRecentChats() {
-
-  const allChats = [
-
-    ...recentChats,
-
-    ...recentGroups
-
-  ];
-
-
-  allChats.sort(
-    (a, b) => {
-
-      const aDate =
-        timestampToDate(
-          a.lastMessageAt
-        );
-
-
-      const bDate =
-        timestampToDate(
-          b.lastMessageAt
-        );
-
-
-      if (
-        aDate &&
-        bDate
-      ) {
-
-        return (
-          bDate.getTime() -
-          aDate.getTime()
-        );
-
-      }
-
-
-      if (aDate) {
-        return -1;
-      }
-
-
-      if (bDate) {
-        return 1;
-      }
-
-
-      /*
-       * Fallback to unread.
-       */
-
-      return (
-        Number(b.unread || 0) -
-        Number(a.unread || 0)
-      );
-
-    }
-  );
-
-
-  renderChats(
-    allChats,
-    $("chatSearch")?.value || ""
-  );
-
-
-  if (currentUser) {
-
-    saveDashboardCache(
-      currentUser.uid
-    );
-
-  }
-
-}
-
-/* =========================================================
-   TIME FORMAT
-========================================================= */
-
-function formatTimestamp(
-  timestamp
-) {
-
-  if (
-    !timestamp?.toDate
-  ) {
-    return "";
-  }
-
-
-  const date =
-    timestamp.toDate();
-
-
-  const now =
-    new Date();
-
-
-  const sameDay =
-    date.toDateString() ===
-    now.toDateString();
-
-
-  if (sameDay) {
-
-    return date.toLocaleTimeString(
-      [],
-      {
-        hour: "numeric",
-        minute: "2-digit"
-      }
-    );
-
-  }
-
-
-  return date.toLocaleDateString(
-    [],
-    {
-      day: "numeric",
-      month: "short"
-    }
-  );
-
-}
-
 
 /* =========================================================
    PRESENCE
@@ -3281,7 +3958,9 @@ async function setPresence(
 ) {
 
   if (!currentUser) {
+
     return;
+
   }
 
 
@@ -3306,7 +3985,7 @@ async function setPresence(
       },
 
       {
-        merge: true
+        merge:true
       }
 
     );
@@ -3329,7 +4008,9 @@ async function setPresence(
 
 function startPresence() {
 
-  if (presenceInterval) {
+  if (
+    presenceInterval
+  ) {
 
     clearInterval(
       presenceInterval
@@ -3364,15 +4045,18 @@ function startPresence() {
 
 function stopDashboardListeners() {
 
-   groupListeners.forEach(
+  groupListeners.forEach(
     unsubscribe => {
 
       try {
+
         unsubscribe();
+
       } catch {}
 
     }
   );
+
 
   groupListeners = [];
 
@@ -3381,19 +4065,24 @@ function stopDashboardListeners() {
     unsubscribe => {
 
       try {
+
         unsubscribe();
+
       } catch {}
 
     }
   );
 
+
   groupReadListeners = [];
+
 
   if (stopUsers) {
 
     stopUsers();
 
-    stopUsers = null;
+    stopUsers =
+      null;
 
   }
 
@@ -3402,7 +4091,8 @@ function stopDashboardListeners() {
 
     stopChats();
 
-    stopChats = null;
+    stopChats =
+      null;
 
   }
 
@@ -3413,7 +4103,8 @@ function stopDashboardListeners() {
       presenceInterval
     );
 
-    presenceInterval = null;
+    presenceInterval =
+      null;
 
   }
 
@@ -3426,7 +4117,9 @@ function stopDashboardListeners() {
 
 function setupUI() {
 
-  /* MENU */
+  /* =======================================================
+     MENU
+  ======================================================= */
 
   const menuBtn =
     $("menuBtn");
@@ -3492,7 +4185,9 @@ function setupUI() {
   }
 
 
-  /* PROFILE BUTTON */
+  /* =======================================================
+     PROFILE
+  ======================================================= */
 
   const profileBtn =
     $("profileBtn");
@@ -3505,7 +4200,9 @@ function setupUI() {
       () => {
 
         if (!currentUser) {
+
           return;
+
         }
 
 
@@ -3520,7 +4217,9 @@ function setupUI() {
   }
 
 
-  /* CONNECTION BUTTON */
+  /* =======================================================
+     CONNECTION
+  ======================================================= */
 
   const connectionBtn =
     $("connectionBtn");
@@ -3542,7 +4241,9 @@ function setupUI() {
   }
 
 
-  /* ONLINE SEARCH */
+  /* =======================================================
+     ONLINE SEARCH
+  ======================================================= */
 
   const onlineSearchBtn =
     $("onlineSearchBtn");
@@ -3600,7 +4301,9 @@ function setupUI() {
   }
 
 
-  /* CHAT SEARCH */
+  /* =======================================================
+     CHAT SEARCH
+  ======================================================= */
 
   const chatSearchBtn =
     $("chatSearchBtn");
@@ -3649,8 +4352,14 @@ function setupUI() {
       event => {
 
         renderChats(
-          recentChats,
+
+          [
+            ...recentChats,
+            ...recentGroups
+          ],
+
           event.target.value
+
         );
 
       }
@@ -3659,7 +4368,9 @@ function setupUI() {
   }
 
 
-  /* COMING SOON */
+  /* =======================================================
+     COMING SOON
+  ======================================================= */
 
   document
     .querySelectorAll(
@@ -3674,6 +4385,7 @@ function setupUI() {
 
             event.preventDefault();
 
+
             showToast(
               `${element.dataset.coming} is coming in the next module.`
             );
@@ -3685,7 +4397,9 @@ function setupUI() {
     );
 
 
-  /* LOGOUT */
+  /* =======================================================
+     LOGOUT
+  ======================================================= */
 
   const logoutBtn =
     $("logoutBtn");
@@ -3715,7 +4429,6 @@ function setupUI() {
             true
           );
 
-
         } catch (error) {
 
           console.error(
@@ -3743,43 +4456,43 @@ function setupUI() {
 
 
 /* =========================================================
-   CONNECTA SESSION START
+   INITIALIZE DASHBOARD
 ========================================================= */
 
 async function initializeDashboard() {
 
   /*
-   * globalAuth.js is now the single source
-   * of truth for the logged-in user.
-   *
-   * allowBlocked:true lets the dashboard
-   * display its existing account restriction
-   * screen instead of globalAuth immediately
-   * redirecting the user.
+   * Draw skeleton immediately only when
+   * there is nothing cached.
+   */
+
+  showDashboardSkeleton();
+
+
+  /*
+   * Authenticate through globalAuth.
    */
 
   const session =
     await getCurrentConnectaUser({
-      redirect: true,
-      allowBlocked: true
+
+      redirect:true,
+
+      allowBlocked:true
+
     });
 
 
-  /*
-   * No authenticated user.
-   */
-
   if (!session) {
+
     return;
+
   }
 
 
-  /* =======================================================
-     SAME USER USED THROUGHOUT CONNECTA
-  ======================================================= */
-
   currentUser =
     session.authUser;
+
 
   currentProfile =
     session.profile || {
@@ -3788,10 +4501,12 @@ async function initializeDashboard() {
         currentUser.uid,
 
       displayName:
-        currentUser.displayName || "",
+        currentUser.displayName ||
+        "",
 
       photoURL:
-        currentUser.photoURL || "",
+        currentUser.photoURL ||
+        "",
 
       isOnline:
         true
@@ -3806,7 +4521,7 @@ async function initializeDashboard() {
 
 
   /* =======================================================
-     ACCOUNT STATUS
+     ACCOUNT CONTROL
   ======================================================= */
 
   const accountControl =
@@ -3819,12 +4534,6 @@ async function initializeDashboard() {
     accountControl.blocked
   ) {
 
-    console.warn(
-      "[CONNECTA] Account restricted:",
-      accountControl.status
-    );
-
-
     showAccountBlockedScreen(
       accountControl
     );
@@ -3836,7 +4545,7 @@ async function initializeDashboard() {
 
 
   /* =======================================================
-     INSTANT CACHE
+     CACHE FIRST
   ======================================================= */
 
   loadDashboardCache(
@@ -3845,31 +4554,8 @@ async function initializeDashboard() {
 
 
   /*
-   * If dashboard cache did not contain
-   * the profile, render globalAuth profile.
-   */
-
-  if (!currentProfile) {
-
-    const cachedProfile =
-      getCachedProfile(
-        currentUser.uid
-      );
-
-
-    if (cachedProfile) {
-
-      currentProfile =
-        cachedProfile;
-
-    }
-
-  }
-
-
-  /*
-   * Always render the profile belonging
-   * to the authenticated Firebase UID.
+   * Always render authenticated
+   * user's current profile.
    */
 
   renderProfile(
@@ -3901,11 +4587,14 @@ async function initializeDashboard() {
 
   const usersQuery =
     query(
+
       collection(
         db,
         "users"
       ),
+
       limit(100)
+
     );
 
 
@@ -3917,56 +4606,54 @@ async function initializeDashboard() {
       snapshot => {
 
         onlineUsers =
-          snapshot.docs
-            .map(
-              snap => {
+          snapshot.docs.map(
+            snap => {
 
-                const data =
-                  snap.data();
-
-
-                const safeUser =
-                  publicProfileData(
-                    snap.id,
-                    data
-                  );
+              const data =
+                snap.data();
 
 
-                /*
-                 * Keep following list only
-                 * for current user's own profile.
-                 */
-
-                if (
-                  snap.id ===
-                  currentUser.uid
-                ) {
-
-                  safeUser.following =
-                    Array.isArray(
-                      data.following
-                    )
-                      ? data.following
-                      : [];
-
-                }
-
-
-                saveProfileToCache(
+              const safeUser =
+                publicProfileData(
                   snap.id,
-                  safeUser
+                  data
                 );
 
 
-                return safeUser;
+              /*
+               * Only keep private following
+               * array for own profile.
+               */
+
+              if (
+                snap.id ===
+                currentUser.uid
+              ) {
+
+                safeUser.following =
+                  Array.isArray(
+                    data.following
+                  )
+                    ? data.following
+                    : [];
 
               }
-            );
+
+
+              saveProfileToCache(
+                snap.id,
+                safeUser
+              );
+
+
+              return safeUser;
+
+            }
+          );
 
 
         /*
-         * Keep current user's profile
-         * synchronized with Firestore.
+         * Synchronize own profile.
          */
 
         const ownUser =
@@ -4002,10 +4689,6 @@ async function initializeDashboard() {
           };
 
 
-          /*
-           * Check account status again.
-           */
-
           const control =
             getAccountControl(
               currentProfile
@@ -4020,6 +4703,7 @@ async function initializeDashboard() {
               control
             );
 
+
             return;
 
           }
@@ -4032,9 +4716,7 @@ async function initializeDashboard() {
         }
 
 
-        /*
-         * Render online users.
-         */
+        /* ONLINE USERS */
 
         renderOnline(
           $("onlineSearch")?.value ||
@@ -4042,10 +4724,7 @@ async function initializeDashboard() {
         );
 
 
-        /*
-         * Update names/photos
-         * in recent chats.
-         */
+        /* UPDATE PRIVATE CHAT PROFILES */
 
         if (
           recentChats.length
@@ -4064,7 +4743,9 @@ async function initializeDashboard() {
 
 
                 if (!profile) {
+
                   return chat;
+
                 }
 
 
@@ -4083,26 +4764,26 @@ async function initializeDashboard() {
 
                   photoURL:
                     profile.photoURL ||
-                    ""
+                    "",
+
+                  isVerified:
+                    profile.isVerified ===
+                    true
 
                 };
 
               }
             );
 
-
-          renderChats(
-            recentChats,
-            $("chatSearch")?.value ||
-            ""
-          );
-
-        }
+          }
 
 
         /*
-         * Save dashboard state.
+         * RENDER PRIVATE + GROUP CHATS
          */
+
+        mergeRecentChats();
+
 
         saveDashboardCache(
           currentUser.uid
@@ -4113,25 +4794,9 @@ async function initializeDashboard() {
       error => {
 
         console.error(
-          "Users listener:",
+          "Users listener error:",
           error
         );
-
-
-        const box =
-          $("onlineUsers");
-
-
-        if (box) {
-
-          box.innerHTML = `
-            <div class="empty-state small">
-              Could not load users.
-              Check Firestore rules.
-            </div>
-          `;
-
-        }
 
       }
 
@@ -4139,25 +4804,27 @@ async function initializeDashboard() {
 
 
   /* =======================================================
-   RECENT CHATS
-======================================================= */
+     PRIVATE CHATS
+  ======================================================= */
 
-listenToChats(
-  currentUser.uid
-);
+  listenToChats(
+    currentUser.uid
+  );
 
 
-/* =======================================================
-   RECENT GROUP CHATS
-======================================================= */
+  /* =======================================================
+     GROUP CHATS
+  ======================================================= */
 
-listenToGroups(
-  currentUser.uid
-);
+  listenToGroups(
+    currentUser.uid
+  );
+
+}
 
 
 /* =========================================================
-   BEST-EFFORT PAGE EXIT PRESENCE
+   PAGE EXIT PRESENCE
 ========================================================= */
 
 window.addEventListener(
@@ -4173,14 +4840,14 @@ window.addEventListener(
 
 
 /* =========================================================
-   INITIALIZE UI
+   START UI
 ========================================================= */
 
 setupUI();
 
 
 /* =========================================================
-   INITIALIZE DASHBOARD
+   START DASHBOARD
 ========================================================= */
 
 initializeDashboard();
