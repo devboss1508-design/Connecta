@@ -2394,17 +2394,26 @@ function renderMessages(
 
 
 /* =====================================================
-   MARK INCOMING AS READ
+   MARK CHAT AS READ
+   =====================================================
+   This is called when the user opens the conversation.
+
+   It immediately resets:
+
+   chats/{chatId}.unreadCount/{currentUser.uid}
+
+   to 0.
+
+   It also marks all incoming messages as read.
 ===================================================== */
 
 async function markIncomingMessages(
-    messages
+    messages = []
 ) {
 
     if (
         !currentUser ||
-        !chatId ||
-        isMarkingMessages
+        !chatId
     ) {
 
         return;
@@ -2412,23 +2421,104 @@ async function markIncomingMessages(
     }
 
 
-    const incoming =
-        messages.filter(
-            message =>
+    /*
+     * =================================================
+     * RESET CHAT UNREAD COUNT IMMEDIATELY
+     * =================================================
+     *
+     * Do this even if there are no unread message
+     * documents yet.
+     *
+     * This makes the dashboard badge disappear
+     * immediately after opening the chat.
+     */
 
-                message.receiverId ===
-                currentUser.uid &&
+    try {
 
-                message.senderId !==
-                currentUser.uid &&
+        await updateDoc(
 
-                message.read !== true
+            doc(
+                db,
+                "chats",
+                chatId
+            ),
+
+            {
+
+                [`unreadCount.${currentUser.uid}`]:
+                    0
+
+            }
+
         );
 
+    } catch (error) {
+
+        console.warn(
+            "Could not reset chat unread count:",
+            error
+        );
+
+    }
+
+
+    /*
+     * =================================================
+     * FIND INCOMING UNREAD MESSAGES
+     * =================================================
+     */
+
+    const incoming =
+        messages.filter(
+            message => {
+
+                const belongsToCurrentUser =
+                    message.receiverId ===
+                    currentUser.uid;
+
+
+                const fromOtherUser =
+                    message.senderId !==
+                    currentUser.uid;
+
+
+                const unread =
+                    message.read !== true;
+
+
+                return (
+                    belongsToCurrentUser &&
+                    fromOtherUser &&
+                    unread
+                );
+
+            }
+        );
+
+
+    /*
+     * No individual messages need updating.
+     *
+     * The conversation unread count has already
+     * been reset above.
+     */
 
     if (
         !incoming.length
     ) {
+
+        return;
+
+    }
+
+
+    /*
+     * =================================================
+     * MARK INDIVIDUAL MESSAGES READ
+     * =================================================
+     */
+
+    if (isMarkingMessages) {
 
         return;
 
@@ -2483,26 +2573,8 @@ async function markIncomingMessages(
         );
 
 
-        const chatRef =
-            doc(
-                db,
-                "chats",
-                chatId
-            );
-
-
-        batch.update(
-            chatRef,
-            {
-
-                [`unreadCount.${currentUser.uid}`]:
-                    0
-
-            }
-        );
-
-
         await batch.commit();
+
 
     } catch (error) {
 
@@ -2515,6 +2587,71 @@ async function markIncomingMessages(
 
         isMarkingMessages =
             false;
+
+    }
+
+}
+
+/* =====================================================
+   MARK CONVERSATION READ
+   =====================================================
+   Used when the chat page is opened or becomes visible.
+===================================================== */
+
+async function markConversationAsRead() {
+
+    if (
+        !currentUser ||
+        !chatId
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        await updateDoc(
+
+            doc(
+                db,
+                "chats",
+                chatId
+            ),
+
+            {
+
+                [`unreadCount.${currentUser.uid}`]:
+                    0
+
+            }
+
+        );
+
+
+        /*
+         * Also process any incoming messages that
+         * are already available locally.
+         */
+
+        if (
+            latestMessages.length
+        ) {
+
+            await markIncomingMessages(
+                latestMessages
+            );
+
+        }
+
+
+    } catch (error) {
+
+        console.warn(
+            "Mark conversation as read failed:",
+            error
+        );
 
     }
 
@@ -4966,24 +5103,30 @@ async function initializeChat() {
         );
 
 
-        /*
-         * =================================================
-         * ENSURE CHAT DOCUMENT
-         * =================================================
-         */
+        /* =================================================
+   ENSURE CHAT DOCUMENT
+================================================= */
 
-        await ensureChat();
+await ensureChat();
 
 
-        /*
-         * =================================================
-         * FINAL ACCOUNT CONTROL
-         * =================================================
-         */
+/* =================================================
+   MARK CHAT AS READ
+   =================================================
+   The moment this conversation is opened, remove
+   the unread count for the current user.
+================================================= */
 
-        applyChatMessagingControl(
-            currentProfile
-        );
+await markConversationAsRead();
+
+
+/* =================================================
+   FINAL ACCOUNT CONTROL
+================================================= */
+
+applyChatMessagingControl(
+    currentProfile
+);
 
 
         /*
