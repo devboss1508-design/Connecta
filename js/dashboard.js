@@ -76,12 +76,17 @@ let recentGroups = [];
 let stopUsers = null;
 let stopChats = null;
 
+let groupListeners = {
+    memberIds: [],
+    members: [],
+    owned: []
+};
+
 let groupUnsubscribers = [];
 
 let presenceInterval = null;
 let groupProcessTimer = null;
 let groupProcessVersion = 0;
-
 
 /* =========================================================
    CACHE
