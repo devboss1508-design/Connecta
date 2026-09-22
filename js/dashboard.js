@@ -1434,13 +1434,29 @@ function renderOnline() {
     );
 
 
+    /* =====================================================
+       CURRENT USER UID
+       Use Firebase Auth first, then profile as fallback.
+    ===================================================== */
+
+    const currentUid =
+        currentUser?.uid ||
+        currentProfile?.uid ||
+        "";
+
+
+    /* =====================================================
+       ONLINE COUNT
+    ===================================================== */
+
     const onlineCount =
         $("onlineCount");
 
 
     const activeCount =
         onlineUsers.filter(
-            user => user.isOnline === true
+            user =>
+                user.isOnline === true
         ).length;
 
 
@@ -1451,6 +1467,10 @@ function renderOnline() {
 
     }
 
+
+    /* =====================================================
+       EMPTY STATE
+    ===================================================== */
 
     if (!onlineUsers.length) {
 
@@ -1467,13 +1487,30 @@ function renderOnline() {
     }
 
 
+    /* =====================================================
+       SORT USERS
+       Current user always appears first.
+       Online users come before offline users.
+    ===================================================== */
+
     const sortedUsers =
         [...onlineUsers].sort(
             (a, b) => {
 
+                const aIsSelf =
+                    String(a.uid || "") ===
+                    String(currentUid || "");
+
+                const bIsSelf =
+                    String(b.uid || "") ===
+                    String(currentUid || "");
+
+
+                /* Current user first */
+
                 if (
-                    a.uid ===
-                    currentUser?.uid
+                    aIsSelf &&
+                    !bIsSelf
                 ) {
 
                     return -1;
@@ -1482,14 +1519,16 @@ function renderOnline() {
 
 
                 if (
-                    b.uid ===
-                    currentUser?.uid
+                    bIsSelf &&
+                    !aIsSelf
                 ) {
 
                     return 1;
 
                 }
 
+
+                /* Online before offline */
 
                 if (
                     a.isOnline !==
@@ -1503,6 +1542,8 @@ function renderOnline() {
                 }
 
 
+                /* Alphabetical */
+
                 return getFullName(a)
                     .localeCompare(
                         getFullName(b)
@@ -1512,6 +1553,10 @@ function renderOnline() {
         );
 
 
+    /* =====================================================
+       RENDER
+    ===================================================== */
+
     box.innerHTML =
         sortedUsers.map(
             user => {
@@ -1520,12 +1565,39 @@ function renderOnline() {
                     getFullName(user);
 
 
-                const self =
-                    user.uid ===
-                    currentUser?.uid;
+                /*
+                 * IMPORTANT:
+                 * Determine ownership using both
+                 * Firebase Auth UID and current profile UID.
+                 */
 
+                const userUid =
+                    String(
+                        user.uid || ""
+                    );
+
+
+                const self =
+                    userUid !== "" &&
+                    (
+                        userUid ===
+                        String(
+                            currentUser?.uid || ""
+                        )
+                        ||
+                        userUid ===
+                        String(
+                            currentProfile?.uid || ""
+                        )
+                    );
+
+
+                /*
+                 * Following only applies to OTHER users.
+                 */
 
                 const following =
+                    !self &&
                     Array.isArray(
                         currentProfile?.following
                     ) &&
@@ -1550,10 +1622,10 @@ function renderOnline() {
                     >
 
                         <div
-                            class="
-                                user-card-profile
-                            "
+                            class="user-card-profile"
                         >
+
+                            <!-- PROFILE PHOTO -->
 
                             <div
                                 class="
@@ -1590,14 +1662,20 @@ function renderOnline() {
                             </div>
 
 
+                            <!-- NAME -->
+
                             <strong>
 
-                                ${escapeHtml(name)}
+                                ${escapeHtml(
+                                    name
+                                )}
 
                                 ${verifiedBadge(user)}
 
                             </strong>
 
+
+                            <!-- ONLINE STATUS -->
 
                             <small
                                 class="
@@ -1630,10 +1708,27 @@ function renderOnline() {
                             </small>
 
 
+                            <!-- ACTION -->
+
                             ${
-                                !self
+                                self
 
                                     ? `
+
+                                        <button
+                                            type="button"
+                                            class="
+                                                follow-btn
+                                                following
+                                            "
+                                            disabled
+                                        >
+                                            You
+                                        </button>
+
+                                      `
+
+                                    : `
 
                                         <button
                                             type="button"
@@ -1657,18 +1752,6 @@ function renderOnline() {
                                         </button>
 
                                       `
-
-                                    : `
-
-                                        <button
-                                            type="button"
-                                            class="follow-btn following"
-                                            disabled
-                                        >
-                                            You
-                                        </button>
-
-                                      `
                             }
 
                         </div>
@@ -1681,70 +1764,93 @@ function renderOnline() {
         ).join("");
 
 
-    box
-        .querySelectorAll(
-            "[data-user-card]"
-        )
-        .forEach(card => {
+    /* =====================================================
+       CARD CLICK
+       Tap card -> public profile
+       Follow button -> follow only
+    ===================================================== */
 
-            card.addEventListener(
-                "click",
-                event => {
+    box.onclick =
+        async event => {
 
-                    if (
-                        event.target.closest(
-                            "[data-follow-uid]"
-                        )
-                    ) {
-
-                        return;
-
-                    }
+            const followButton =
+                event.target.closest(
+                    "[data-follow-uid]"
+                );
 
 
-                    const uid =
-                        card.dataset.userCard;
+            if (followButton) {
+
+                event.preventDefault();
+                event.stopPropagation();
 
 
-                    if (!uid) {
-                        return;
-                    }
+                const targetUid =
+                    followButton.dataset.followUid;
 
 
-                    location.href =
-                        `profile.html?uid=${encodeURIComponent(
-                            uid
-                        )}`;
-
+                if (!targetUid) {
+                    return;
                 }
-            );
-
-        });
 
 
-    box
-        .querySelectorAll(
-            "[data-follow-uid]"
-        )
-        .forEach(button => {
+                followButton.disabled =
+                    true;
 
-            button.addEventListener(
-                "click",
-                event => {
 
-                    event.stopPropagation();
+                try {
 
-                    toggleFollow(
-                        button.dataset.followUid
+                    await toggleFollow(
+                        targetUid
                     );
 
+                } finally {
+
+                    followButton.disabled =
+                        false;
+
                 }
+
+
+                return;
+
+            }
+
+
+            const card =
+                event.target.closest(
+                    "[data-user-card]"
+                );
+
+
+            if (!card) {
+                return;
+            }
+
+
+            const uid =
+                card.dataset.userCard;
+
+
+            if (!uid) {
+                return;
+            }
+
+
+            console.log(
+                "[CONNECTA] Opening profile:",
+                uid
             );
 
-        });
+
+            window.location.href =
+                `profile.html?uid=${encodeURIComponent(
+                    uid
+                )}`;
+
+        };
 
 }
-
 
 /* =========================================================
    FOLLOW
