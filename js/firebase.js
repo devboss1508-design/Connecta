@@ -20,7 +20,7 @@ import {
 const firebaseConfig = {
 
     apiKey:
-        "AIzaSyCRDtEYFvigP9ofUwnEPrOlBAKqegK2Z7c",
+        "AIzaSyCRDtEYFvigP9ofUwnEPrOLbAKqegK2Z7c",
 
     authDomain:
         "zantona-73561.firebaseapp.com",
