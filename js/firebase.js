@@ -1,36 +1,26 @@
-// ============================================================
-// CONNECTA FIREBASE CONFIGURATION
-// ============================================================
+// frontend/js/firebase.js
 
 import {
     initializeApp
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
 
 import {
-    getAuth,
-    onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+    getAuth
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
 import {
-    initializeFirestore,
-    getFirestore,
-    persistentLocalCache,
-    persistentMultipleTabManager
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+    getFirestore
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 import {
     getStorage
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js";
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
 
-
-// ============================================================
-// FIREBASE WEB APP CONFIG
-// ============================================================
 
 const firebaseConfig = {
 
     apiKey:
-        "AIzaSyCRDtEYFvigP9ofUwnPrOLbAKqegK2Z7c",
+        "AIzaSyCRDtEYFvigP9ofUwnEPrOlBAKqegK2Z7c",
 
     authDomain:
         "zantona-73561.firebaseapp.com",
@@ -50,87 +40,27 @@ const firebaseConfig = {
 };
 
 
-// ============================================================
-// INITIALIZE FIREBASE
-// ============================================================
-
 const app =
     initializeApp(
         firebaseConfig
     );
 
 
-// ============================================================
-// FIREBASE AUTH
-// ============================================================
-
 const auth =
-    getAuth(
-        app
-    );
+    getAuth(app);
 
 
-// ============================================================
-// FIRESTORE
-// ============================================================
+const db =
+    getFirestore(app);
 
-let db;
-
-try {
-
-    db =
-        initializeFirestore(
-            app,
-            {
-                localCache:
-                    persistentLocalCache({
-
-                        tabManager:
-                            persistentMultipleTabManager()
-
-                    })
-            }
-        );
-
-    console.log(
-        "[CONNECTA] Firestore persistent cache enabled."
-    );
-
-} catch (error) {
-
-    console.warn(
-        "[CONNECTA] Persistent Firestore cache unavailable. Using standard Firestore.",
-        error
-    );
-
-    db =
-        getFirestore(
-            app
-        );
-
-}
-
-
-// ============================================================
-// FIREBASE STORAGE
-// ============================================================
 
 const storage =
-    getStorage(
-        app
-    );
+    getStorage(app);
 
-
-// ============================================================
-// EXPORTS
-// ============================================================
 
 export {
-
     app,
     auth,
     db,
-    storage,
-    onAuthStateChanged
-
+    storage
 };
