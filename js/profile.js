@@ -52,21 +52,6 @@ let verificationPolling = false;
 
 let isFollowing = false;
 
-
-/*
-=====================================================
-CURRENT USER FOLLOWING
-=====================================================
-
-IMPORTANT:
-
-This comes from Firestore:
-
-users/{currentUser.uid}
-
-It does NOT come from the Firebase Auth user object.
-*/
-
 let currentUserFollowing = [];
 
 
@@ -79,6 +64,185 @@ const OWN_PROFILE_CACHE_KEY =
 
 const PUBLIC_PROFILE_CACHE_KEY =
   "connectaPublicProfileCache_v2";
+
+
+/* =====================================================
+   INSTANT PROFILE CSS
+===================================================== */
+
+function installInstantProfileStyles() {
+
+  if (
+    document.getElementById(
+      "connectaInstantProfileStyles"
+    )
+  ) {
+    return;
+  }
+
+
+  const style =
+    document.createElement("style");
+
+
+  style.id =
+    "connectaInstantProfileStyles";
+
+
+  style.textContent = `
+
+    /*
+    ================================================
+    INSTANT PROFILE SKELETON
+    ================================================
+    */
+
+    .connecta-profile-skeleton {
+      padding: 20px 16px 40px;
+      animation: connectaProfileFadeIn .18s ease-out;
+    }
+
+
+    .connecta-skeleton-hero {
+      text-align: center;
+      padding: 12px 0 28px;
+    }
+
+
+    .connecta-skeleton-avatar {
+      width: 112px;
+      height: 112px;
+      border-radius: 50%;
+      margin: 0 auto 18px;
+      background: linear-gradient(
+        90deg,
+        #e8edf2 25%,
+        #f7f9fb 37%,
+        #e8edf2 63%
+      );
+      background-size: 400% 100%;
+      animation: connectaProfileShimmer 1.25s infinite;
+    }
+
+
+    .connecta-skeleton-line {
+      height: 13px;
+      border-radius: 999px;
+      margin: 9px auto;
+      background: linear-gradient(
+        90deg,
+        #e8edf2 25%,
+        #f7f9fb 37%,
+        #e8edf2 63%
+      );
+      background-size: 400% 100%;
+      animation: connectaProfileShimmer 1.25s infinite;
+    }
+
+
+    .connecta-skeleton-name {
+      width: 150px;
+      height: 18px;
+    }
+
+
+    .connecta-skeleton-username {
+      width: 100px;
+    }
+
+
+    .connecta-skeleton-status {
+      width: 75px;
+    }
+
+
+    .connecta-skeleton-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 18px;
+      margin: 14px 0;
+      min-height: 100px;
+      box-shadow:
+        0 2px 12px rgba(0,0,0,.04);
+    }
+
+
+    .connecta-skeleton-card-title {
+      width: 145px;
+      height: 16px;
+      margin-bottom: 20px;
+    }
+
+
+    .connecta-skeleton-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+
+    .connecta-skeleton-box {
+      height: 62px;
+      border-radius: 12px;
+      background: linear-gradient(
+        90deg,
+        #e8edf2 25%,
+        #f7f9fb 37%,
+        #e8edf2 63%
+      );
+      background-size: 400% 100%;
+      animation: connectaProfileShimmer 1.25s infinite;
+    }
+
+
+    @keyframes connectaProfileShimmer {
+
+      0% {
+        background-position: 100% 0;
+      }
+
+      100% {
+        background-position: -100% 0;
+      }
+
+    }
+
+
+    @keyframes connectaProfileFadeIn {
+
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+
+    }
+
+
+    /*
+    ================================================
+    IMAGE FADE-IN
+    ================================================
+    */
+
+    .profile-avatar img {
+      opacity: 0;
+      transition: opacity .18s ease;
+    }
+
+
+    .profile-avatar img.connecta-profile-image-ready {
+      opacity: 1;
+    }
+
+  `;
+
+
+  document.head.appendChild(style);
+
+}
 
 
 /* =====================================================
@@ -130,10 +294,6 @@ function initials(name = "U") {
 
 function getFullName(user = {}) {
 
-  /*
-  Prefer displayName if it contains a real name.
-  */
-
   const displayName =
     String(
       user.displayName || ""
@@ -149,10 +309,6 @@ function getFullName(user = {}) {
 
   }
 
-
-  /*
-  Otherwise build the name from firstName + lastName.
-  */
 
   const firstName =
     String(
@@ -176,10 +332,6 @@ function getFullName(user = {}) {
 
   }
 
-
-  /*
-  Username is the next fallback.
-  */
 
   if (user.username) {
 
@@ -420,6 +572,18 @@ function saveOwnProfileCache(profile) {
         profile.verificationStatus ||
         "not_submitted",
 
+      verificationAmount:
+        Number(
+          profile.verificationAmount || 0
+        ),
+
+      verificationTransactionCode:
+        profile.verificationTransactionCode ||
+        "",
+
+      verifiedAt:
+        profile.verifiedAt || null,
+
       balance:
         Number(
           profile.balance || 0
@@ -535,10 +699,6 @@ function savePublicProfileCache(profile) {
 
   try {
 
-    /*
-    ONLY public information is stored.
-    */
-
     const publicProfile = {
 
       uid:
@@ -620,10 +780,6 @@ function getPublicProfile(profile) {
   }
 
 
-  /*
-  Only fields that can safely be displayed publicly.
-  */
-
   return {
 
     uid:
@@ -672,6 +828,100 @@ function getPublicProfile(profile) {
 
 
 /* =====================================================
+   PROFILE SKELETON
+===================================================== */
+
+function showProfileSkeleton() {
+
+  const container =
+    $("profileContainer");
+
+
+  if (!container) {
+    return;
+  }
+
+
+  /*
+  Do not replace an already rendered profile.
+  */
+
+  if (
+    container.dataset.profileRendered ===
+    "true"
+  ) {
+    return;
+  }
+
+
+  container.innerHTML = `
+
+    <div class="connecta-profile-skeleton">
+
+      <div class="connecta-skeleton-hero">
+
+        <div class="connecta-skeleton-avatar"></div>
+
+        <div class="
+          connecta-skeleton-line
+          connecta-skeleton-name
+        "></div>
+
+        <div class="
+          connecta-skeleton-line
+          connecta-skeleton-username
+        "></div>
+
+        <div class="
+          connecta-skeleton-line
+          connecta-skeleton-status
+        "></div>
+
+      </div>
+
+
+      <div class="connecta-skeleton-card">
+
+        <div class="
+          connecta-skeleton-line
+          connecta-skeleton-card-title
+        "></div>
+
+
+        <div class="connecta-skeleton-grid">
+
+          <div class="connecta-skeleton-box"></div>
+
+          <div class="connecta-skeleton-box"></div>
+
+          <div class="connecta-skeleton-box"></div>
+
+          <div class="connecta-skeleton-box"></div>
+
+        </div>
+
+      </div>
+
+
+      <div class="connecta-skeleton-card">
+
+        <div class="
+          connecta-skeleton-line
+          connecta-skeleton-card-title
+        "></div>
+
+        <div class="connecta-skeleton-box"></div>
+
+      </div>
+
+    </div>
+
+  `;
+
+}
+
+
+/* =====================================================
    MARK CURRENT USER ONLINE
 ===================================================== */
 
@@ -706,11 +956,6 @@ async function markCurrentUserOnline() {
     );
 
 
-    console.log(
-      "CONNECTA: user marked online"
-    );
-
-
   } catch (error) {
 
     console.warn(
@@ -740,32 +985,40 @@ async function loadCurrentUserFollowing() {
   =====================================================
   */
 
-  try {
+  const cached =
+    getOwnProfileCache();
 
-    const cached =
-      getOwnProfileCache();
+
+  if (
+    cached &&
+    Array.isArray(
+      cached.following
+    )
+  ) {
+
+    currentUserFollowing =
+      [
+        ...cached.following
+      ];
 
 
     if (
-      cached &&
-      Array.isArray(
-        cached.following
+      viewedUser &&
+      !isOwnProfile(
+        viewedUser.uid
       )
     ) {
 
-      currentUserFollowing =
-        [
-          ...cached.following
-        ];
+      isFollowing =
+        currentUserFollowing.includes(
+          viewedUser.uid
+        );
+
+      renderProfile(
+        viewedUser
+      );
 
     }
-
-  } catch (error) {
-
-    console.warn(
-      "Following cache read failed:",
-      error
-    );
 
   }
 
@@ -811,47 +1064,38 @@ async function loadCurrentUserFollowing() {
         : [];
 
 
-    /*
-    Keep own cache synchronized.
-    */
-
-    const cached =
+    const ownCache =
       getOwnProfileCache();
 
 
-    if (cached) {
+    if (ownCache) {
 
-      cached.following =
+      ownCache.following =
         [
           ...currentUserFollowing
         ];
 
 
-      cached.followingCount =
+      ownCache.followingCount =
         Number(
           data.followingCount ??
           currentUserFollowing.length
         );
 
 
-      cached.cachedAt =
+      ownCache.cachedAt =
         Date.now();
 
 
       localStorage.setItem(
         OWN_PROFILE_CACHE_KEY,
         JSON.stringify(
-          cached
+          ownCache
         )
       );
 
     }
 
-
-    /*
-    If viewing another profile,
-    refresh Follow/Following button.
-    */
 
     if (
       viewedUser &&
@@ -875,11 +1119,53 @@ async function loadCurrentUserFollowing() {
   } catch (error) {
 
     console.warn(
-      "Unable to load current user's following list:",
+      "Unable to load following list:",
       error
     );
 
   }
+
+}
+
+
+/* =====================================================
+   IMAGE READY HANDLER
+===================================================== */
+
+function markProfileImagesReady() {
+
+  document
+    .querySelectorAll(
+      ".profile-avatar img"
+    )
+    .forEach(
+      image => {
+
+        if (image.complete) {
+
+          image.classList.add(
+            "connecta-profile-image-ready"
+          );
+
+        }
+
+
+        image.addEventListener(
+          "load",
+          () => {
+
+            image.classList.add(
+              "connecta-profile-image-ready"
+            );
+
+          },
+          {
+            once: true
+          }
+        );
+
+      }
+    );
 
 }
 
@@ -914,11 +1200,6 @@ function renderProfile(profile) {
     );
 
 
-  /*
-  Other users are rendered only from
-  public profile fields.
-  */
-
   const safeProfile =
     own
       ? profile
@@ -931,12 +1212,6 @@ function renderProfile(profile) {
     return;
   }
 
-
-  /*
-  =====================================================
-  FOLLOW STATE
-  =====================================================
-  */
 
   if (!own) {
 
@@ -998,17 +1273,12 @@ function renderProfile(profile) {
         <img
           src="${escapeHtml(photo)}"
           alt="${escapeHtml(name)}"
+          decoding="async"
         >
       `
 
       : initials(name);
 
-
-  /*
-  =====================================================
-  VERIFIED BADGE
-  =====================================================
-  */
 
   const verifiedBadge =
     verified
@@ -1025,12 +1295,6 @@ function renderProfile(profile) {
 
       : "";
 
-
-  /*
-  =====================================================
-  STATUS
-  =====================================================
-  */
 
   const statusHtml =
     online
@@ -1060,12 +1324,6 @@ function renderProfile(profile) {
       `;
 
 
-  /*
-  =====================================================
-  BIO
-  =====================================================
-  */
-
   const bioHtml =
     safeProfile.bio
 
@@ -1080,14 +1338,14 @@ function renderProfile(profile) {
       : "";
 
 
-  /*
-  =====================================================
-  ACTION BUTTONS
-  =====================================================
-  */
-
   let actionHtml = "";
 
+
+  /*
+  =====================================================
+  OWN PROFILE ACTION
+  =====================================================
+  */
 
   if (own) {
 
@@ -1135,7 +1393,16 @@ function renderProfile(profile) {
 
     }
 
-  } else {
+  }
+
+
+  /*
+  =====================================================
+  OTHER USER ACTIONS
+  =====================================================
+  */
+
+  else {
 
     actionHtml = `
 
@@ -1168,9 +1435,11 @@ function renderProfile(profile) {
   }
 
 
-  /* =====================================================
-     OWN PROFILE
-  ===================================================== */
+  /*
+  =====================================================
+  OWN PROFILE
+  =====================================================
+  */
 
   if (own) {
 
@@ -1462,9 +1731,11 @@ function renderProfile(profile) {
   }
 
 
-  /* =====================================================
-     OTHER USER PROFILE
-  ===================================================== */
+  /*
+  =====================================================
+  OTHER USER PROFILE
+  =====================================================
+  */
 
   else {
 
@@ -1589,9 +1860,21 @@ function renderProfile(profile) {
   }
 
 
-  /* =====================================================
-     HEADER TITLE
-  ===================================================== */
+  /*
+  =====================================================
+  MARK PROFILE AS RENDERED
+  =====================================================
+  */
+
+  container.dataset.profileRendered =
+    "true";
+
+
+  /*
+  =====================================================
+  HEADER TITLE
+  =====================================================
+  */
 
   const headerTitle =
     $("profileHeaderTitle");
@@ -1607,9 +1890,11 @@ function renderProfile(profile) {
   }
 
 
-  /* =====================================================
-     OWN PROFILE PHOTO UPLOAD
-  ===================================================== */
+  /*
+  =====================================================
+  OWN PHOTO UPLOAD
+  =====================================================
+  */
 
   if (own) {
 
@@ -1646,9 +1931,11 @@ function renderProfile(profile) {
   }
 
 
-  /* =====================================================
-     CHAT BUTTON
-  ===================================================== */
+  /*
+  =====================================================
+  CHAT
+  =====================================================
+  */
 
   const chatButton =
     $("chatProfileBtn");
@@ -1676,9 +1963,11 @@ function renderProfile(profile) {
   }
 
 
-  /* =====================================================
-     FOLLOW BUTTON
-  ===================================================== */
+  /*
+  =====================================================
+  FOLLOW
+  =====================================================
+  */
 
   const followButton =
     $("followProfileBtn");
@@ -1701,9 +1990,11 @@ function renderProfile(profile) {
   }
 
 
-  /* =====================================================
-     VERIFY BUTTON
-  ===================================================== */
+  /*
+  =====================================================
+  VERIFY
+  =====================================================
+  */
 
   const verifyButton =
     $("verifyAccountBtn");
@@ -1719,9 +2010,11 @@ function renderProfile(profile) {
   }
 
 
-  /* =====================================================
-     REFER & EARN
-  ===================================================== */
+  /*
+  =====================================================
+  REFER & EARN
+  =====================================================
+  */
 
   const referEarnButton =
     $("referEarnBtn");
@@ -1740,6 +2033,17 @@ function renderProfile(profile) {
     );
 
   }
+
+
+  /*
+  =====================================================
+  IMAGE FADE-IN
+  =====================================================
+  */
+
+  requestAnimationFrame(
+    markProfileImagesReady
+  );
 
 }
 
@@ -1803,25 +2107,6 @@ async function toggleFollow(
       );
 
 
-    /*
-    =================================================
-    FIRESTORE TRANSACTION
-    =================================================
-
-    User A:
-      following
-      followingCount
-
-    User B:
-      followers
-      followersCount
-
-    are updated together.
-
-    Firestore retries the transaction if another
-    client changes a document being read.
-    */
-
     const result =
       await runTransaction(
         db,
@@ -1869,12 +2154,6 @@ async function toggleFollow(
             targetSnapshot.data();
 
 
-          /*
-          ============================================
-          CURRENT USER FOLLOWING
-          ============================================
-          */
-
           const following =
             Array.isArray(
               currentData.following
@@ -1884,12 +2163,6 @@ async function toggleFollow(
                 ]
               : [];
 
-
-          /*
-          ============================================
-          TARGET USER FOLLOWERS
-          ============================================
-          */
 
           const followers =
             Array.isArray(
@@ -1908,9 +2181,9 @@ async function toggleFollow(
 
 
           /*
-          ============================================
+          ==========================================
           UNFOLLOW
-          ============================================
+          ==========================================
           */
 
           if (alreadyFollowing) {
@@ -1938,7 +2211,7 @@ async function toggleFollow(
 
             const oldFollowersCount =
               Number(
-                targetData.followersCount ?? 
+                targetData.followersCount ??
                 followers.length
               );
 
@@ -2005,9 +2278,9 @@ async function toggleFollow(
 
 
           /*
-          ============================================
+          ==========================================
           FOLLOW
-          ============================================
+          ==========================================
           */
 
           const newFollowing =
@@ -2017,10 +2290,14 @@ async function toggleFollow(
             ];
 
 
-          const newFollowers =
+          const followerWasAlreadyPresent =
             followers.includes(
               currentUser.uid
-            )
+            );
+
+
+          const newFollowers =
+            followerWasAlreadyPresent
               ? followers
               : [
                   ...followers,
@@ -2039,17 +2316,6 @@ async function toggleFollow(
             Number(
               targetData.followersCount ??
               followers.length
-            );
-
-
-          /*
-          Only increase target's follower count
-          if this UID was not already there.
-          */
-
-          const followerWasAlreadyPresent =
-            followers.includes(
-              currentUser.uid
             );
 
 
@@ -2113,7 +2379,7 @@ async function toggleFollow(
 
     /*
     =================================================
-    UPDATE LOCAL STATE
+    IMMEDIATE LOCAL UPDATE
     =================================================
     */
 
@@ -2133,7 +2399,7 @@ async function toggleFollow(
 
     /*
     =================================================
-    UPDATE OWN PROFILE CACHE
+    UPDATE OWN CACHE
     =================================================
     */
 
@@ -2202,7 +2468,7 @@ async function toggleFollow(
 
     /*
     =================================================
-    IMMEDIATE BUTTON UPDATE
+    UPDATE BUTTON WITHOUT RELOAD
     =================================================
     */
 
@@ -2271,27 +2537,26 @@ async function handleProfilePhotoUpload(event) {
     return;
   }
 
+
   const file =
     event.target.files?.[0];
+
 
   if (!file) {
     return;
   }
 
+
   const status =
     $("profileUploadStatus");
 
-  /*
-  =====================================================
-  ALLOWED IMAGE TYPES
-  =====================================================
-  */
 
   const allowedTypes = [
     "image/jpeg",
     "image/png",
     "image/webp"
   ];
+
 
   if (!allowedTypes.includes(file.type)) {
 
@@ -2302,21 +2567,21 @@ async function handleProfilePhotoUpload(event) {
 
       status.className =
         "profile-upload-status error";
+
     }
+
 
     event.target.value = "";
 
     return;
+
   }
 
 
-  /*
-  =====================================================
-  MAX FILE SIZE — 5MB
-  =====================================================
-  */
-
-  if (file.size > 5 * 1024 * 1024) {
+  if (
+    file.size >
+    5 * 1024 * 1024
+  ) {
 
     if (status) {
 
@@ -2325,19 +2590,16 @@ async function handleProfilePhotoUpload(event) {
 
       status.className =
         "profile-upload-status error";
+
     }
+
 
     event.target.value = "";
 
     return;
+
   }
 
-
-  /*
-  =====================================================
-  UPLOAD STATUS
-  =====================================================
-  */
 
   if (status) {
 
@@ -2346,20 +2608,11 @@ async function handleProfilePhotoUpload(event) {
 
     status.className =
       "profile-upload-status";
+
   }
 
 
   try {
-
-    /*
-    ===================================================
-    STORAGE PATH
-
-    MUST MATCH FIREBASE STORAGE RULES:
-
-    users/{userId}/profile/{fileName}
-    ===================================================
-    */
 
     const extension =
       file.type === "image/png"
@@ -2380,22 +2633,18 @@ async function handleProfilePhotoUpload(event) {
       );
 
 
-    /*
-    ===================================================
-    UPLOAD
-    ===================================================
-    */
-
     const uploadTask =
       uploadBytesResumable(
         photoRef,
         file,
         {
+
           contentType:
             file.type,
 
           cacheControl:
             "public,max-age=3600"
+
         }
       );
 
@@ -2448,12 +2697,6 @@ async function handleProfilePhotoUpload(event) {
       );
 
 
-    /*
-    ===================================================
-    GET DOWNLOAD URL
-    ===================================================
-    */
-
     const photoURL =
       await getDownloadURL(
         snapshot.ref
@@ -2461,9 +2704,9 @@ async function handleProfilePhotoUpload(event) {
 
 
     /*
-    ===================================================
-    UPDATE FIREBASE AUTH PROFILE
-    ===================================================
+    =====================================================
+    UPDATE FIREBASE AUTH
+    =====================================================
     */
 
     await updateProfile(
@@ -2475,9 +2718,9 @@ async function handleProfilePhotoUpload(event) {
 
 
     /*
-    ===================================================
-    UPDATE FIRESTORE USER PROFILE
-    ===================================================
+    =====================================================
+    UPDATE FIRESTORE
+    =====================================================
     */
 
     const userRef =
@@ -2497,9 +2740,9 @@ async function handleProfilePhotoUpload(event) {
 
 
     /*
-    ===================================================
+    =====================================================
     UPDATE LOCAL STATE
-    ===================================================
+    =====================================================
     */
 
     if (viewedUser) {
@@ -2511,9 +2754,9 @@ async function handleProfilePhotoUpload(event) {
 
 
     /*
-    ===================================================
+    =====================================================
     UPDATE CACHE
-    ===================================================
+    =====================================================
     */
 
     if (viewedUser) {
@@ -2526,9 +2769,9 @@ async function handleProfilePhotoUpload(event) {
 
 
     /*
-    ===================================================
-    UPDATE PROFILE IMAGE IMMEDIATELY
-    ===================================================
+    =====================================================
+    IMMEDIATE IMAGE UPDATE
+    =====================================================
     */
 
     const avatar =
@@ -2548,18 +2791,13 @@ async function handleProfilePhotoUpload(event) {
               viewedUser || {}
             )
           )}"
+          class="connecta-profile-image-ready"
         >
 
       `;
 
     }
 
-
-    /*
-    ===================================================
-    SUCCESS
-    ===================================================
-    */
 
     if (status) {
 
@@ -2570,22 +2808,6 @@ async function handleProfilePhotoUpload(event) {
         "profile-upload-status success";
 
     }
-
-
-    /*
-    ===================================================
-    CACHE-BUST OTHER UI ELEMENTS
-
-    The realtime Firestore listener will also
-    update other CONNECTA pages that are open.
-    ===================================================
-    */
-
-    console.log(
-      "CONNECTA profile photo uploaded:",
-      storagePath
-    );
-
 
   } catch (error) {
 
@@ -2611,7 +2833,6 @@ async function handleProfilePhotoUpload(event) {
 
       }
 
-
       else if (
         error?.code ===
         "storage/canceled"
@@ -2622,7 +2843,6 @@ async function handleProfilePhotoUpload(event) {
 
       }
 
-
       else if (
         error?.code ===
         "storage/quota-exceeded"
@@ -2632,7 +2852,6 @@ async function handleProfilePhotoUpload(event) {
           "Firebase Storage quota is unavailable.";
 
       }
-
 
       else if (
         error?.code ===
@@ -2648,6 +2867,7 @@ async function handleProfilePhotoUpload(event) {
       status.textContent =
         message;
 
+
       status.className =
         "profile-upload-status error";
 
@@ -2656,16 +2876,9 @@ async function handleProfilePhotoUpload(event) {
   }
 
 
-  /*
-  =====================================================
-  RESET FILE INPUT
-
-  Allows the user to select the same image again.
-  =====================================================
-  */
-
   event.target.value = "";
-  }
+
+}
 
 
 /* =====================================================
@@ -2699,13 +2912,33 @@ function loadCachedProfile(uid) {
 
 
   /*
-  Own profile is always online while active.
+  Own profile is considered online while
+  the authenticated session is active.
   */
 
   if (own) {
 
     cached.isOnline =
       true;
+
+  }
+
+
+  /*
+  Restore following immediately.
+  */
+
+  if (
+    own &&
+    Array.isArray(
+      cached.following
+    )
+  ) {
+
+    currentUserFollowing =
+      [
+        ...cached.following
+      ];
 
   }
 
@@ -2726,47 +2959,29 @@ function loadCachedProfile(uid) {
 
 async function loadProfile(
   uid,
-  showLoading = true
+  showSkeleton = false
 ) {
 
-  const container =
-    $("profileContainer");
-
-
-  if (
-    !container ||
-    !uid
-  ) {
-
+  if (!uid) {
     return;
-
   }
 
 
   /*
   =====================================================
-  CACHE FIRST
+  IMPORTANT:
+
+  Never replace an already visible cached profile
+  with "Loading profile...".
   =====================================================
   */
 
-  const cached =
-    loadCachedProfile(
-      uid
-    );
-
-
   if (
-    !cached &&
-    showLoading
+    showSkeleton &&
+    !viewedUser
   ) {
 
-    container.innerHTML = `
-
-      <div class="profile-loading">
-        Loading profile...
-      </div>
-
-    `;
+    showProfileSkeleton();
 
   }
 
@@ -2781,6 +2996,11 @@ async function loadProfile(
       );
 
 
+    /*
+    This is now a background refresh.
+    The realtime listener is also active.
+    */
+
     const snapshot =
       await getDoc(
         profileRef
@@ -2789,15 +3009,27 @@ async function loadProfile(
 
     if (!snapshot.exists()) {
 
-      if (!cached) {
+      /*
+      If cached profile exists, keep showing it.
+      */
 
-        container.innerHTML = `
+      if (!viewedUser) {
 
-          <div class="profile-error">
-            This profile could not be found.
-          </div>
+        const container =
+          $("profileContainer");
 
-        `;
+
+        if (container) {
+
+          container.innerHTML = `
+
+            <div class="profile-error">
+              This profile could not be found.
+            </div>
+
+          `;
+
+        }
 
       }
 
@@ -2835,10 +3067,6 @@ async function loadProfile(
         true;
 
 
-      /*
-      Keep following state synchronized.
-      */
-
       currentUserFollowing =
         Array.isArray(
           profile.following
@@ -2861,6 +3089,7 @@ async function loadProfile(
       renderProfile(
         profile
       );
+
 
     }
 
@@ -2893,22 +3122,41 @@ async function loadProfile(
 
   } catch (error) {
 
-    console.error(
-      "Profile loading error:",
+    console.warn(
+      "Background profile refresh failed:",
       error
     );
 
 
-    if (!cached) {
+    /*
+    Never destroy a valid cached profile because
+    the network temporarily failed.
+    */
 
-      container.innerHTML = `
+    if (!viewedUser) {
 
-        <div class="profile-error">
-          Unable to load this profile.
-          Please check your connection and try again.
-        </div>
+      const container =
+        $("profileContainer");
 
-      `;
+
+      if (container) {
+
+        container.innerHTML = `
+
+          <div class="profile-error">
+
+            Unable to connect right now.
+
+            <br>
+
+            Please check your connection
+            and try again.
+
+          </div>
+
+        `;
+
+      }
 
     }
 
@@ -2954,7 +3202,9 @@ function listenToProfile(uid) {
       snapshot => {
 
         if (!snapshot.exists()) {
+
           return;
+
         }
 
 
@@ -2986,13 +3236,6 @@ function listenToProfile(uid) {
           profile.isOnline =
             true;
 
-
-          /*
-          IMPORTANT:
-
-          Keep current user's following list updated
-          in realtime.
-          */
 
           currentUserFollowing =
             Array.isArray(
@@ -3349,6 +3592,7 @@ async function startVerification() {
       await fetch(
         `${API_BASE_URL}/api/verification/initiate`,
         {
+
           method: "POST",
 
           headers: {
@@ -3650,6 +3894,7 @@ async function checkVerificationStatus(
     await fetch(
       `${API_BASE_URL}/api/verification/status`,
       {
+
         method: "POST",
 
         headers: {
@@ -3688,12 +3933,6 @@ async function checkVerificationStatus(
 
   }
 
-
-  /*
-  =====================================================
-  COMPLETED
-  =====================================================
-  */
 
   if (
     data.success === true &&
@@ -3747,12 +3986,6 @@ async function checkVerificationStatus(
   }
 
 
-  /*
-  =====================================================
-  FAILED
-  =====================================================
-  */
-
   if (
     data.status === "failed"
   ) {
@@ -3785,12 +4018,6 @@ async function checkVerificationStatus(
   }
 
 
-  /*
-  =====================================================
-  PENDING
-  =====================================================
-  */
-
   setVerificationMessage(
     "Waiting for M-PESA payment confirmation...",
     "pending"
@@ -3806,11 +4033,16 @@ async function checkVerificationStatus(
    BACK BUTTON
 ===================================================== */
 
-const backButton =
-  $("backBtn");
+function setupBackButton() {
+
+  const backButton =
+    $("backBtn");
 
 
-if (backButton) {
+  if (!backButton) {
+    return;
+  }
+
 
   backButton.addEventListener(
     "click",
@@ -3837,198 +4069,139 @@ if (backButton) {
 
 
 /* =====================================================
-   VERIFICATION CLOSE
+   VERIFICATION EVENTS
 ===================================================== */
 
-const verificationClose =
-  $("verificationClose");
+function setupVerificationEvents() {
+
+  const verificationClose =
+    $("verificationClose");
 
 
-if (verificationClose) {
+  if (verificationClose) {
 
-  verificationClose.addEventListener(
-    "click",
-    closeVerificationModal
-  );
+    verificationClose.addEventListener(
+      "click",
+      closeVerificationModal
+    );
 
-}
-
-
-/* =====================================================
-   CLOSE MODAL BY BACKDROP
-===================================================== */
-
-const verificationModal =
-  $("verificationModal");
+  }
 
 
-if (verificationModal) {
-
-  verificationModal.addEventListener(
-    "click",
-    event => {
-
-      if (
-        event.target ===
-        verificationModal
-      ) {
-
-        closeVerificationModal();
-
-      }
-
-    }
-  );
-
-}
+  const verificationModal =
+    $("verificationModal");
 
 
-/* =====================================================
-   VERIFICATION SUBMIT
-===================================================== */
+  if (verificationModal) {
 
-const verificationSubmit =
-  $("verificationSubmit");
+    verificationModal.addEventListener(
+      "click",
+      event => {
 
+        if (
+          event.target ===
+          verificationModal
+        ) {
 
-if (verificationSubmit) {
-
-  verificationSubmit.addEventListener(
-    "click",
-    startVerification
-  );
-
-}
-
-
-/* =====================================================
-   AUTH STATE
-===================================================== */
-
-onAuthStateChanged(
-  auth,
-
-  async user => {
-
-    currentUser =
-      user;
-
-
-    if (!user) {
-
-      location.replace(
-        "login.html"
-      );
-
-      return;
-
-    }
-
-
-    /*
-    =================================================
-    DETERMINE PROFILE
-    =================================================
-    */
-
-    const requestedUid =
-      getProfileUid();
-
-
-    const profileUid =
-      requestedUid ||
-      user.uid;
-
-
-    /*
-    =================================================
-    SHOW CACHE FIRST
-    =================================================
-    */
-
-    const hasCachedProfile =
-      loadCachedProfile(
-        profileUid
-      );
-
-
-    /*
-    =================================================
-    OWN PROFILE PRESENCE
-    =================================================
-    */
-
-    if (
-      profileUid ===
-      user.uid
-    ) {
-
-      markCurrentUserOnline()
-        .catch(
-          error => {
-
-            console.warn(
-              "Presence update failed:",
-              error
-            );
-
-          }
-        );
-
-    }
-
-
-    /*
-    =================================================
-    LOAD CURRENT USER FOLLOWING
-    =================================================
-
-    This happens in the background and does not
-    block the profile from appearing.
-    */
-
-    loadCurrentUserFollowing()
-      .catch(
-        error => {
-
-          console.warn(
-            "Following startup failed:",
-            error
-          );
+          closeVerificationModal();
 
         }
-      );
+
+      }
+    );
+
+  }
 
 
-    /*
-    =================================================
-    REALTIME PROFILE LISTENER
-    =================================================
-    */
+  const verificationSubmit =
+    $("verificationSubmit");
 
-    listenToProfile(
+
+  if (verificationSubmit) {
+
+    verificationSubmit.addEventListener(
+      "click",
+      startVerification
+    );
+
+  }
+
+}
+
+
+/* =====================================================
+   INITIALIZE PROFILE
+===================================================== */
+
+async function initializeProfile(user) {
+
+  currentUser =
+    user;
+
+
+  if (!user) {
+
+    location.replace(
+      "login.html"
+    );
+
+    return;
+
+  }
+
+
+  const requestedUid =
+    getProfileUid();
+
+
+  const profileUid =
+    requestedUid ||
+    user.uid;
+
+
+  /*
+  =====================================================
+  STEP 1 — CACHE FIRST
+  =====================================================
+  */
+
+  const hasCachedProfile =
+    loadCachedProfile(
       profileUid
     );
 
 
-    /*
-    =================================================
-    FIRESTORE REFRESH
-    =================================================
+  /*
+  =====================================================
+  STEP 2 — ONLY SHOW SKELETON IF ABSOLUTELY
+  NECESSARY
+  =====================================================
+  */
 
-    Cached profile is already visible, so there
-    is no reason to display another loading state.
-    */
+  if (!hasCachedProfile) {
 
-    loadProfile(
-      profileUid,
-      !hasCachedProfile
-    )
+    showProfileSkeleton();
+
+  }
+
+
+  /*
+  =====================================================
+  STEP 3 — PRESENCE DOES NOT BLOCK UI
+  =====================================================
+  */
+
+  if (
+    profileUid ===
+    user.uid
+  ) {
+
+    markCurrentUserOnline()
       .catch(
         error => {
 
-          console.error(
-            "Profile startup error:",
+          console.warn(
+            "Presence update failed:",
             error
           );
 
@@ -4036,6 +4209,88 @@ onAuthStateChanged(
       );
 
   }
+
+
+  /*
+  =====================================================
+  STEP 4 — FOLLOWING CACHE/FRESH DATA
+  DOES NOT BLOCK PROFILE
+  =====================================================
+  */
+
+  loadCurrentUserFollowing()
+    .catch(
+      error => {
+
+        console.warn(
+          "Following startup failed:",
+          error
+        );
+
+      }
+    );
+
+
+  /*
+  =====================================================
+  STEP 5 — REALTIME PROFILE
+  =====================================================
+  */
+
+  listenToProfile(
+    profileUid
+  );
+
+
+  /*
+  =====================================================
+  STEP 6 — BACKGROUND FIRESTORE REFRESH
+  =====================================================
+  */
+
+  loadProfile(
+    profileUid,
+    false
+  )
+    .catch(
+      error => {
+
+        console.warn(
+          "Profile background refresh failed:",
+          error
+        );
+
+      }
+    );
+
+}
+
+
+/* =====================================================
+   START
+===================================================== */
+
+installInstantProfileStyles();
+
+setupBackButton();
+
+setupVerificationEvents();
+
+
+/*
+=====================================================
+AUTH LISTENER
+=====================================================
+
+The profile is initialized as soon as Firebase Auth
+restores the session.
+
+No artificial loading delay.
+*/
+
+onAuthStateChanged(
+  auth,
+  initializeProfile
 );
 
 
@@ -4067,6 +4322,10 @@ window.addEventListener(
         null;
 
     }
+
+
+    verificationPolling =
+      false;
 
   }
 );
