@@ -2198,17 +2198,11 @@ async function refreshUserProfile(uid) {
 /* =========================================================
    PRIVATE CHAT LIVE LISTENER
    =========================================================
-   IMPORTANT:
-   This listener is user-specific.
-
-   It listens directly to chats where the current
-   user is a participant.
-
-   When either user sends a message and the chat
-   document's lastMessage / updatedAt changes,
-   Firestore automatically sends a new snapshot.
-
-   Therefore the dashboard updates WITHOUT refresh.
+   - Listens ONLY to chats involving the current user
+   - Updates immediately when a message is sent
+   - No page refresh required
+   - No composite index required
+   - Sorts chats locally by updatedAt
 ========================================================= */
 
 function listenToChats(uid) {
@@ -2217,9 +2211,9 @@ function listenToChats(uid) {
         return;
     }
 
-    /*
-     * Stop previous listener
-     */
+
+    /* STOP PREVIOUS LISTENER */
+
     if (stopChats) {
 
         stopChats();
@@ -2237,13 +2231,19 @@ function listenToChats(uid) {
 
 
     /*
-     * IMPORTANT:
+     * IMPORTANT
      *
-     * Filter by participants FIRST.
+     * We intentionally do NOT use:
      *
-     * This is much better than listening to the
-     * newest 50 chats globally and filtering them
-     * afterwards.
+     * orderBy("updatedAt", "desc")
+     *
+     * here.
+     *
+     * That combination with array-contains can require
+     * a composite Firestore index.
+     *
+     * Instead, Firestore listens to all chats belonging
+     * to this user and we sort them locally.
      */
 
     const chatsQuery =
@@ -2257,18 +2257,13 @@ function listenToChats(uid) {
                 uid
             ),
 
-            orderBy(
-                "updatedAt",
-                "desc"
-            ),
-
-            limit(50)
+            limit(100)
 
         );
 
 
     console.log(
-        "[CONNECTA] Starting live chat listener for:",
+        "[CONNECTA] Starting LIVE private chat listener:",
         uid
     );
 
@@ -2281,7 +2276,7 @@ function listenToChats(uid) {
             async snapshot => {
 
                 console.log(
-                    "[CONNECTA] Live chat update:",
+                    "[CONNECTA] LIVE chat snapshot:",
                     snapshot.docs.length
                 );
 
@@ -2299,21 +2294,22 @@ function listenToChats(uid) {
 
 
                     /*
-                     * Find the other participant.
+                     * FIND OTHER USER
                      */
 
-                    const otherUid =
+                    const participants =
                         Array.isArray(
                             data.participants
                         )
+                            ? data.participants
+                            : [];
 
-                            ? data.participants.find(
-                                participant =>
-                                    participant !==
-                                    uid
-                            )
 
-                            : null;
+                    const otherUid =
+                        participants.find(
+                            participant =>
+                                participant !== uid
+                        );
 
 
                     if (!otherUid) {
@@ -2324,8 +2320,10 @@ function listenToChats(uid) {
 
 
                     /*
-                     * Get profile from the users
-                     * already loaded on dashboard.
+                     * FIND USER PROFILE
+                     *
+                     * First use users already loaded
+                     * by the dashboard.
                      */
 
                     let profile =
@@ -2337,7 +2335,7 @@ function listenToChats(uid) {
 
 
                     /*
-                     * Fall back to profile cache.
+                     * Then try local profile cache.
                      */
 
                     if (!profile) {
@@ -2351,8 +2349,10 @@ function listenToChats(uid) {
 
 
                     /*
-                     * Never block the dashboard
-                     * waiting for a profile.
+                     * DO NOT WAIT FOR PROFILE
+                     *
+                     * The chat must appear immediately
+                     * even if the profile hasn't loaded.
                      */
 
                     const otherName =
@@ -2381,7 +2381,7 @@ function listenToChats(uid) {
 
 
                     /*
-                     * Unread messages.
+                     * UNREAD COUNT
                      */
 
                     const unread =
@@ -2393,7 +2393,7 @@ function listenToChats(uid) {
 
 
                     /*
-                     * Last sender.
+                     * LAST SENDER
                      */
 
                     const lastSenderId =
@@ -2403,7 +2403,7 @@ function listenToChats(uid) {
 
 
                     /*
-                     * Last message.
+                     * LAST MESSAGE
                      */
 
                     const lastMessage =
@@ -2412,7 +2412,7 @@ function listenToChats(uid) {
 
 
                     /*
-                     * Message type.
+                     * MESSAGE TYPE
                      */
 
                     const lastMessageType =
@@ -2436,7 +2436,7 @@ function listenToChats(uid) {
 
 
                     /*
-                     * Empty conversation.
+                     * EMPTY / NEW CHAT
                      */
 
                     if (
@@ -2450,6 +2450,10 @@ function listenToChats(uid) {
                     }
 
 
+                    /*
+                     * BUILD CHAT OBJECT
+                     */
+
                     result.push({
 
                         type:
@@ -2458,7 +2462,9 @@ function listenToChats(uid) {
                         chatId:
                             chatDoc.id,
 
-                        otherUid,
+                        otherUid:
+
+                            otherUid,
 
                         otherUserName:
                             otherName,
@@ -2472,18 +2478,23 @@ function listenToChats(uid) {
                         lastMessage:
                             preview,
 
-                        lastMessageType,
+                        lastMessageType:
+                            lastMessageType,
 
-                        lastSenderId,
+                        lastSenderId:
+                            lastSenderId,
 
-                        unread,
+                        unread:
+                            unread,
 
                         /*
-                         * VERY IMPORTANT
+                         * IMPORTANT:
                          *
-                         * updatedAt is what moves
-                         * the conversation to the
-                         * top immediately.
+                         * chat.js updates updatedAt
+                         * whenever a new message is sent.
+                         *
+                         * This value is used to move the
+                         * conversation to the top.
                          */
 
                         lastMessageAt:
@@ -2507,7 +2518,41 @@ function listenToChats(uid) {
 
 
                 /*
-                 * Replace the current live chat list.
+                 * SORT LOCALLY
+                 *
+                 * Newest conversation first.
+                 */
+
+                result.sort(
+                    (a, b) => {
+
+                        const dateA =
+                            timestampToDate(
+                                a.lastMessageAt ||
+                                a.updatedAt
+                            );
+
+
+                        const dateB =
+                            timestampToDate(
+                                b.lastMessageAt ||
+                                b.updatedAt
+                            );
+
+
+                        return (
+
+                            (dateB?.getTime() || 0) -
+                            (dateA?.getTime() || 0)
+
+                        );
+
+                    }
+                );
+
+
+                /*
+                 * REPLACE LIVE CHAT DATA
                  */
 
                 recentChats =
@@ -2515,17 +2560,17 @@ function listenToChats(uid) {
 
 
                 /*
-                 * Immediately update the unified
-                 * Recent Chats section.
+                 * RENDER IMMEDIATELY
                  */
 
                 mergeRecentChats();
 
 
                 /*
-                 * Refresh profiles in the background.
+                 * REFRESH OTHER USER PROFILES
                  *
-                 * This does NOT block rendering.
+                 * This happens in the background.
+                 * It does NOT delay the chat preview.
                  */
 
                 result.forEach(
@@ -2543,7 +2588,7 @@ function listenToChats(uid) {
             error => {
 
                 console.error(
-                    "[CONNECTA] Live chat listener error:",
+                    "[CONNECTA] LIVE chat listener error:",
                     error
                 );
 
@@ -2559,6 +2604,7 @@ function listenToChats(uid) {
         );
 
 }
+
 
 /* =========================================================
    GROUP UNREAD COUNT
