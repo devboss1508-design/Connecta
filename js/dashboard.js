@@ -2196,11 +2196,30 @@ async function refreshUserProfile(uid) {
 
 
 /* =========================================================
-   PRIVATE CHAT LISTENER
+   PRIVATE CHAT LIVE LISTENER
+   =========================================================
+   IMPORTANT:
+   This listener is user-specific.
+
+   It listens directly to chats where the current
+   user is a participant.
+
+   When either user sends a message and the chat
+   document's lastMessage / updatedAt changes,
+   Firestore automatically sends a new snapshot.
+
+   Therefore the dashboard updates WITHOUT refresh.
 ========================================================= */
 
 function listenToChats(uid) {
 
+    if (!uid) {
+        return;
+    }
+
+    /*
+     * Stop previous listener
+     */
     if (stopChats) {
 
         stopChats();
@@ -2210,25 +2229,62 @@ function listenToChats(uid) {
     }
 
 
+    const chatsRef =
+        collection(
+            db,
+            "chats"
+        );
+
+
+    /*
+     * IMPORTANT:
+     *
+     * Filter by participants FIRST.
+     *
+     * This is much better than listening to the
+     * newest 50 chats globally and filtering them
+     * afterwards.
+     */
+
     const chatsQuery =
         query(
-            collection(
-                db,
-                "chats"
+
+            chatsRef,
+
+            where(
+                "participants",
+                "array-contains",
+                uid
             ),
+
             orderBy(
                 "updatedAt",
                 "desc"
             ),
+
             limit(50)
+
         );
+
+
+    console.log(
+        "[CONNECTA] Starting live chat listener for:",
+        uid
+    );
 
 
     stopChats =
         onSnapshot(
+
             chatsQuery,
 
             async snapshot => {
+
+                console.log(
+                    "[CONNECTA] Live chat update:",
+                    snapshot.docs.length
+                );
+
 
                 const result = [];
 
@@ -2242,36 +2298,47 @@ function listenToChats(uid) {
                         chatDoc.data();
 
 
-                    if (
-                        !Array.isArray(
-                            data.participants
-                        ) ||
-                        !data.participants.includes(uid)
-                    ) {
-
-                        continue;
-
-                    }
-
+                    /*
+                     * Find the other participant.
+                     */
 
                     const otherUid =
-                        data.participants.find(
-                            id =>
-                                id !== uid
-                        );
+                        Array.isArray(
+                            data.participants
+                        )
+
+                            ? data.participants.find(
+                                participant =>
+                                    participant !==
+                                    uid
+                            )
+
+                            : null;
 
 
                     if (!otherUid) {
+
                         continue;
+
                     }
 
+
+                    /*
+                     * Get profile from the users
+                     * already loaded on dashboard.
+                     */
 
                     let profile =
                         onlineUsers.find(
                             user =>
-                                user.uid === otherUid
+                                user.uid ===
+                                otherUid
                         );
 
+
+                    /*
+                     * Fall back to profile cache.
+                     */
 
                     if (!profile) {
 
@@ -2283,9 +2350,18 @@ function listenToChats(uid) {
                     }
 
 
+                    /*
+                     * Never block the dashboard
+                     * waiting for a profile.
+                     */
+
                     const otherName =
                         profile
-                            ? getFullName(profile)
+
+                            ? getFullName(
+                                profile
+                            )
+
                             : (
                                 data.otherUserName ||
                                 "CONNECTA User"
@@ -2304,6 +2380,10 @@ function listenToChats(uid) {
                         data.otherUserVerified === true;
 
 
+                    /*
+                     * Unread messages.
+                     */
+
                     const unread =
                         Number(
                             data.unreadCount?.[uid] ||
@@ -2312,11 +2392,28 @@ function listenToChats(uid) {
                         );
 
 
+                    /*
+                     * Last sender.
+                     */
+
                     const lastSenderId =
                         data.lastSenderId ||
                         data.lastMessageSenderId ||
                         "";
 
+
+                    /*
+                     * Last message.
+                     */
+
+                    const lastMessage =
+                        data.lastMessage ||
+                        "";
+
+
+                    /*
+                     * Message type.
+                     */
 
                     const lastMessageType =
                         data.lastMessageType ||
@@ -2324,18 +2421,23 @@ function listenToChats(uid) {
 
 
                     let preview =
-                        data.lastMessage ||
-                        "";
+                        lastMessage;
 
 
                     if (
-                        lastMessageType === "image"
+                        lastMessageType ===
+                        "image"
                     ) {
 
-                        preview = "📷 Photo";
+                        preview =
+                            "📷 Photo";
 
                     }
 
+
+                    /*
+                     * Empty conversation.
+                     */
 
                     if (
                         !preview &&
@@ -2376,6 +2478,14 @@ function listenToChats(uid) {
 
                         unread,
 
+                        /*
+                         * VERY IMPORTANT
+                         *
+                         * updatedAt is what moves
+                         * the conversation to the
+                         * top immediately.
+                         */
+
                         lastMessageAt:
                             data.updatedAt ||
                             data.lastMessageAt ||
@@ -2383,22 +2493,39 @@ function listenToChats(uid) {
 
                         updatedAt:
                             data.updatedAt ||
-                            null
+                            null,
+
+                        delivered:
+                            data.delivered === true,
+
+                        read:
+                            data.read === true
 
                     });
 
                 }
 
 
+                /*
+                 * Replace the current live chat list.
+                 */
+
                 recentChats =
                     result;
 
+
+                /*
+                 * Immediately update the unified
+                 * Recent Chats section.
+                 */
 
                 mergeRecentChats();
 
 
                 /*
-                 * Refresh profiles in background.
+                 * Refresh profiles in the background.
+                 *
+                 * This does NOT block rendering.
                  */
 
                 result.forEach(
@@ -2416,21 +2543,22 @@ function listenToChats(uid) {
             error => {
 
                 console.error(
-                    "Private chat listener error:",
+                    "[CONNECTA] Live chat listener error:",
                     error
                 );
 
+
                 /*
-                 * Keep groups visible.
+                 * Keep cached chats visible.
                  */
 
                 mergeRecentChats();
 
             }
+
         );
 
 }
-
 
 /* =========================================================
    GROUP UNREAD COUNT
