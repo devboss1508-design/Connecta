@@ -4738,7 +4738,14 @@ async function initializeDashboard() {
 
 
 /* =========================================================
-   PAGE HIDE
+   PAGE LIFECYCLE
+   =========================================================
+   Important:
+   When navigating Dashboard → Chat → Back,
+   the browser may restore Dashboard from BFCache.
+
+   pagehide stops the listeners before leaving.
+   pageshow starts them again when Dashboard returns.
 ========================================================= */
 
 window.addEventListener(
@@ -4767,6 +4774,95 @@ window.addEventListener(
     }
 );
 
+
+/* =========================================================
+   RESUME DASHBOARD AFTER BACK/FORWARD
+========================================================= */
+
+window.addEventListener(
+    "pageshow",
+    event => {
+
+        console.log(
+            "[CONNECTA] Dashboard pageshow:",
+            event.persisted
+        );
+
+
+        /*
+         * If the browser restored this page from
+         * BFCache, restart everything.
+         */
+
+        if (
+            event.persisted
+        ) {
+
+            resumeDashboardLive();
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   RESUME LIVE DASHBOARD
+========================================================= */
+
+function resumeDashboardLive() {
+
+    if (!currentUser?.uid) {
+
+        /*
+         * If the page was restored before authentication
+         * was available, initialize normally.
+         */
+
+        initializeDashboard();
+
+        return;
+
+    }
+
+
+    console.log(
+        "[CONNECTA] Restarting dashboard live listeners..."
+    );
+
+
+    /*
+     * Restart presence.
+     */
+
+    startPresence();
+
+
+    /*
+     * Restart live users.
+     */
+
+    listenToUsers();
+
+
+    /*
+     * Restart private chat listener.
+     */
+
+    listenToChats(
+        currentUser.uid
+    );
+
+
+    /*
+     * Restart group listeners.
+     */
+
+    listenToGroups(
+        currentUser.uid
+    );
+
+}
 
 /* =========================================================
    START
