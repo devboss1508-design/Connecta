@@ -44,17 +44,6 @@ let currentUser = null;
 
 let currentProfile = null;
 
-/*
- * IMPORTANT:
- * Messaging is disabled until the current user's
- * account-control profile has been verified.
- *
- * This prevents a user from sending a message during
- * the short period before Firestore returns:
- *
- * - status
- * - messagingRestricted
- */
 let accountControlLoaded = false;
 
 let otherUser = null;
@@ -111,17 +100,34 @@ let isSendingPhoto = false;
 
 
 /* =====================================================
-   PROFILE CACHE
+   CACHE
 ===================================================== */
 
 const PROFILE_CACHE_KEY =
     "connectaProfileCache";
 
+
 const OWN_PROFILE_CACHE_KEY =
     "connectaOwnProfileCache_v2";
 
+
 const PUBLIC_PROFILE_CACHE_KEY =
     "connectaPublicProfileCache_v2";
+
+
+const MESSAGE_CACHE_PREFIX =
+    "connectaMessages_v2_";
+
+
+/* =====================================================
+   UI STATE
+===================================================== */
+
+let headerReady = false;
+
+let conversationReady = false;
+
+let firebaseMessagesReceived = false;
 
 
 /* =====================================================
@@ -148,7 +154,7 @@ function getProfileCache() {
 
 
 /* =====================================================
-   GET NEW PUBLIC PROFILE CACHE
+   GET PUBLIC PROFILE CACHE
 ===================================================== */
 
 function getNewPublicProfileCache(uid) {
@@ -301,7 +307,7 @@ function getCachedProfile(uid) {
 
 
 /* =====================================================
-   SAVE CHAT PROFILE CACHE
+   SAVE CHAT PROFILE
 ===================================================== */
 
 function saveChatProfile(
@@ -320,10 +326,6 @@ function saveChatProfile(
 
 
     try {
-
-        /*
-        Only public information is cached.
-        */
 
         const publicProfile = {
 
@@ -589,6 +591,134 @@ function createChatId(
 
 
 /* =====================================================
+   TIMESTAMP → DATE
+===================================================== */
+
+function timestampToDate(
+    timestamp
+) {
+
+    if (!timestamp) {
+        return null;
+    }
+
+
+    if (
+        timestamp instanceof Date
+    ) {
+
+        return timestamp;
+
+    }
+
+
+    if (
+        typeof timestamp ===
+        "number"
+    ) {
+
+        const date =
+            new Date(
+                timestamp
+            );
+
+
+        return Number.isNaN(
+            date.getTime()
+        )
+            ? null
+            : date;
+
+    }
+
+
+    if (
+        timestamp?.toDate &&
+        typeof timestamp.toDate ===
+        "function"
+    ) {
+
+        try {
+
+            return timestamp.toDate();
+
+        } catch {
+
+            return null;
+
+        }
+
+    }
+
+
+    /*
+     * JSON cached Firestore Timestamp.
+     */
+
+    if (
+        typeof timestamp === "object"
+    ) {
+
+        if (
+            typeof timestamp.seconds ===
+            "number"
+        ) {
+
+            return new Date(
+                timestamp.seconds * 1000 +
+                Math.floor(
+                    (timestamp.nanoseconds || 0) /
+                    1000000
+                )
+            );
+
+        }
+
+
+        if (
+            typeof timestamp._seconds ===
+            "number"
+        ) {
+
+            return new Date(
+                timestamp._seconds * 1000 +
+                Math.floor(
+                    (timestamp._nanoseconds || 0) /
+                    1000000
+                )
+            );
+
+        }
+
+    }
+
+
+    if (
+        typeof timestamp ===
+        "string"
+    ) {
+
+        const date =
+            new Date(
+                timestamp
+            );
+
+
+        return Number.isNaN(
+            date.getTime()
+        )
+            ? null
+            : date;
+
+    }
+
+
+    return null;
+
+}
+
+
+/* =====================================================
    FORMAT TIME
 ===================================================== */
 
@@ -596,35 +726,14 @@ function formatTime(
     timestamp
 ) {
 
-    let date = null;
+    const date =
+        timestampToDate(
+            timestamp
+        );
 
 
-    if (
-        timestamp?.toDate
-    ) {
-
-        date =
-            timestamp.toDate();
-
-    } else if (
-        typeof timestamp === "number"
-    ) {
-
-        date =
-            new Date(timestamp);
-
-    }
-
-
-    if (
-        !date ||
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-
+    if (!date) {
         return "";
-
     }
 
 
@@ -647,32 +756,13 @@ function formatDate(
     timestamp
 ) {
 
-    let date = null;
+    const date =
+        timestampToDate(
+            timestamp
+        );
 
 
-    if (
-        timestamp?.toDate
-    ) {
-
-        date =
-            timestamp.toDate();
-
-    } else if (
-        typeof timestamp === "number"
-    ) {
-
-        date =
-            new Date(timestamp);
-
-    }
-
-
-    if (
-        !date ||
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
+    if (!date) {
 
         return "Today";
 
@@ -724,6 +814,89 @@ function formatDate(
                     : undefined
         }
     );
+
+}
+
+
+/* =====================================================
+   REMOVE CHAT HEADER SKELETON
+===================================================== */
+
+function removeHeaderSkeleton() {
+
+    const nameSkeleton =
+        $("chatUserNameSkeleton");
+
+
+    const statusSkeleton =
+        $("chatStatusSkeleton");
+
+
+    const name =
+        $("chatUserName");
+
+
+    const status =
+        $("chatStatusText");
+
+
+    if (nameSkeleton) {
+
+        nameSkeleton.style.display =
+            "none";
+
+    }
+
+
+    if (statusSkeleton) {
+
+        statusSkeleton.style.display =
+            "none";
+
+    }
+
+
+    if (name) {
+
+        name.style.display =
+            "inline-flex";
+
+    }
+
+
+    if (status) {
+
+        status.style.display =
+            "inline";
+
+    }
+
+
+    headerReady =
+        true;
+
+}
+
+
+/* =====================================================
+   REMOVE CONVERSATION SKELETON
+===================================================== */
+
+function removeConversationSkeleton() {
+
+    const skeleton =
+        $("chatInstantSkeleton");
+
+
+    if (skeleton) {
+
+        skeleton.remove();
+
+    }
+
+
+    conversationReady =
+        true;
 
 }
 
@@ -789,7 +962,9 @@ function renderChatHeader(
 
     nameElement.innerHTML = `
 
-        <span class="chat-user-name-text">
+        <span
+            class="chat-user-name-text"
+        >
             ${escapeHtml(name)}
         </span>
 
@@ -815,6 +990,9 @@ function renderChatHeader(
             initials(name);
 
     }
+
+
+    removeHeaderSkeleton();
 
 
     updateStatusDisplay();
@@ -867,6 +1045,22 @@ function updateStatusDisplay() {
         `;
 
 
+        statusText.style.display =
+            "inline-flex";
+
+
+        const skeleton =
+            $("chatStatusSkeleton");
+
+
+        if (skeleton) {
+
+            skeleton.style.display =
+                "none";
+
+        }
+
+
         if (statusDot) {
 
             statusDot.style.display =
@@ -888,6 +1082,10 @@ function updateStatusDisplay() {
             "Online";
 
 
+        statusText.style.display =
+            "inline";
+
+
         if (statusDot) {
 
             statusDot.style.display =
@@ -905,6 +1103,10 @@ function updateStatusDisplay() {
         getLastSeenText(
             otherUser
         );
+
+
+    statusText.style.display =
+        "inline";
 
 
     if (statusDot) {
@@ -925,17 +1127,17 @@ function getLastSeenText(
     user
 ) {
 
-    if (
-        !user?.lastSeen?.toDate
-    ) {
+    const date =
+        timestampToDate(
+            user?.lastSeen
+        );
+
+
+    if (!date) {
 
         return "Offline";
 
     }
-
-
-    const date =
-        user.lastSeen.toDate();
 
 
     const today =
@@ -983,6 +1185,12 @@ async function loadOtherUser(
         );
 
 
+    /*
+     * =================================================
+     * CACHE FIRST
+     * =================================================
+     */
+
     if (cached) {
 
         otherUser = {
@@ -1001,6 +1209,12 @@ async function loadOtherUser(
     }
 
 
+    /*
+     * =================================================
+     * FIRESTORE UPDATE
+     * =================================================
+     */
+
     try {
 
         const snap =
@@ -1018,7 +1232,9 @@ async function loadOtherUser(
         ) {
 
             if (cached) {
+
                 return;
+
             }
 
 
@@ -1075,10 +1291,6 @@ async function loadOtherUser(
    MESSAGE CACHE
 ===================================================== */
 
-const MESSAGE_CACHE_PREFIX =
-    "connectaMessages_v1_";
-
-
 function getMessageCache(
     chatId
 ) {
@@ -1125,6 +1337,11 @@ function getMessageCache(
                     ...message
                 };
 
+
+                /*
+                 * Restore cached milliseconds
+                 * to a Firestore-like object.
+                 */
 
                 if (
                     typeof restored.createdAt ===
@@ -1191,6 +1408,10 @@ function saveMessageCache(
 
     try {
 
+        /*
+         * Keep only the latest 100 messages.
+         */
+
         const latest =
             messages.slice(
                 -100
@@ -1205,22 +1426,16 @@ function saveMessageCache(
                         null;
 
 
-                    if (
-                        message.createdAt?.toDate
-                    ) {
-
-                        createdAt =
+                    const date =
+                        timestampToDate(
                             message.createdAt
-                                .toDate()
-                                .getTime();
+                        );
 
-                    } else if (
-                        typeof message.createdAt ===
-                        "number"
-                    ) {
+
+                    if (date) {
 
                         createdAt =
-                            message.createdAt;
+                            date.getTime();
 
                     }
 
@@ -1635,10 +1850,16 @@ function listenToChat() {
                     data.typing || {};
 
 
-                isOtherUserTyping =
-                    typing[
-                        otherUser.uid
-                    ] === true;
+                if (
+                    otherUser?.uid
+                ) {
+
+                    isOtherUserTyping =
+                        typing[
+                            otherUser.uid
+                        ] === true;
+
+                }
 
 
                 updateStatusDisplay();
@@ -1689,12 +1910,26 @@ function listenToMessages() {
         );
 
 
+    if (stopMessages) {
+
+        stopMessages();
+
+        stopMessages =
+            null;
+
+    }
+
+
     stopMessages =
         onSnapshot(
 
             messagesQuery,
 
             async snapshot => {
+
+                firebaseMessagesReceived =
+                    true;
+
 
                 const messages =
                     snapshot.docs.map(
@@ -1713,16 +1948,36 @@ function listenToMessages() {
                     messages;
 
 
+                /*
+                 * Firebase has responded.
+                 * Remove the skeleton now.
+                 */
+
+                removeConversationSkeleton();
+
+
+                /*
+                 * Save fresh messages locally.
+                 */
+
                 saveMessageCache(
                     chatId,
                     messages
                 );
 
 
+                /*
+                 * Render the real conversation.
+                 */
+
                 renderMessages(
                     messages
                 );
 
+
+                /*
+                 * Read receipts.
+                 */
 
                 await markIncomingMessages(
                     messages
@@ -1738,15 +1993,28 @@ function listenToMessages() {
                 );
 
 
+                /*
+                 * If cached messages exist,
+                 * NEVER replace them with an error.
+                 */
+
                 if (
-                    !latestMessages.length
+                    latestMessages.length
                 ) {
 
-                    showChatError(
-                        "Could not load messages. Please check your Firestore rules."
-                    );
+                    removeConversationSkeleton();
+
+                    return;
 
                 }
+
+
+                removeConversationSkeleton();
+
+
+                showChatError(
+                    "Could not load messages. Please check your Firestore rules."
+                );
 
             }
 
@@ -1764,6 +2032,7 @@ function getMessageTickState(
 ) {
 
     if (
+        !currentUser ||
         message.senderId !==
         currentUser.uid
     ) {
@@ -1919,6 +2188,13 @@ function renderMessages(
     }
 
 
+    /*
+     * Real data has arrived.
+     */
+
+    removeConversationSkeleton();
+
+
     if (
         !messages.length
     ) {
@@ -1966,6 +2242,7 @@ function renderMessages(
         message => {
 
             const mine =
+                currentUser &&
                 message.senderId ===
                 currentUser.uid;
 
@@ -2012,16 +2289,11 @@ function renderMessages(
                     : "";
 
 
-            /*
-            =================================================
-            IMAGE MESSAGE
-            =================================================
-            */
-
             const isImage =
                 message.type === "image" ||
                 !!message.imageUrl ||
-                !!message.photoURL;
+                !!message.photoURL ||
+                !!message.photoUrl;
 
 
             let messageContent = "";
@@ -2042,7 +2314,7 @@ function renderMessages(
                     <span
                         class="message-text"
                     >${escapeHtml(
-                        message.text
+                        message.text || ""
                     )}</span>
 
                     <span
@@ -2081,10 +2353,12 @@ function renderMessages(
                 >
 
                     <div
-                        class="message-bubble
+                        class="
+                            message-bubble
                             ${isImage
                                 ? "photo-message"
-                                : ""}"
+                                : ""}
+                        "
                     >
 
                         ${messageContent}
@@ -2248,7 +2522,7 @@ async function markIncomingMessages(
 
 
 /* =====================================================
-   MARK SENT MESSAGES AS DELIVERED
+   MARK SENT MESSAGES DELIVERED
 ===================================================== */
 
 async function markMessagesDelivered() {
@@ -2344,7 +2618,8 @@ async function markMessagesDelivered() {
 async function sendTextMessage(
     text
 ) {
-        const control =
+
+    const control =
         getChatAccountControl(
             currentProfile
         );
@@ -2367,6 +2642,7 @@ async function sendTextMessage(
         return;
 
     }
+
 
     if (
         !text ||
@@ -2481,7 +2757,7 @@ async function sendTextMessage(
 
 
 /* =====================================================
-   VALIDATE PHOTO
+   PHOTO VALIDATION
 ===================================================== */
 
 function validatePhoto(
@@ -2491,18 +2767,16 @@ function validatePhoto(
     if (!file) {
 
         return {
+
             valid: false,
-            message: "Please select a photo."
+
+            message:
+                "Please select a photo."
+
         };
 
     }
 
-
-    /*
-    =================================================
-    TYPE
-    =================================================
-    */
 
     if (
         !ALLOWED_PHOTO_TYPES.includes(
@@ -2511,19 +2785,16 @@ function validatePhoto(
     ) {
 
         return {
+
             valid: false,
+
             message:
                 "Only JPG, PNG and WebP photos are allowed. Videos are not supported."
+
         };
 
     }
 
-
-    /*
-    =================================================
-    SIZE
-    =================================================
-    */
 
     if (
         file.size >
@@ -2531,16 +2802,21 @@ function validatePhoto(
     ) {
 
         return {
+
             valid: false,
+
             message:
                 "Photo must be 5MB or smaller."
+
         };
 
     }
 
 
     return {
+
         valid: true
+
     };
 
 }
@@ -2577,7 +2853,7 @@ function setPhotoStatus(
 
 
 /* =====================================================
-   CLEAR PHOTO SELECTION
+   CLEAR PHOTO
 ===================================================== */
 
 function clearSelectedPhoto() {
@@ -2648,7 +2924,7 @@ function clearSelectedPhoto() {
 
 
 /* =====================================================
-   SHOW PHOTO PREVIEW
+   PHOTO PREVIEW
 ===================================================== */
 
 function showPhotoPreview(
@@ -2774,9 +3050,7 @@ function formatFileSize(
     bytes
 ) {
 
-    if (
-        !bytes
-    ) {
+    if (!bytes) {
 
         return "0 KB";
 
@@ -2784,7 +3058,8 @@ function formatFileSize(
 
 
     if (
-        bytes < 1024 * 1024
+        bytes <
+        1024 * 1024
     ) {
 
         return `${(
@@ -2809,7 +3084,8 @@ function formatFileSize(
 async function uploadPhoto(
     file
 ) {
-        const control =
+
+    const control =
         getChatAccountControl(
             currentProfile
         );
@@ -2826,6 +3102,7 @@ async function uploadPhoto(
         );
 
     }
+
 
     if (
         !currentUser ||
@@ -2848,12 +3125,6 @@ async function uploadPhoto(
             "messages"
         );
 
-
-    /*
-    Create the message ID before uploading
-    so the Storage path and Firestore message
-    use the same ID.
-    */
 
     const messageRef =
         doc(
@@ -2962,12 +3233,6 @@ async function uploadPhoto(
             snapshot.ref
         );
 
-
-    /*
-    =================================================
-    CREATE FIRESTORE PHOTO MESSAGE
-    =================================================
-    */
 
     const batch =
         writeBatch(
@@ -3089,7 +3354,7 @@ async function uploadPhoto(
 
 
 /* =====================================================
-   GET FILE EXTENSION
+   FILE EXTENSION
 ===================================================== */
 
 function getFileExtension(
@@ -3148,7 +3413,7 @@ function getFileExtension(
 
 async function sendMessage() {
 
-        const control =
+    const control =
         getChatAccountControl(
             currentProfile
         );
@@ -3172,6 +3437,7 @@ async function sendMessage() {
 
     }
 
+
     const input =
         $("messageInput");
 
@@ -3186,15 +3452,11 @@ async function sendMessage() {
 
 
     const hasText =
-        Boolean(
-            text
-        );
+        Boolean(text);
 
 
     const hasPhoto =
-        Boolean(
-            selectedPhoto
-        );
+        Boolean(selectedPhoto);
 
 
     if (
@@ -3242,12 +3504,6 @@ async function sendMessage() {
         );
 
 
-        /*
-        =================================================
-        SEND TEXT FIRST
-        =================================================
-        */
-
         if (hasText) {
 
             await sendTextMessage(
@@ -3263,15 +3519,7 @@ async function sendMessage() {
         }
 
 
-        /*
-        =================================================
-        SEND PHOTO
-        =================================================
-        */
-
-        if (
-            hasPhoto
-        ) {
+        if (hasPhoto) {
 
             isSendingPhoto =
                 true;
@@ -3375,7 +3623,7 @@ async function setTyping(
     typing
 ) {
 
-        const control =
+    const control =
         getChatAccountControl(
             currentProfile
         );
@@ -3389,6 +3637,7 @@ async function setTyping(
         return;
 
     }
+
 
     if (
         !currentUser ||
@@ -3434,7 +3683,7 @@ async function setTyping(
 
 function handleTyping() {
 
-        const control =
+    const control =
         getChatAccountControl(
             currentProfile
         );
@@ -3448,6 +3697,7 @@ function handleTyping() {
         return;
 
     }
+
 
     const input =
         $("messageInput");
@@ -3484,12 +3734,14 @@ function handleTyping() {
 
 
     if (
-        now - lastTypingWrite >
+        now -
+        lastTypingWrite >
         1000
     ) {
 
         lastTypingWrite =
             now;
+
 
         setTyping(
             true
@@ -3563,6 +3815,9 @@ function showChatError(
     }
 
 
+    removeConversationSkeleton();
+
+
     box.innerHTML = `
 
         <div
@@ -3584,36 +3839,15 @@ function showChatError(
 
 }
 
+
 /* =====================================================
    ADMIN ACCOUNT / CHAT CONTROLS
-
-   Controlled by the CONNECTA Admin Panel:
-
-   status:
-   - active
-   - suspended
-   - banned
-
-   messagingRestricted:
-   - false → user can send messages
-   - true  → user can read chats but cannot send
-
-   IMPORTANT:
-   These frontend checks are UX protection.
-   Firestore/backend security rules must also
-   enforce the restriction so it cannot be bypassed.
 ===================================================== */
 
 function getChatAccountControl(
     profile = null
 ) {
 
-    /*
-     * FAIL CLOSED
-     *
-     * Until we have confirmed the current user's
-     * Firestore profile, messaging is restricted.
-     */
     if (
         !accountControlLoaded ||
         !profile
@@ -3621,7 +3855,8 @@ function getChatAccountControl(
 
         return {
 
-            blocked: false,
+            blocked:
+                false,
 
             status:
                 "checking",
@@ -3639,7 +3874,8 @@ function getChatAccountControl(
 
     const status =
         String(
-            profile.status || "active"
+            profile.status ||
+            "active"
         )
         .trim()
         .toLowerCase();
@@ -3649,17 +3885,14 @@ function getChatAccountControl(
         profile.messagingRestricted === true;
 
 
-    /*
-     * BANNED
-     */
-
     if (
         status === "banned"
     ) {
 
         return {
 
-            blocked: true,
+            blocked:
+                true,
 
             status:
                 "banned",
@@ -3675,17 +3908,14 @@ function getChatAccountControl(
     }
 
 
-    /*
-     * SUSPENDED
-     */
-
     if (
         status === "suspended"
     ) {
 
         return {
 
-            blocked: true,
+            blocked:
+                true,
 
             status:
                 "suspended",
@@ -3701,17 +3931,14 @@ function getChatAccountControl(
     }
 
 
-    /*
-     * ACTIVE BUT MESSAGING RESTRICTED
-     */
-
     if (
         messagingRestricted
     ) {
 
         return {
 
-            blocked: false,
+            blocked:
+                false,
 
             status:
                 "active",
@@ -3727,13 +3954,10 @@ function getChatAccountControl(
     }
 
 
-    /*
-     * NORMAL ACTIVE ACCOUNT
-     */
-
     return {
 
-        blocked: false,
+        blocked:
+            false,
 
         status:
             "active",
@@ -3748,6 +3972,7 @@ function getChatAccountControl(
 
 }
 
+
 /* =====================================================
    CHAT COMPOSER CONTROL
 ===================================================== */
@@ -3760,72 +3985,6 @@ function applyChatMessagingControl(
         getChatAccountControl(
             profile
         );
-
-  /*
- * Account permissions are still being verified.
- * Fail closed.
- */
-if (
-    control.status === "checking"
-) {
-
-    const input =
-        $("messageInput");
-
-    const sendButton =
-        $("sendButton");
-
-    const attachButton =
-        $("attachButton");
-
-    const photoInput =
-        $("photoInput");
-
-
-    if (input) {
-
-        input.disabled =
-            true;
-
-        input.placeholder =
-            "Checking account permissions...";
-
-    }
-
-
-    if (sendButton) {
-
-        sendButton.disabled =
-            true;
-
-    }
-
-
-    if (attachButton) {
-
-        attachButton.disabled =
-            true;
-
-    }
-
-
-    if (photoInput) {
-
-        photoInput.disabled =
-            true;
-
-    }
-
-
-    showChatRestrictionNotice(
-        "Checking your CONNECTA account permissions...",
-        "checking"
-    );
-
-
-    return control;
-
-}
 
 
     const form =
@@ -3849,12 +4008,67 @@ if (
 
 
     /*
-     * Account suspended/banned.
-     *
-     * The entire composer is disabled.
+     * CHECKING
      */
 
-    if (control.blocked) {
+    if (
+        control.status ===
+        "checking"
+    ) {
+
+        if (input) {
+
+            input.disabled =
+                true;
+
+            input.placeholder =
+                "Checking account permissions...";
+
+        }
+
+
+        if (sendButton) {
+
+            sendButton.disabled =
+                true;
+
+        }
+
+
+        if (attachButton) {
+
+            attachButton.disabled =
+                true;
+
+        }
+
+
+        if (photoInput) {
+
+            photoInput.disabled =
+                true;
+
+        }
+
+
+        showChatRestrictionNotice(
+            "Checking your CONNECTA account permissions...",
+            "checking"
+        );
+
+
+        return control;
+
+    }
+
+
+    /*
+     * BLOCKED
+     */
+
+    if (
+        control.blocked
+    ) {
 
         if (input) {
 
@@ -3911,9 +4125,7 @@ if (
 
 
     /*
-     * Messaging restriction.
-     *
-     * User can still read the conversation.
+     * MESSAGING RESTRICTED
      */
 
     if (
@@ -3975,7 +4187,7 @@ if (
 
 
     /*
-     * Normal active account.
+     * ACTIVE
      */
 
     if (input) {
@@ -4139,10 +4351,6 @@ function listenToOwnProfile(
     }
 
 
-    /*
-     * Start in fail-closed mode.
-     */
-
     accountControlLoaded =
         false;
 
@@ -4171,11 +4379,6 @@ function listenToOwnProfile(
                     !snapshot.exists()
                 ) {
 
-                    /*
-                     * We cannot verify the account.
-                     * Fail closed.
-                     */
-
                     accountControlLoaded =
                         false;
 
@@ -4203,10 +4406,6 @@ function listenToOwnProfile(
                 }
 
 
-                /*
-                 * LIVE ADMIN-CONTROLLED PROFILE
-                 */
-
                 currentProfile = {
 
                     uid,
@@ -4216,38 +4415,13 @@ function listenToOwnProfile(
                 };
 
 
-                /*
-                 * The profile has now been verified.
-                 */
-
                 accountControlLoaded =
                     true;
 
 
-                const control =
-                    applyChatMessagingControl(
-                        currentProfile
-                    );
-
-
-                console.log(
-                    "[CONNECTA] Chat account control:",
-                    control
+                applyChatMessagingControl(
+                    currentProfile
                 );
-
-
-                /*
-                 * IMPORTANT:
-                 *
-                 * We do NOT destroy the chat listeners
-                 * when an account becomes restricted.
-                 *
-                 * This allows the admin to restore the
-                 * account while the user remains on the
-                 * page.
-                 *
-                 * The composer is disabled while restricted.
-                 */
 
             },
 
@@ -4258,10 +4432,6 @@ function listenToOwnProfile(
                     error
                 );
 
-
-                /*
-                 * FAIL CLOSED
-                 */
 
                 accountControlLoaded =
                     false;
@@ -4289,6 +4459,7 @@ function listenToOwnProfile(
         );
 
 }
+
 
 /* =====================================================
    PHOTO ATTACHMENT
@@ -4319,12 +4490,6 @@ function setupAttachmentButton() {
     }
 
 
-    /*
-    =================================================
-    OPEN PHOTO PICKER
-    =================================================
-    */
-
     button.addEventListener(
         "click",
         () => {
@@ -4343,12 +4508,6 @@ function setupAttachmentButton() {
         }
     );
 
-
-    /*
-    =================================================
-    PHOTO SELECTED
-    =================================================
-    */
 
     input.addEventListener(
         "change",
@@ -4370,12 +4529,6 @@ function setupAttachmentButton() {
         }
     );
 
-
-    /*
-    =================================================
-    CANCEL PHOTO
-    =================================================
-    */
 
     const cancelButton =
         $("photoPreviewCancel");
@@ -4402,12 +4555,6 @@ function setupAttachmentButton() {
 ===================================================== */
 
 function setupUI() {
-
-    /*
-    =================================================
-    BACK
-    =================================================
-    */
 
     const back =
         $("backBtn");
@@ -4437,12 +4584,6 @@ function setupUI() {
 
     }
 
-
-    /*
-    =================================================
-    PROFILE
-    =================================================
-    */
 
     const profile =
         $("profileBtn");
@@ -4474,12 +4615,6 @@ function setupUI() {
     }
 
 
-    /*
-    =================================================
-    USER HEADER
-    =================================================
-    */
-
     const userArea =
         $("chatUserArea");
 
@@ -4510,12 +4645,6 @@ function setupUI() {
     }
 
 
-    /*
-    =================================================
-    SEND FORM
-    =================================================
-    */
-
     const form =
         $("messageForm");
 
@@ -4536,17 +4665,15 @@ function setupUI() {
     }
 
 
-    /*
-    =================================================
-    MESSAGE INPUT
-    =================================================
-    */
-
     const input =
         $("messageInput");
 
 
     if (input) {
+
+        input.dataset.originalPlaceholder =
+            "Type a message...";
+
 
         input.addEventListener(
             "input",
@@ -4571,7 +4698,7 @@ function setupUI() {
 
                     event.preventDefault();
 
-                    form.requestSubmit();
+                    form?.requestSubmit();
 
                 }
 
@@ -4585,33 +4712,30 @@ function setupUI() {
 
 }
 
+
 /* =====================================================
-   CONNECTA GLOBAL AUTH SESSION
+   INITIALIZE CHAT
 ===================================================== */
 
 async function initializeChat() {
 
     /*
-     * globalAuth.js is now the single authentication
-     * source for CONNECTA.
-     *
-     * This means dashboard.html, chat.html,
-     * groups.html, profile.html, etc. all use
-     * the same Firebase Auth session.
+     * =================================================
+     * AUTH
+     * =================================================
      */
 
     const session =
         await getCurrentConnectaUser({
-            redirect: true,
-            allowBlocked: true
+
+            redirect:
+                true,
+
+            allowBlocked:
+                true
+
         });
 
-
-    /*
-     * Not authenticated.
-     *
-     * globalAuth handles the redirect.
-     */
 
     if (!session) {
 
@@ -4619,12 +4743,6 @@ async function initializeChat() {
 
     }
 
-
-    /*
-     * =================================================
-     * AUTHENTICATED USER
-     * =================================================
-     */
 
     currentUser =
         session.authUser;
@@ -4648,25 +4766,10 @@ async function initializeChat() {
         };
 
 
-    console.log(
-        "[CONNECTA] Chat user:",
-        currentUser.uid
-    );
-
-
     /*
      * =================================================
-     * CURRENT USER ADMIN CONTROLS
+     * ACCOUNT CONTROL
      * =================================================
-     *
-     * This listener remains active so the admin panel
-     * can change:
-     *
-     * messagingRestricted
-     * suspended
-     * banned
-     *
-     * while the user is already inside the chat.
      */
 
     listenToOwnProfile(
@@ -4676,7 +4779,7 @@ async function initializeChat() {
 
     /*
      * =================================================
-     * GET OTHER USER
+     * OTHER USER
      * =================================================
      */
 
@@ -4741,16 +4844,15 @@ async function initializeChat() {
     }
 
 
-    /*
-     * =================================================
-     * CHAT INITIALIZATION
-     * =================================================
-     */
-
     try {
 
         /*
-         * 1. CREATE CHAT ID
+         * =================================================
+         * CHAT ID FIRST
+         * =================================================
+         *
+         * We don't need to wait for Firestore to calculate
+         * the chat ID.
          */
 
         chatId =
@@ -4761,7 +4863,9 @@ async function initializeChat() {
 
 
         /*
-         * 2. LOAD CACHED OTHER PROFILE
+         * =================================================
+         * CACHE PROFILE IMMEDIATELY
+         * =================================================
          */
 
         const cachedProfile =
@@ -4790,7 +4894,9 @@ async function initializeChat() {
 
 
         /*
-         * 3. LOAD CACHED MESSAGES
+         * =================================================
+         * CACHE MESSAGES IMMEDIATELY
+         * =================================================
          */
 
         const cachedMessages =
@@ -4815,7 +4921,9 @@ async function initializeChat() {
 
 
         /*
-         * 4. REALTIME OTHER USER
+         * =================================================
+         * REALTIME PROFILE
+         * =================================================
          */
 
         listenToOtherUser(
@@ -4824,21 +4932,33 @@ async function initializeChat() {
 
 
         /*
-         * 5. REALTIME MESSAGES
-         */
-
-        listenToMessages();
-
-
-        /*
-         * 6. REALTIME CHAT METADATA
+         * =================================================
+         * REALTIME CHAT METADATA
+         * =================================================
          */
 
         listenToChat();
 
 
         /*
-         * 7. LOAD OTHER USER FROM FIRESTORE
+         * =================================================
+         * REALTIME MESSAGES
+         * =================================================
+         *
+         * This listener can operate even while the chat
+         * document is being created.
+         */
+
+        listenToMessages();
+
+
+        /*
+         * =================================================
+         * LOAD FIRESTORE PROFILE
+         * =================================================
+         *
+         * If cache already exists, the user already sees
+         * the header. This request simply refreshes it.
          */
 
         await loadOtherUser(
@@ -4847,20 +4967,38 @@ async function initializeChat() {
 
 
         /*
-         * 8. CREATE / REPAIR CHAT
+         * =================================================
+         * ENSURE CHAT DOCUMENT
+         * =================================================
          */
 
         await ensureChat();
 
 
         /*
-         * Apply the already-known account
-         * control after chat initialization.
+         * =================================================
+         * FINAL ACCOUNT CONTROL
+         * =================================================
          */
 
         applyChatMessagingControl(
             currentProfile
         );
+
+
+        /*
+         * =================================================
+         * MARK EXISTING MESSAGES DELIVERED
+         * =================================================
+         */
+
+        if (
+            otherUser?.isOnline === true
+        ) {
+
+            markMessagesDelivered();
+
+        }
 
 
     } catch (error) {
@@ -4871,15 +5009,26 @@ async function initializeChat() {
         );
 
 
+        /*
+         * Never destroy an already visible cached
+         * conversation because a background Firebase
+         * operation failed.
+         */
+
         if (
-            !latestMessages.length
+            latestMessages.length
         ) {
 
-            showChatError(
-                "Could not open this conversation. Please try again."
-            );
+            removeConversationSkeleton();
+
+            return;
 
         }
+
+
+        showChatError(
+            "Could not open this conversation. Please try again."
+        );
 
     }
 
@@ -4887,8 +5036,10 @@ async function initializeChat() {
 
 
 /* =====================================================
-   START CHAT
+   START
 ===================================================== */
+
+setupUI();
 
 initializeChat();
 
@@ -4964,14 +5115,15 @@ window.addEventListener(
 
         }
 
+
         if (
-    stopOwnProfile
-) {
+            stopOwnProfile
+        ) {
 
-    stopOwnProfile();
+            stopOwnProfile();
 
-    stopOwnProfile =
-        null;
+            stopOwnProfile =
+                null;
 
         }
 
@@ -4989,10 +5141,3 @@ window.addEventListener(
 
     }
 );
-
-
-/* =====================================================
-   START UI
-===================================================== */
-
-setupUI();
