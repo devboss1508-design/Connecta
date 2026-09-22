@@ -5,54 +5,38 @@
    Compatible with:
    - dashboard.html
    - dashboard.css
+   - firebase.js
+   - globalAuth.js
    - chat.js
    - group-chat.js
-   - globalAuth.js
-   - firebase.js
 
    FEATURES
-   - Instant cache-first dashboard
-   - Skeleton/shimmer instead of Loading text
+   - Cache-first dashboard
+   - Instant previous data
+   - Skeleton instead of "Loading..."
    - Live users
    - Online/offline status
-   - Live private chats
-   - Live groups
-   - Group membership via memberIds OR members
+   - Private chats
+   - Groups
+   - Group membership: members OR memberIds
    - Group unread counts
-   - Unified Recent Chats
-   - Private-chat unread counts
+   - Unified recent chats
    - Verified badges
    - Follow system
    - Profile cache
    - Dashboard cache
    - Presence heartbeat
    - Account restriction protection
-   - Correct HTML/CSS IDs and classes
-========================================================= */
-
-
-/* =========================================================
-   FIREBASE
 ========================================================= */
 
 import {
     db
 } from "./firebase.js";
 
-
-/* =========================================================
-   GLOBAL AUTH
-========================================================= */
-
 import {
     getCurrentConnectaUser,
     logout
 } from "./globalAuth.js";
-
-
-/* =========================================================
-   FIRESTORE
-========================================================= */
 
 import {
     collection,
@@ -67,15 +51,14 @@ import {
     runTransaction,
     setDoc,
     serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 
 /* =========================================================
-   DOM HELPER
+   DOM
 ========================================================= */
 
-const $ = id =>
-    document.getElementById(id);
+const $ = id => document.getElementById(id);
 
 
 /* =========================================================
@@ -83,38 +66,20 @@ const $ = id =>
 ========================================================= */
 
 let currentUser = null;
-
 let currentProfile = null;
 
 let onlineUsers = [];
 
 let recentChats = [];
-
 let recentGroups = [];
 
-
-/*
- * Group listener state.
- */
-
-let groupListeners = {
-
-    memberIds: [],
-    members: [],
-    owned: [],
-    unsubscribers: []
-
-};
-
-
 let stopUsers = null;
-
 let stopChats = null;
 
+let groupUnsubscribers = [];
+
 let presenceInterval = null;
-
 let groupProcessTimer = null;
-
 let groupProcessVersion = 0;
 
 
@@ -130,7 +95,7 @@ const PROFILE_CACHE_KEY =
 
 
 /* =========================================================
-   INSTANT DASHBOARD STYLES
+   INSTANT STYLES
 ========================================================= */
 
 function installInstantDashboardStyles() {
@@ -138,321 +103,167 @@ function installInstantDashboardStyles() {
     if (
         $("connectaDashboardInstantStyles")
     ) {
-
         return;
-
     }
-
 
     const style =
         document.createElement("style");
 
-
     style.id =
         "connectaDashboardInstantStyles";
-
 
     style.textContent = `
 
         @keyframes connectaShimmer {
 
             0% {
-                background-position:
-                    -500px 0;
+                background-position:-600px 0;
             }
 
             100% {
-                background-position:
-                    500px 0;
+                background-position:600px 0;
             }
 
         }
 
-
-        .connecta-dashboard-skeleton {
+        .connecta-skeleton {
 
             background:
                 linear-gradient(
                     90deg,
-                    #e9efeb 25%,
+                    #edf2ee 25%,
                     #f8faf8 50%,
-                    #e9efeb 75%
+                    #edf2ee 75%
                 );
 
-            background-size:
-                1000px 100%;
+            background-size:1200px 100%;
 
             animation:
                 connectaShimmer
                 1.25s infinite linear;
 
-            border-radius:
-                14px;
+            border-radius:16px;
 
         }
 
+        .connecta-skeleton-users {
 
-        .connecta-dashboard-skeleton-row {
-
-            display:
-                flex;
-
-            gap:
-                11px;
-
-            width:
-                100%;
-
-            overflow:
-                hidden;
+            display:flex;
+            gap:10px;
+            width:100%;
+            overflow:hidden;
 
         }
 
+        .connecta-skeleton-user {
 
-        .connecta-dashboard-skeleton-user {
-
-            flex:
-                0 0 122px;
-
-            height:
-                150px;
-
-            border-radius:
-                18px;
+            min-width:122px;
+            height:150px;
+            flex:0 0 122px;
 
         }
 
+        .connecta-skeleton-chat {
 
-        .connecta-dashboard-skeleton-chat {
-
-            width:
-                100%;
-
-            height:
-                66px;
-
-            margin-bottom:
-                9px;
-
-            border-radius:
-                15px;
+            width:100%;
+            height:68px;
+            margin-bottom:8px;
 
         }
-
-
-        .connecta-dashboard-empty {
-
-            width:
-                100%;
-
-            min-height:
-                100px;
-
-            display:
-                grid;
-
-            place-items:
-                center;
-
-            text-align:
-                center;
-
-            color:
-                #718078;
-
-            font-size:
-                13px;
-
-            padding:
-                20px;
-
-        }
-
-
-        .connecta-dashboard-error {
-
-            width:
-                100%;
-
-            padding:
-                18px;
-
-            text-align:
-                center;
-
-            color:
-                #718078;
-
-            font-size:
-                13px;
-
-        }
-
-
-        .connecta-dashboard-unread {
-
-            min-width:
-                21px;
-
-            height:
-                21px;
-
-            padding:
-                0 5px;
-
-            display:
-                grid;
-
-            place-items:
-                center;
-
-            border-radius:
-                999px;
-
-            background:
-                #22c55e;
-
-            color:
-                #fff;
-
-            font-size:
-                9px;
-
-            font-weight:
-                800;
-
-        }
-
 
         .verified-badge {
 
-            display:
-                inline-flex;
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
 
-            align-items:
-                center;
+            width:16px;
+            height:16px;
 
-            justify-content:
-                center;
+            margin-left:3px;
 
-            width:
-                16px;
+            border-radius:50%;
 
-            height:
-                16px;
+            background:#22c55e;
+            color:#fff;
 
-            margin-left:
-                3px;
+            font-size:10px;
+            font-weight:900;
 
-            border-radius:
-                50%;
-
-            background:
-                #22c55e;
-
-            color:
-                #fff;
-
-            font-size:
-                10px;
-
-            font-weight:
-                900;
-
-            vertical-align:
-                middle;
+            vertical-align:middle;
 
         }
 
+        .chat-status-ticks {
 
-        .chat-list-item .avatar {
-
-            position:
-                relative;
-
-        }
-
-
-        .chat-list-item.group-chat .avatar {
-
-            background:
-                #dcfce7;
-
-            color:
-                #15803d;
+            font-size:10px;
+            margin-left:3px;
+            color:#94a3b8;
 
         }
 
+        .chat-status-ticks.read {
 
-        .chat-list-item {
-
-            cursor:
-                pointer;
+            color:#22c55e;
 
         }
 
+        .connecta-empty {
 
-        .chat-list-item.unread {
+            width:100%;
+            min-height:100px;
 
-            background:
-                #f7fff8;
+            display:grid;
+            place-items:center;
 
-        }
+            padding:20px;
 
+            color:#718078;
 
-        .chat-list-preview {
-
-            min-width:
-                0;
-
-        }
-
-
-        .chat-list-preview
-        .verified-badge {
-
-            width:
-                14px;
-
-            height:
-                14px;
-
-            font-size:
-                8px;
+            font-size:13px;
+            text-align:center;
 
         }
 
+        .connecta-error {
+
+            width:100%;
+            padding:18px;
+
+            color:#b42318;
+
+            font-size:13px;
+            text-align:center;
+
+        }
 
         .user-card {
 
-            cursor:
-                pointer;
+            cursor:pointer;
 
         }
 
+        .chat-item {
 
-        .user-card button {
+            cursor:pointer;
 
-            position:
-                relative;
+        }
 
-            z-index:
-                2;
+        .group-avatar {
+
+            background:#dcfce7;
+            color:#166534;
 
         }
 
     `;
 
-
-    document.head.appendChild(
-        style
-    );
-
+    document.head.appendChild(style);
 }
 
 
 /* =========================================================
-   DASHBOARD SKELETON
+   SKELETON
 ========================================================= */
 
 function showDashboardSkeleton() {
@@ -460,197 +271,102 @@ function showDashboardSkeleton() {
     const onlineBox =
         $("onlineUsers");
 
-
     const chatBox =
         $("chatList");
 
 
-    /*
-     * Online users.
-     *
-     * Replace the HTML "Loading online users..."
-     * placeholder immediately.
-     */
-
     if (onlineBox) {
 
-        const loadingPlaceholder =
-            onlineBox.querySelector(
-                ".empty-state"
-            );
+        onlineBox.innerHTML = `
 
-
-        if (
-            loadingPlaceholder
-        ) {
-
-            loadingPlaceholder.remove();
-
-        }
-
-
-        if (
-            !onlineBox.children.length
-        ) {
-
-            onlineBox.innerHTML = `
+            <div
+                class="connecta-skeleton-users"
+                aria-hidden="true"
+            >
 
                 <div
                     class="
-                        connecta-dashboard-skeleton-row
+                        connecta-skeleton
+                        connecta-skeleton-user
                     "
-                    aria-hidden="true"
-                >
+                ></div>
 
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-user
-                        "
-                    ></div>
+                <div
+                    class="
+                        connecta-skeleton
+                        connecta-skeleton-user
+                    "
+                ></div>
 
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-user
-                        "
-                    ></div>
+                <div
+                    class="
+                        connecta-skeleton
+                        connecta-skeleton-user
+                    "
+                ></div>
 
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-user
-                        "
-                    ></div>
+                <div
+                    class="
+                        connecta-skeleton
+                        connecta-skeleton-user
+                    "
+                ></div>
 
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-user
-                        "
-                    ></div>
+            </div>
 
-                </div>
-
-            `;
-
-        }
-
+        `;
 
         onlineBox.setAttribute(
             "aria-busy",
             "true"
         );
-
     }
 
 
-    /*
-     * Chats.
-     */
-
     if (chatBox) {
 
-        const loadingPlaceholder =
-            chatBox.querySelector(
-                ".empty-state"
-            );
+        chatBox.innerHTML = `
 
+            <div aria-hidden="true">
 
-        if (
-            loadingPlaceholder
-        ) {
+                <div
+                    class="
+                        connecta-skeleton
+                        connecta-skeleton-chat
+                    "
+                ></div>
 
-            loadingPlaceholder.remove();
+                <div
+                    class="
+                        connecta-skeleton
+                        connecta-skeleton-chat
+                    "
+                ></div>
 
-        }
+                <div
+                    class="
+                        connecta-skeleton
+                        connecta-skeleton-chat
+                    "
+                ></div>
 
+            </div>
 
-        if (
-            !chatBox.children.length
-        ) {
-
-            chatBox.innerHTML = `
-
-                <div aria-hidden="true">
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-chat
-                        "
-                    ></div>
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-chat
-                        "
-                    ></div>
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-chat
-                        "
-                    ></div>
-
-                </div>
-
-            `;
-
-        }
-
+        `;
 
         chatBox.setAttribute(
             "aria-busy",
             "true"
         );
-
     }
-
 }
 
 
 /* =========================================================
-   HIDE SKELETON
+   PUBLIC PROFILE DATA
 ========================================================= */
 
-function hideOnlineSkeleton() {
-
-    const box =
-        $("onlineUsers");
-
-
-    box?.setAttribute(
-        "aria-busy",
-        "false"
-    );
-
-}
-
-
-function hideChatSkeleton() {
-
-    const box =
-        $("chatList");
-
-
-    box?.setAttribute(
-        "aria-busy",
-        "false"
-    );
-
-}
-
-
-/* =========================================================
-   SAFE PUBLIC PROFILE
-========================================================= */
-
-function publicProfileData(
-    user = {}
-) {
+function publicProfileData(user = {}) {
 
     return {
 
@@ -684,20 +400,14 @@ function publicProfileData(
             user.isVerified === true,
 
         followersCount:
-            Number(
-                user.followersCount || 0
-            ),
+            Number(user.followersCount || 0),
 
         followingCount:
-            Number(
-                user.followingCount || 0
-            ),
+            Number(user.followingCount || 0),
 
         lastSeen:
             user.lastSeen || null
-
     };
-
 }
 
 
@@ -705,13 +415,92 @@ function publicProfileData(
    CACHE KEY
 ========================================================= */
 
-function getDashboardCacheKey(
-    uid
-) {
+function getDashboardCacheKey(uid) {
 
     return (
-        `${DASHBOARD_CACHE_PREFIX}${uid}`
+        DASHBOARD_CACHE_PREFIX +
+        uid
     );
+
+}
+
+
+/* =========================================================
+   PROFILE CACHE
+========================================================= */
+
+function getProfileCache() {
+
+    try {
+
+        return JSON.parse(
+            localStorage.getItem(
+                PROFILE_CACHE_KEY
+            ) || "{}"
+        );
+
+    } catch {
+
+        return {};
+
+    }
+
+}
+
+
+function saveProfileToCache(profile) {
+
+    if (!profile?.uid) {
+        return;
+    }
+
+    try {
+
+        const cache =
+            getProfileCache();
+
+        cache[profile.uid] = {
+
+            ...publicProfileData(
+                profile
+            ),
+
+            cachedAt:
+                Date.now()
+
+        };
+
+        localStorage.setItem(
+            PROFILE_CACHE_KEY,
+            JSON.stringify(cache)
+        );
+
+    } catch {
+
+        // Cache is optional.
+    }
+
+}
+
+
+function getCachedProfile(uid) {
+
+    if (!uid) {
+        return null;
+    }
+
+    try {
+
+        const cache =
+            getProfileCache();
+
+        return cache[uid] || null;
+
+    } catch {
+
+        return null;
+
+    }
 
 }
 
@@ -722,20 +511,14 @@ function getDashboardCacheKey(
 
 function saveDashboardCache() {
 
-    if (
-        !currentUser
-    ) {
-
+    if (!currentUser) {
         return;
-
     }
-
 
     try {
 
         const safeProfile =
             currentProfile
-
                 ? {
 
                     ...publicProfileData(
@@ -746,15 +529,12 @@ function saveDashboardCache() {
                         Array.isArray(
                             currentProfile.following
                         )
-                            ? [
-                                ...currentProfile.following
-                            ]
+                            ? currentProfile.following
                             : [],
 
                     balance:
                         Number(
-                            currentProfile.balance ||
-                            0
+                            currentProfile.balance || 0
                         ),
 
                     status:
@@ -762,24 +542,20 @@ function saveDashboardCache() {
                         "active"
 
                 }
-
                 : null;
 
 
         const safeGroups =
-            recentGroups.map(
-                group => {
+            recentGroups.map(group => {
 
-                    const {
-                        readData,
-                        ...safeGroup
-                    } = group;
+                const {
+                    readData,
+                    ...safeGroup
+                } = group;
 
+                return safeGroup;
 
-                    return safeGroup;
-
-                }
-            );
+            });
 
 
         const payload = {
@@ -816,11 +592,10 @@ function saveDashboardCache() {
 
         );
 
-
     } catch (error) {
 
         console.warn(
-            "[CONNECTA] Dashboard cache save failed:",
+            "Dashboard cache save failed:",
             error
         );
 
@@ -835,31 +610,22 @@ function saveDashboardCache() {
 
 function loadDashboardCache() {
 
-    if (
-        !currentUser
-    ) {
-
+    if (!currentUser) {
         return false;
-
     }
-
 
     try {
 
         const raw =
             localStorage.getItem(
-
                 getDashboardCacheKey(
                     currentUser.uid
                 )
-
             );
 
 
         if (!raw) {
-
             return false;
-
         }
 
 
@@ -868,19 +634,13 @@ function loadDashboardCache() {
 
 
         if (!cache) {
-
             return false;
-
         }
 
 
-        /*
-         * PROFILE
-         */
+        /* PROFILE */
 
-        if (
-            cache.profile
-        ) {
+        if (cache.profile) {
 
             currentProfile = {
 
@@ -890,15 +650,12 @@ function loadDashboardCache() {
 
             };
 
-
             renderProfile();
 
         }
 
 
-        /*
-         * USERS
-         */
+        /* USERS */
 
         if (
             Array.isArray(
@@ -909,15 +666,12 @@ function loadDashboardCache() {
             onlineUsers =
                 cache.users;
 
-
             renderOnline();
 
         }
 
 
-        /*
-         * PRIVATE CHATS
-         */
+        /* PRIVATE CHATS */
 
         if (
             Array.isArray(
@@ -931,9 +685,7 @@ function loadDashboardCache() {
         }
 
 
-        /*
-         * GROUPS
-         */
+        /* GROUPS */
 
         if (
             Array.isArray(
@@ -947,10 +699,6 @@ function loadDashboardCache() {
         }
 
 
-        /*
-         * UNIFIED RECENT CHATS
-         */
-
         if (
             recentChats.length ||
             recentGroups.length
@@ -963,14 +711,12 @@ function loadDashboardCache() {
 
         return true;
 
-
     } catch (error) {
 
         console.warn(
-            "[CONNECTA] Dashboard cache load failed:",
+            "Dashboard cache load failed:",
             error
         );
-
 
         return false;
 
@@ -980,168 +726,10 @@ function loadDashboardCache() {
 
 
 /* =========================================================
-   PROFILE CACHE
+   NAME
 ========================================================= */
 
-function getProfileCache() {
-
-    try {
-
-        return JSON.parse(
-
-            localStorage.getItem(
-                PROFILE_CACHE_KEY
-            ) || "{}"
-
-        );
-
-    } catch {
-
-        return {};
-
-    }
-
-}
-
-
-function saveProfileToCache(
-    profile
-) {
-
-    if (
-        !profile?.uid
-    ) {
-
-        return;
-
-    }
-
-
-    try {
-
-        const cache =
-            getProfileCache();
-
-
-        cache[
-            profile.uid
-        ] = {
-
-            ...publicProfileData(
-                profile
-            ),
-
-            cachedAt:
-                Date.now()
-
-        };
-
-
-        localStorage.setItem(
-
-            PROFILE_CACHE_KEY,
-
-            JSON.stringify(
-                cache
-            )
-
-        );
-
-    } catch {
-
-        /* Ignore cache errors */
-
-    }
-
-}
-
-
-function getCachedProfile(
-    uid
-) {
-
-    if (!uid) {
-
-        return null;
-
-    }
-
-
-    try {
-
-        const cache =
-            getProfileCache();
-
-
-        return (
-            cache[uid] ||
-            null
-        );
-
-    } catch {
-
-        return null;
-
-    }
-
-}
-
-
-/* =========================================================
-   INITIALS
-========================================================= */
-
-function initials(
-    name = "U"
-) {
-
-    const parts =
-        String(name)
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean);
-
-
-    if (
-        !parts.length
-    ) {
-
-        return "U";
-
-    }
-
-
-    if (
-        parts.length === 1
-    ) {
-
-        return parts[0]
-            .slice(0, 2)
-            .toUpperCase();
-
-    }
-
-
-    return (
-
-        parts[0][0] +
-
-        parts[
-            parts.length - 1
-        ][0]
-
-    ).toUpperCase();
-
-}
-
-
-/* =========================================================
-   FULL NAME
-========================================================= */
-
-function getFullName(
-    user = {}
-) {
+function getFullName(user = {}) {
 
     const displayName =
         String(
@@ -1176,9 +764,7 @@ function getFullName(
 
 
     if (fullName) {
-
         return fullName;
-
     }
 
 
@@ -1204,16 +790,49 @@ function getFullName(
 
 
 /* =========================================================
+   INITIALS
+========================================================= */
+
+function initials(name = "U") {
+
+    const parts =
+        String(name)
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean);
+
+
+    if (!parts.length) {
+        return "U";
+    }
+
+
+    if (parts.length === 1) {
+
+        return parts[0]
+            .slice(0, 2)
+            .toUpperCase();
+
+    }
+
+
+    return (
+
+        parts[0][0] +
+        parts[parts.length - 1][0]
+
+    ).toUpperCase();
+
+}
+
+
+/* =========================================================
    ESCAPE HTML
 ========================================================= */
 
-function escapeHtml(
-    value
-) {
+function escapeHtml(value) {
 
-    return String(
-        value ?? ""
-    )
+    return String(value ?? "")
         .replace(
             /[&<>"']/g,
             character => ({
@@ -1233,7 +852,7 @@ function escapeHtml(
                 "'":
                     "&#039;"
 
-            }[character])
+            })[character]
         );
 
 }
@@ -1243,9 +862,7 @@ function escapeHtml(
    VERIFIED BADGE
 ========================================================= */
 
-function verifiedBadge(
-    user
-) {
+function verifiedBadge(user) {
 
     if (
         user?.isVerified !== true
@@ -1275,14 +892,10 @@ function verifiedBadge(
    TIMESTAMP
 ========================================================= */
 
-function timestampToDate(
-    value
-) {
+function timestampToDate(value) {
 
     if (!value) {
-
         return null;
-
     }
 
 
@@ -1291,23 +904,6 @@ function timestampToDate(
     ) {
 
         return value;
-
-    }
-
-
-    if (
-        typeof value === "number"
-    ) {
-
-        const date =
-            new Date(value);
-
-
-        return Number.isNaN(
-            date.getTime()
-        )
-            ? null
-            : date;
 
     }
 
@@ -1323,7 +919,23 @@ function timestampToDate(
 
 
     if (
-        typeof value?.seconds ===
+        typeof value === "number"
+    ) {
+
+        const date =
+            new Date(value);
+
+        return Number.isNaN(
+            date.getTime()
+        )
+            ? null
+            : date;
+
+    }
+
+
+    if (
+        typeof value.seconds ===
         "number"
     ) {
 
@@ -1335,7 +947,7 @@ function timestampToDate(
 
 
     if (
-        typeof value?._seconds ===
+        typeof value._seconds ===
         "number"
     ) {
 
@@ -1352,7 +964,6 @@ function timestampToDate(
 
         const date =
             new Date(value);
-
 
         return Number.isNaN(
             date.getTime()
@@ -1372,18 +983,14 @@ function timestampToDate(
    FORMAT TIME
 ========================================================= */
 
-function formatTimestamp(
-    value
-) {
+function formatTimestamp(value) {
 
     const date =
         timestampToDate(value);
 
 
     if (!date) {
-
         return "";
-
     }
 
 
@@ -1399,11 +1006,8 @@ function formatTimestamp(
         return date.toLocaleTimeString(
             [],
             {
-                hour:
-                    "numeric",
-
-                minute:
-                    "2-digit"
+                hour: "numeric",
+                minute: "2-digit"
             }
         );
 
@@ -1412,7 +1016,6 @@ function formatTimestamp(
 
     const yesterday =
         new Date();
-
 
     yesterday.setDate(
         yesterday.getDate() - 1
@@ -1432,61 +1035,10 @@ function formatTimestamp(
     return date.toLocaleDateString(
         [],
         {
-            day:
-                "numeric",
-
-            month:
-                "short"
+            day: "numeric",
+            month: "short"
         }
     );
-
-}
-
-
-/* =========================================================
-   TOAST
-========================================================= */
-
-function showToast(
-    message
-) {
-
-    const toast =
-        $("toast");
-
-
-    if (!toast) {
-
-        return;
-
-    }
-
-
-    toast.textContent =
-        message || "";
-
-
-    toast.classList.add(
-        "show"
-    );
-
-
-    clearTimeout(
-        showToast.timer
-    );
-
-
-    showToast.timer =
-        setTimeout(
-            () => {
-
-                toast.classList.remove(
-                    "show"
-                );
-
-            },
-            2500
-        );
 
 }
 
@@ -1495,20 +1047,14 @@ function showToast(
    ACCOUNT CONTROL
 ========================================================= */
 
-function getAccountControl(
-    profile
-) {
+function getAccountControl(profile) {
 
     if (!profile) {
 
         return {
 
-            blocked:
-                true,
-
-            status:
-                "unknown",
-
+            blocked: true,
+            status: "unknown",
             message:
                 "Your account could not be verified."
 
@@ -1526,17 +1072,12 @@ function getAccountControl(
             .toLowerCase();
 
 
-    if (
-        status === "banned"
-    ) {
+    if (status === "banned") {
 
         return {
 
-            blocked:
-                true,
-
-            status:
-                "banned",
+            blocked: true,
+            status: "banned",
 
             message:
                 "Your CONNECTA account has been banned."
@@ -1546,17 +1087,12 @@ function getAccountControl(
     }
 
 
-    if (
-        status === "suspended"
-    ) {
+    if (status === "suspended") {
 
         return {
 
-            blocked:
-                true,
-
-            status:
-                "suspended",
+            blocked: true,
+            status: "suspended",
 
             message:
                 "Your CONNECTA account is currently suspended."
@@ -1568,14 +1104,9 @@ function getAccountControl(
 
     return {
 
-        blocked:
-            false,
-
-        status:
-            "active",
-
-        message:
-            ""
+        blocked: false,
+        status: "active",
+        message: ""
 
     };
 
@@ -1586,9 +1117,7 @@ function getAccountControl(
    BLOCKED SCREEN
 ========================================================= */
 
-function showAccountBlockedScreen(
-    control
-) {
+function showAccountBlockedScreen(control) {
 
     stopDashboardListeners();
 
@@ -1614,7 +1143,9 @@ function showAccountBlockedScreen(
                     border-radius:24px;
                     padding:32px 24px;
                     text-align:center;
-                    box-shadow:0 15px 45px rgba(0,0,0,.08);
+                    box-shadow:
+                        0 15px 45px
+                        rgba(0,0,0,.08);
                 "
             >
 
@@ -1624,9 +1155,8 @@ function showAccountBlockedScreen(
                         height:64px;
                         border-radius:50%;
                         margin:0 auto 18px;
-                        display:flex;
-                        align-items:center;
-                        justify-content:center;
+                        display:grid;
+                        place-items:center;
                         background:#fff1f2;
                         font-size:30px;
                     "
@@ -1697,13 +1227,12 @@ function showAccountBlockedScreen(
 
 function renderAvatarElement(
     element,
-    user
+    user,
+    className = ""
 ) {
 
     if (!element) {
-
         return;
-
     }
 
 
@@ -1715,6 +1244,13 @@ function renderAvatarElement(
         user?.photoURL ||
         user?.photoUrl ||
         "";
+
+
+    element.classList.add(
+        ...className
+            .split(" ")
+            .filter(Boolean)
+    );
 
 
     if (photo) {
@@ -1745,50 +1281,48 @@ function renderAvatarElement(
 function renderProfile() {
 
     if (!currentProfile) {
-
         return;
-
     }
 
 
-    const name =
+    const fullName =
         getFullName(
             currentProfile
         );
 
 
+    const photo =
+        currentProfile.photoURL ||
+        currentProfile.photoUrl ||
+        "";
+
+
     const welcomeName =
         $("welcomeName");
 
+    const balanceAmount =
+        $("balanceAmount");
+
+    const menuName =
+        $("menuName");
+
+    const menuUsername =
+        $("menuUsername");
+
+    const menuAvatar =
+        $("menuAvatar");
 
     const welcomeAvatar =
         $("welcomeAvatar");
-
 
     const profileBtn =
         $("profileBtn");
 
 
-    const menuAvatar =
-        $("menuAvatar");
-
-
-    const menuName =
-        $("menuName");
-
-
-    const menuUsername =
-        $("menuUsername");
-
-
-    const balanceAmount =
-        $("balanceAmount");
-
-
     if (welcomeName) {
 
         welcomeName.textContent =
-            name;
+            fullName;
 
     }
 
@@ -1797,16 +1331,12 @@ function renderProfile() {
 
         balanceAmount.textContent =
             Number(
-                currentProfile.balance ||
-                0
+                currentProfile.balance || 0
             ).toLocaleString(
                 "en-KE",
                 {
-                    minimumFractionDigits:
-                        0,
-
-                    maximumFractionDigits:
-                        2
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2
                 }
             );
 
@@ -1816,7 +1346,7 @@ function renderProfile() {
     if (menuName) {
 
         menuName.textContent =
-            name;
+            fullName;
 
     }
 
@@ -1825,23 +1355,15 @@ function renderProfile() {
 
         menuUsername.textContent =
             currentProfile.username
-
                 ? `@${String(
                     currentProfile.username
                 ).replace(
                     /^@/,
                     ""
                 )}`
-
                 : "";
 
     }
-
-
-    renderAvatarElement(
-        welcomeAvatar,
-        currentProfile
-    );
 
 
     renderAvatarElement(
@@ -1851,16 +1373,34 @@ function renderProfile() {
 
 
     renderAvatarElement(
-        profileBtn,
+        welcomeAvatar,
         currentProfile
     );
 
 
     if (profileBtn) {
 
+        if (photo) {
+
+            profileBtn.innerHTML = `
+
+                <img
+                    src="${escapeHtml(photo)}"
+                    alt="${escapeHtml(fullName)}"
+                >
+
+            `;
+
+        } else {
+
+            profileBtn.textContent =
+                initials(fullName);
+
+        }
+
         profileBtn.setAttribute(
             "aria-label",
-            `${name} profile`
+            `${fullName} profile`
         );
 
     }
@@ -1872,360 +1412,331 @@ function renderProfile() {
    RENDER ONLINE USERS
 ========================================================= */
 
-function renderOnline(
-    usersToRender = onlineUsers
-) {
+function renderOnline() {
 
     const box =
         $("onlineUsers");
 
 
     if (!box) {
-
         return;
-
     }
 
 
-    hideOnlineSkeleton();
+    box.setAttribute(
+        "aria-busy",
+        "false"
+    );
 
-
-    /*
-     * Online count should show actual online users,
-     * not the total users displayed.
-     */
 
     const onlineCount =
-        onlineUsers.filter(
-            user =>
-                user.isOnline === true
-        ).length;
-
-
-    const countElement =
         $("onlineCount");
 
 
-    if (countElement) {
+    const activeCount =
+        onlineUsers.filter(
+            user => user.isOnline === true
+        ).length;
 
-        countElement.textContent =
-            `(${onlineCount})`;
+
+    if (onlineCount) {
+
+        onlineCount.textContent =
+            `(${activeCount})`;
 
     }
 
 
-    if (!usersToRender.length) {
+    if (!onlineUsers.length) {
 
         box.innerHTML = `
 
-            <div class="empty-state small">
-
+            <div class="connecta-empty">
                 No users found.
-
             </div>
 
         `;
 
-
         return;
 
     }
 
 
-    const users =
-        [...usersToRender]
-            .sort(
-                (a, b) => {
+    const sortedUsers =
+        [...onlineUsers].sort(
+            (a, b) => {
 
-                    /*
-                     * Current user first.
-                     */
+                if (
+                    a.uid ===
+                    currentUser?.uid
+                ) {
 
-                    if (
-                        a.uid ===
-                        currentUser?.uid
-                    ) {
-
-                        return -1;
-
-                    }
-
-
-                    if (
-                        b.uid ===
-                        currentUser?.uid
-                    ) {
-
-                        return 1;
-
-                    }
-
-
-                    /*
-                     * Online users before offline.
-                     */
-
-                    if (
-                        a.isOnline !==
-                        b.isOnline
-                    ) {
-
-                        return a.isOnline
-                            ? -1
-                            : 1;
-
-                    }
-
-
-                    return getFullName(a)
-                        .localeCompare(
-                            getFullName(b)
-                        );
+                    return -1;
 
                 }
-            );
+
+
+                if (
+                    b.uid ===
+                    currentUser?.uid
+                ) {
+
+                    return 1;
+
+                }
+
+
+                if (
+                    a.isOnline !==
+                    b.isOnline
+                ) {
+
+                    return a.isOnline
+                        ? -1
+                        : 1;
+
+                }
+
+
+                return getFullName(a)
+                    .localeCompare(
+                        getFullName(b)
+                    );
+
+            }
+        );
 
 
     box.innerHTML =
-        users
-            .map(
-                user => {
+        sortedUsers.map(
+            user => {
 
-                    const name =
-                        getFullName(user);
-
-
-                    const isSelf =
-                        user.uid ===
-                        currentUser?.uid;
+                const name =
+                    getFullName(user);
 
 
-                    const following =
-                        Array.isArray(
-                            currentProfile?.following
-                        ) &&
-                        currentProfile.following.includes(
+                const self =
+                    user.uid ===
+                    currentUser?.uid;
+
+
+                const following =
+                    Array.isArray(
+                        currentProfile?.following
+                    ) &&
+                    currentProfile.following.includes(
+                        user.uid
+                    );
+
+
+                const photo =
+                    user.photoURL ||
+                    user.photoUrl ||
+                    "";
+
+
+                return `
+
+                    <div
+                        class="user-card"
+                        data-user-card="${escapeHtml(
                             user.uid
-                        );
-
-
-                    const photo =
-                        user.photoURL ||
-                        user.photoUrl ||
-                        "";
-
-
-                    return `
+                        )}"
+                    >
 
                         <div
-                            class="user-card"
-                            data-uid="${escapeHtml(
-                                user.uid
-                            )}"
+                            class="
+                                user-card-profile
+                            "
                         >
 
                             <div
-                                class="user-card-profile"
+                                class="
+                                    avatar
+                                    large
+                                    ${
+                                        user.isOnline
+                                            ? "avatar-green"
+                                            : ""
+                                    }
+                                "
                             >
 
-                                <div
-                                    class="
-                                        avatar
-                                        large
-                                        ${
-                                            user.isOnline
-                                                ? "avatar-green"
-                                                : ""
-                                        }
-                                    "
-                                >
+                                ${
+                                    photo
 
+                                        ? `
+                                            <img
+                                                src="${escapeHtml(
+                                                    photo
+                                                )}"
+                                                alt="${escapeHtml(
+                                                    name
+                                                )}"
+                                                loading="lazy"
+                                            >
+                                          `
+
+                                        : escapeHtml(
+                                            initials(name)
+                                        )
+                                }
+
+                            </div>
+
+
+                            <strong>
+
+                                ${escapeHtml(name)}
+
+                                ${verifiedBadge(user)}
+
+                            </strong>
+
+
+                            <small
+                                class="
+                                    online-text
                                     ${
-                                        photo
-
-                                            ? `
-                                                <img
-                                                    src="${escapeHtml(
-                                                        photo
-                                                    )}"
-                                                    alt="${escapeHtml(
-                                                        name
-                                                    )}"
-                                                    loading="lazy"
-                                                >
-                                              `
-
-                                            : escapeHtml(
-                                                initials(name)
-                                            )
+                                        user.isOnline
+                                            ? "online"
+                                            : "offline"
                                     }
+                                "
+                            >
 
-                                </div>
-
-
-                                <strong>
-
-                                    ${escapeHtml(
-                                        name
-                                    )}
-
-                                    ${verifiedBadge(
-                                        user
-                                    )}
-
-                                </strong>
-
-
-                                <small
+                                <span
                                     class="
-                                        online-text
+                                        status-dot
                                         ${
                                             user.isOnline
                                                 ? "online"
                                                 : "offline"
                                         }
                                     "
-                                >
-
-                                    <span
-                                        class="
-                                            status-dot
-                                            ${
-                                                user.isOnline
-                                                    ? "online"
-                                                    : "offline"
-                                            }
-                                        "
-                                    ></span>
-
-                                    ${
-                                        user.isOnline
-                                            ? "Online"
-                                            : "Offline"
-                                    }
-
-                                </small>
-
+                                ></span>
 
                                 ${
-                                    !isSelf
-
-                                        ? `
-
-                                            <button
-                                                class="
-                                                    follow-btn
-                                                    ${
-                                                        following
-                                                            ? "following"
-                                                            : ""
-                                                    }
-                                                "
-                                                data-follow-uid="${escapeHtml(
-                                                    user.uid
-                                                )}"
-                                            >
-
-                                                ${
-                                                    following
-                                                        ? "Following"
-                                                        : "Follow"
-                                                }
-
-                                            </button>
-
-                                          `
-
-                                        : ""
+                                    user.isOnline
+                                        ? "Online"
+                                        : "Offline"
                                 }
 
-                            </div>
+                            </small>
+
+
+                            ${
+                                !self
+
+                                    ? `
+
+                                        <button
+                                            type="button"
+                                            class="
+                                                follow-btn
+                                                ${
+                                                    following
+                                                        ? "following"
+                                                        : ""
+                                                }
+                                            "
+                                            data-follow-uid="${escapeHtml(
+                                                user.uid
+                                            )}"
+                                        >
+                                            ${
+                                                following
+                                                    ? "Following"
+                                                    : "Follow"
+                                            }
+                                        </button>
+
+                                      `
+
+                                    : `
+
+                                        <button
+                                            type="button"
+                                            class="follow-btn following"
+                                            disabled
+                                        >
+                                            You
+                                        </button>
+
+                                      `
+                            }
 
                         </div>
 
-                    `;
+                    </div>
 
-                }
-            )
-            .join("");
+                `;
 
+            }
+        ).join("");
 
-    /*
-     * Profile navigation.
-     */
 
     box
         .querySelectorAll(
-            ".user-card"
+            "[data-user-card]"
         )
-        .forEach(
-            card => {
+        .forEach(card => {
 
-                card.addEventListener(
-                    "click",
-                    event => {
+            card.addEventListener(
+                "click",
+                event => {
 
-                        if (
-                            event.target.closest(
-                                ".follow-btn"
-                            )
-                        ) {
+                    if (
+                        event.target.closest(
+                            "[data-follow-uid]"
+                        )
+                    ) {
 
-                            return;
-
-                        }
-
-
-                        const uid =
-                            card.dataset.uid;
-
-
-                        if (!uid) {
-
-                            return;
-
-                        }
-
-
-                        location.href =
-                            `profile.html?uid=${encodeURIComponent(
-                                uid
-                            )}`;
+                        return;
 
                     }
-                );
-
-            }
-        );
 
 
-    /*
-     * Follow buttons.
-     */
+                    const uid =
+                        card.dataset.userCard;
+
+
+                    if (!uid) {
+                        return;
+                    }
+
+
+                    location.href =
+                        `profile.html?uid=${encodeURIComponent(
+                            uid
+                        )}`;
+
+                }
+            );
+
+        });
+
 
     box
         .querySelectorAll(
             "[data-follow-uid]"
         )
-        .forEach(
-            button => {
+        .forEach(button => {
 
-                button.addEventListener(
-                    "click",
-                    async event => {
+            button.addEventListener(
+                "click",
+                event => {
 
-                        event.stopPropagation();
+                    event.stopPropagation();
 
+                    toggleFollow(
+                        button.dataset.followUid
+                    );
 
-                        await toggleFollow(
-                            button.dataset.followUid
-                        );
+                }
+            );
 
-                    }
-                );
-
-            }
-        );
+        });
 
 }
 
@@ -2234,9 +1745,7 @@ function renderOnline(
    FOLLOW
 ========================================================= */
 
-async function toggleFollow(
-    targetUid
-) {
+async function toggleFollow(targetUid) {
 
     if (
         !currentUser ||
@@ -2307,19 +1816,15 @@ async function toggleFollow(
                     Array.isArray(
                         currentData.following
                     )
-                        ? [
-                            ...currentData.following
-                        ]
+                        ? [...currentData.following]
                         : [];
 
 
-                const targetFollowers =
+                const followers =
                     Array.isArray(
                         targetData.followers
                     )
-                        ? [
-                            ...targetData.followers
-                        ]
+                        ? [...targetData.followers]
                         : [];
 
 
@@ -2329,22 +1834,19 @@ async function toggleFollow(
                     );
 
 
-                if (
-                    alreadyFollowing
-                ) {
+                if (alreadyFollowing) {
 
                     const nextFollowing =
                         following.filter(
-                            uid =>
-                                uid !==
-                                targetUid
+                            id =>
+                                id !== targetUid
                         );
 
 
                     const nextFollowers =
-                        targetFollowers.filter(
-                            uid =>
-                                uid !==
+                        followers.filter(
+                            id =>
+                                id !==
                                 currentUser.uid
                         );
 
@@ -2360,8 +1862,7 @@ async function toggleFollow(
                                 Math.max(
                                     0,
                                     Number(
-                                        currentData.followingCount ||
-                                        0
+                                        currentData.followingCount || 0
                                     ) - 1
                                 )
 
@@ -2380,8 +1881,7 @@ async function toggleFollow(
                                 Math.max(
                                     0,
                                     Number(
-                                        targetData.followersCount ||
-                                        0
+                                        targetData.followersCount || 0
                                     ) - 1
                                 )
 
@@ -2396,12 +1896,12 @@ async function toggleFollow(
 
 
                     if (
-                        !targetFollowers.includes(
+                        !followers.includes(
                             currentUser.uid
                         )
                     ) {
 
-                        targetFollowers.push(
+                        followers.push(
                             currentUser.uid
                         );
 
@@ -2416,8 +1916,7 @@ async function toggleFollow(
 
                             followingCount:
                                 Number(
-                                    currentData.followingCount ||
-                                    0
+                                    currentData.followingCount || 0
                                 ) + 1
 
                         }
@@ -2428,13 +1927,11 @@ async function toggleFollow(
                         targetRef,
                         {
 
-                            followers:
-                                targetFollowers,
+                            followers,
 
                             followersCount:
                                 Number(
-                                    targetData.followersCount ||
-                                    0
+                                    targetData.followersCount || 0
                                 ) + 1
 
                         }
@@ -2446,10 +1943,6 @@ async function toggleFollow(
         );
 
 
-        /*
-         * Refresh own profile.
-         */
-
         const profileSnap =
             await getDoc(
                 doc(
@@ -2460,9 +1953,7 @@ async function toggleFollow(
             );
 
 
-        if (
-            profileSnap.exists()
-        ) {
+        if (profileSnap.exists()) {
 
             currentProfile = {
 
@@ -2492,10 +1983,9 @@ async function toggleFollow(
     } catch (error) {
 
         console.error(
-            "[CONNECTA] Follow error:",
+            "Follow error:",
             error
         );
-
 
         showToast(
             error?.message ||
@@ -2508,41 +1998,15 @@ async function toggleFollow(
 
 
 /* =========================================================
-   GET USER PROFILE
+   USER PROFILE
 ========================================================= */
 
-async function getUserProfile(
-    uid
-) {
+async function getUserProfile(uid) {
 
     if (!uid) {
-
         return null;
-
     }
 
-
-    /*
-     * Live users are the fastest source.
-     */
-
-    const live =
-        onlineUsers.find(
-            user =>
-                user.uid === uid
-        );
-
-
-    if (live) {
-
-        return live;
-
-    }
-
-
-    /*
-     * Cached profile.
-     */
 
     const cached =
         getCachedProfile(uid);
@@ -2573,12 +2037,8 @@ async function getUserProfile(
             );
 
 
-        if (
-            !snapshot.exists()
-        ) {
-
+        if (!snapshot.exists()) {
             return null;
-
         }
 
 
@@ -2611,14 +2071,10 @@ async function getUserProfile(
    REFRESH USER PROFILE
 ========================================================= */
 
-async function refreshUserProfile(
-    uid
-) {
+async function refreshUserProfile(uid) {
 
     if (!uid) {
-
         return null;
-
     }
 
 
@@ -2634,12 +2090,8 @@ async function refreshUserProfile(
             );
 
 
-        if (
-            !snapshot.exists()
-        ) {
-
+        if (!snapshot.exists()) {
             return null;
-
         }
 
 
@@ -2698,8 +2150,7 @@ async function refreshUserProfile(
                 group => {
 
                     if (
-                        group.lastMessageSenderId !==
-                        uid
+                        group.lastMessageSenderId !== uid
                     ) {
 
                         return group;
@@ -2743,9 +2194,7 @@ async function refreshUserProfile(
    PRIVATE CHAT LISTENER
 ========================================================= */
 
-function listenToChats(
-    uid
-) {
+function listenToChats(uid) {
 
     if (stopChats) {
 
@@ -2758,25 +2207,20 @@ function listenToChats(
 
     const chatsQuery =
         query(
-
             collection(
                 db,
                 "chats"
             ),
-
             orderBy(
                 "updatedAt",
                 "desc"
             ),
-
             limit(50)
-
         );
 
 
     stopChats =
         onSnapshot(
-
             chatsQuery,
 
             async snapshot => {
@@ -2797,9 +2241,7 @@ function listenToChats(
                         !Array.isArray(
                             data.participants
                         ) ||
-                        !data.participants.includes(
-                            uid
-                        )
+                        !data.participants.includes(uid)
                     ) {
 
                         continue;
@@ -2809,23 +2251,20 @@ function listenToChats(
 
                     const otherUid =
                         data.participants.find(
-                            participant =>
-                                participant !== uid
+                            id =>
+                                id !== uid
                         );
 
 
                     if (!otherUid) {
-
                         continue;
-
                     }
 
 
                     let profile =
                         onlineUsers.find(
                             user =>
-                                user.uid ===
-                                otherUid
+                                user.uid === otherUid
                         );
 
 
@@ -2839,7 +2278,7 @@ function listenToChats(
                     }
 
 
-                    const name =
+                    const otherName =
                         profile
                             ? getFullName(profile)
                             : (
@@ -2848,14 +2287,14 @@ function listenToChats(
                             );
 
 
-                    const photo =
+                    const otherPhoto =
                         profile?.photoURL ||
                         profile?.photoUrl ||
                         data.otherUserPhoto ||
                         "";
 
 
-                    const verified =
+                    const otherVerified =
                         profile?.isVerified === true ||
                         data.otherUserVerified === true;
 
@@ -2885,24 +2324,21 @@ function listenToChats(
 
 
                     if (
-                        lastMessageType ===
-                        "image"
+                        lastMessageType === "image"
                     ) {
 
-                        preview =
-                            "📷 Photo";
+                        preview = "📷 Photo";
 
                     }
 
 
                     if (
-                        !preview
+                        !preview &&
+                        lastSenderId === uid
                     ) {
 
                         preview =
-                            lastSenderId === uid
-                                ? "You started a conversation"
-                                : "Start a conversation";
+                            "You started a conversation";
 
                     }
 
@@ -2918,13 +2354,13 @@ function listenToChats(
                         otherUid,
 
                         otherUserName:
-                            name,
+                            otherName,
 
                         otherUserPhoto:
-                            photo,
+                            otherPhoto,
 
                         otherUserVerified:
-                            verified,
+                            otherVerified,
 
                         lastMessage:
                             preview,
@@ -2953,11 +2389,6 @@ function listenToChats(
                     result;
 
 
-                /*
-                 * IMPORTANT:
-                 * Use unified rendering.
-                 */
-
                 mergeRecentChats();
 
 
@@ -2980,20 +2411,17 @@ function listenToChats(
             error => {
 
                 console.error(
-                    "[CONNECTA] Private chat listener:",
+                    "Private chat listener error:",
                     error
                 );
 
-
                 /*
-                 * Keep groups visible even if
-                 * private chats fail.
+                 * Keep groups visible.
                  */
 
                 mergeRecentChats();
 
             }
-
         );
 
 }
@@ -3030,100 +2458,81 @@ async function getGroupUnreadCount(
 
 
         /*
-         * Read the latest messages.
-         *
-         * This avoids requiring a Firestore composite
-         * index for createdAt > date + orderBy.
+         * Never opened.
          */
 
-        const messagesQuery =
-            query(
+        if (
+            !readData?.lastReadAt
+        ) {
 
-                messagesRef,
+            const q =
+                query(
+                    messagesRef,
+                    orderBy(
+                        "createdAt",
+                        "desc"
+                    ),
+                    limit(100)
+                );
 
-                orderBy(
-                    "createdAt",
-                    "desc"
-                ),
 
-                limit(100)
-
-            );
+            const snapshot =
+                await getDocs(q);
 
 
-        const snapshot =
-            await getDocs(
-                messagesQuery
-            );
+            return snapshot.docs.filter(
+                messageDoc =>
+                    messageDoc.data().senderId !==
+                    currentUser.uid
+            ).length;
+
+        }
 
 
         const readDate =
             timestampToDate(
-                readData?.lastReadAt
+                readData.lastReadAt
             );
 
 
+        if (!readDate) {
+            return 0;
+        }
+
+
+        const q =
+            query(
+                messagesRef,
+                where(
+                    "createdAt",
+                    ">",
+                    readDate
+                ),
+                orderBy(
+                    "createdAt",
+                    "desc"
+                ),
+                limit(100)
+            );
+
+
+        const snapshot =
+            await getDocs(q);
+
+
         return snapshot.docs.filter(
-            messageDoc => {
-
-                const data =
-                    messageDoc.data();
-
-
-                /*
-                 * Don't count own messages.
-                 */
-
-                if (
-                    data.senderId ===
-                    currentUser.uid
-                ) {
-
-                    return false;
-
-                }
-
-
-                /*
-                 * Never opened.
-                 */
-
-                if (!readDate) {
-
-                    return true;
-
-                }
-
-
-                const messageDate =
-                    timestampToDate(
-                        data.createdAt
-                    );
-
-
-                if (!messageDate) {
-
-                    return false;
-
-                }
-
-
-                return (
-                    messageDate.getTime() >
-                    readDate.getTime()
-                );
-
-            }
+            messageDoc =>
+                messageDoc.data().senderId !==
+                currentUser.uid
         ).length;
-
 
     } catch (error) {
 
         console.warn(
-            `[CONNECTA] Group unread count failed for ${groupId}:`,
+            "Group unread count failed:",
+            groupId,
             error
         );
-
 
         return 0;
 
@@ -3138,60 +2547,76 @@ async function getGroupUnreadCount(
 
 async function processGroups() {
 
+    if (!currentUser) {
+        return;
+    }
+
+
     const version =
         ++groupProcessVersion;
 
 
-    if (!currentUser) {
+    const groupMap =
+        new Map();
 
-        return;
+
+    for (
+        const groupDoc
+        of groupListeners.memberIds
+    ) {
+
+        groupMap.set(
+            groupDoc.id,
+            {
+                groupId:
+                    groupDoc.id,
+
+                ...groupDoc.data()
+            }
+        );
 
     }
 
 
-    const allGroups =
-        new Map();
+    for (
+        const groupDoc
+        of groupListeners.members
+    ) {
 
-
-    [
-        ...groupListeners.memberIds,
-        ...groupListeners.members,
-        ...groupListeners.owned
-    ]
-        .forEach(
-            groupDoc => {
-
-                if (
-                    !groupDoc?.id
-                ) {
-
-                    return;
-
-                }
-
-
-                allGroups.set(
-
+        groupMap.set(
+            groupDoc.id,
+            {
+                groupId:
                     groupDoc.id,
 
-                    {
-
-                        groupId:
-                            groupDoc.id,
-
-                        ...groupDoc.data()
-
-                    }
-
-                );
-
+                ...groupDoc.data()
             }
         );
+
+    }
+
+
+    for (
+        const groupDoc
+        of groupListeners.owned
+    ) {
+
+        groupMap.set(
+            groupDoc.id,
+            {
+                groupId:
+                    groupDoc.id,
+
+                ...groupDoc.data()
+            }
+        );
+
+    }
 
 
     const groups =
         Array.from(
-            allGroups.values()
+            groupMap.values()
         );
 
 
@@ -3228,13 +2653,11 @@ async function processGroups() {
             ||
 
             group.ownerId ===
-            currentUser.uid;
+                currentUser.uid;
 
 
         if (!isMember) {
-
             continue;
-
         }
 
 
@@ -3255,9 +2678,7 @@ async function processGroups() {
                 );
 
 
-            if (
-                readSnapshot.exists()
-            ) {
+            if (readSnapshot.exists()) {
 
                 readData =
                     readSnapshot.data();
@@ -3278,8 +2699,7 @@ async function processGroups() {
             );
 
 
-        let senderProfile =
-            null;
+        let senderProfile = null;
 
 
         if (
@@ -3292,7 +2712,6 @@ async function processGroups() {
                         user.uid ===
                         group.lastMessageSenderId
                 ) ||
-
                 getCachedProfile(
                     group.lastMessageSenderId
                 );
@@ -3313,11 +2732,9 @@ async function processGroups() {
 
 
         const senderVerified =
-            group.lastMessageSenderVerified ===
-                true ||
+            group.lastMessageSenderVerified === true ||
 
-            senderProfile?.isVerified ===
-                true;
+            senderProfile?.isVerified === true;
 
 
         enriched.push({
@@ -3342,7 +2759,7 @@ async function processGroups() {
 
             lastMessageType:
                 group.lastMessageType ||
-                "",
+                "text",
 
             lastMessageSenderId:
                 group.lastMessageSenderId ||
@@ -3379,10 +2796,6 @@ async function processGroups() {
     }
 
 
-    /*
-     * Ignore old async processing.
-     */
-
     if (
         version !==
         groupProcessVersion
@@ -3397,48 +2810,7 @@ async function processGroups() {
         enriched;
 
 
-    /*
-     * Group badge.
-     */
-
-    const groupUnread =
-        recentGroups.reduce(
-            (
-                total,
-                group
-            ) =>
-                total +
-                Number(
-                    group.unread || 0
-                ),
-            0
-        );
-
-
-    const groupBadge =
-        $("groupBadge");
-
-
-    if (groupBadge) {
-
-        if (groupUnread > 0) {
-
-            groupBadge.hidden =
-                false;
-
-            groupBadge.textContent =
-                groupUnread > 99
-                    ? "99+"
-                    : String(groupUnread);
-
-        } else {
-
-            groupBadge.hidden =
-                true;
-
-        }
-
-    }
+    updateGroupBadge();
 
 
     mergeRecentChats();
@@ -3462,19 +2834,17 @@ function queueGroupProcessing() {
             () => {
 
                 processGroups()
-                    .catch(
-                        error => {
+                    .catch(error => {
 
-                            console.error(
-                                "[CONNECTA] Group processing:",
-                                error
-                            );
+                        console.error(
+                            "Group processing error:",
+                            error
+                        );
 
-                        }
-                    );
+                    });
 
             },
-            80
+            60
         );
 
 }
@@ -3484,112 +2854,84 @@ function queueGroupProcessing() {
    GROUP LISTENER
 ========================================================= */
 
-function listenToGroups(
-    uid
-) {
+function listenToGroups(uid) {
 
-    /*
-     * Remove previous listeners.
-     */
+    groupUnsubscribers.forEach(
+        unsubscribe => {
 
-    groupListeners.unsubscribers
-        .forEach(
-            unsubscribe => {
+            if (
+                typeof unsubscribe ===
+                "function"
+            ) {
 
-                if (
-                    typeof unsubscribe ===
-                    "function"
-                ) {
-
-                    unsubscribe();
-
-                }
+                unsubscribe();
 
             }
-        );
+
+        }
+    );
+
+
+    groupUnsubscribers = [];
 
 
     groupListeners = {
 
         memberIds: [],
         members: [],
-        owned: [],
-        unsubscribers: []
+        owned: []
 
     };
 
 
-    /*
-     * MEMBER IDS
-     */
+    recentGroups = [];
+
+
+    const groupsRef =
+        collection(
+            db,
+            "groups"
+        );
+
 
     const memberIdsQuery =
         query(
-
-            collection(
-                db,
-                "groups"
-            ),
-
+            groupsRef,
             where(
                 "memberIds",
                 "array-contains",
                 uid
             ),
-
             limit(30)
-
         );
 
 
-    /*
-     * MEMBERS
-     */
-
     const membersQuery =
         query(
-
-            collection(
-                db,
-                "groups"
-            ),
-
+            groupsRef,
             where(
                 "members",
                 "array-contains",
                 uid
             ),
-
             limit(30)
-
         );
 
 
-    /*
-     * OWNER
-     */
-
     const ownerQuery =
         query(
-
-            collection(
-                db,
-                "groups"
-            ),
-
+            groupsRef,
             where(
                 "ownerId",
                 "==",
                 uid
             ),
-
             limit(30)
-
         );
 
 
     /*
-     * Initial fetch.
+     * Initial data.
      */
 
     Promise.allSettled([
@@ -3606,63 +2948,60 @@ function listenToGroups(
             ownerQuery
         )
 
-    ])
-        .then(
-            results => {
+    ]).then(results => {
 
-                const [
-                    memberIdsResult,
-                    membersResult,
-                    ownerResult
-                ] = results;
+        const [
+            memberIdsResult,
+            membersResult,
+            ownerResult
+        ] = results;
 
 
-                if (
-                    memberIdsResult.status ===
-                    "fulfilled"
-                ) {
+        if (
+            memberIdsResult.status ===
+            "fulfilled"
+        ) {
 
-                    groupListeners.memberIds =
-                        memberIdsResult.value.docs;
+            groupListeners.memberIds =
+                memberIdsResult.value.docs;
 
-                }
-
-
-                if (
-                    membersResult.status ===
-                    "fulfilled"
-                ) {
-
-                    groupListeners.members =
-                        membersResult.value.docs;
-
-                }
+        }
 
 
-                if (
-                    ownerResult.status ===
-                    "fulfilled"
-                ) {
+        if (
+            membersResult.status ===
+            "fulfilled"
+        ) {
 
-                    groupListeners.owned =
-                        ownerResult.value.docs;
+            groupListeners.members =
+                membersResult.value.docs;
 
-                }
+        }
 
 
-                queueGroupProcessing();
+        if (
+            ownerResult.status ===
+            "fulfilled"
+        ) {
 
-            }
-        );
+            groupListeners.owned =
+                ownerResult.value.docs;
+
+        }
+
+
+        queueGroupProcessing();
+
+    });
 
 
     /*
-     * LIVE memberIds.
+     * memberIds
      */
 
-    const stopMemberIds =
-        onSnapshot(
+    groupUnsubscribers.push(
 
+        onSnapshot(
             memberIdsQuery,
 
             snapshot => {
@@ -3677,22 +3016,23 @@ function listenToGroups(
             error => {
 
                 console.warn(
-                    "[CONNECTA] memberIds group listener:",
+                    "memberIds listener:",
                     error
                 );
 
             }
+        )
 
-        );
+    );
 
 
     /*
-     * LIVE members.
+     * members
      */
 
-    const stopMembers =
-        onSnapshot(
+    groupUnsubscribers.push(
 
+        onSnapshot(
             membersQuery,
 
             snapshot => {
@@ -3707,22 +3047,23 @@ function listenToGroups(
             error => {
 
                 console.warn(
-                    "[CONNECTA] members group listener:",
+                    "members listener:",
                     error
                 );
 
             }
+        )
 
-        );
+    );
 
 
     /*
-     * LIVE owner groups.
+     * owner
      */
 
-    const stopOwned =
-        onSnapshot(
+    groupUnsubscribers.push(
 
+        onSnapshot(
             ownerQuery,
 
             snapshot => {
@@ -3737,110 +3078,126 @@ function listenToGroups(
             error => {
 
                 console.warn(
-                    "[CONNECTA] owner group listener:",
+                    "owner listener:",
                     error
                 );
 
             }
+        )
 
-        );
-
-
-    groupListeners.unsubscribers = [
-
-        stopMemberIds,
-        stopMembers,
-        stopOwned
-
-    ];
+    );
 
 }
 
 
 /* =========================================================
-   MERGE PRIVATE CHATS + GROUPS
+   GROUP BADGE
+========================================================= */
+
+function updateGroupBadge() {
+
+    const badge =
+        $("groupBadge");
+
+
+    if (!badge) {
+        return;
+    }
+
+
+    const unread =
+        recentGroups.reduce(
+            (total, group) =>
+                total +
+                Number(
+                    group.unread || 0
+                ),
+            0
+        );
+
+
+    if (unread > 0) {
+
+        badge.hidden = false;
+
+        badge.textContent =
+            unread > 99
+                ? "99+"
+                : String(unread);
+
+    } else {
+
+        badge.hidden = true;
+
+    }
+
+}
+
+
+/* =========================================================
+   MERGE RECENT CHATS
 ========================================================= */
 
 function mergeRecentChats() {
 
-    const combined = [
-
-        ...recentChats,
-
-        ...recentGroups
-
-    ];
-
-
-    /*
-     * Remove duplicate private chats/groups.
-     */
-
-    const unique =
+    const map =
         new Map();
 
 
-    combined.forEach(
-        item => {
+    for (
+        const chat
+        of recentChats
+    ) {
 
-            const key =
-                item.type === "group"
+        map.set(
+            `private:${chat.chatId}`,
+            chat
+        );
 
-                    ? `group:${item.groupId}`
-
-                    : `private:${item.chatId}`;
-
-
-            unique.set(
-                key,
-                item
-            );
-
-        }
-    );
+    }
 
 
-    const sorted =
+    for (
+        const group
+        of recentGroups
+    ) {
+
+        map.set(
+            `group:${group.groupId}`,
+            group
+        );
+
+    }
+
+
+    const combined =
         Array.from(
-            unique.values()
+            map.values()
         );
 
 
-    sorted.sort(
-        (
-            first,
-            second
-        ) => {
+    combined.sort(
+        (a, b) => {
 
-            const firstDate =
+            const dateA =
                 timestampToDate(
-                    first.lastMessageAt ||
-                    first.updatedAt
+                    a.lastMessageAt ||
+                    a.updatedAt
                 );
 
 
-            const secondDate =
+            const dateB =
                 timestampToDate(
-                    second.lastMessageAt ||
-                    second.updatedAt
+                    b.lastMessageAt ||
+                    b.updatedAt
                 );
-
-
-            const firstTime =
-                firstDate
-                    ? firstDate.getTime()
-                    : 0;
-
-
-            const secondTime =
-                secondDate
-                    ? secondDate.getTime()
-                    : 0;
 
 
             return (
-                secondTime -
-                firstTime
+
+                (dateB?.getTime() || 0) -
+                (dateA?.getTime() || 0)
+
             );
 
         }
@@ -3848,7 +3205,7 @@ function mergeRecentChats() {
 
 
     renderChats(
-        sorted
+        combined
     );
 
 
@@ -3858,57 +3215,84 @@ function mergeRecentChats() {
 
 
 /* =========================================================
-   CHAT AVATAR
+   CHAT STATUS
 ========================================================= */
 
-function chatAvatar(
-    name,
-    photo,
-    isGroup = false
-) {
+function getMessageStatus(chat) {
 
-    if (photo) {
+    if (
+        chat.lastSenderId !==
+        currentUser?.uid
+    ) {
+
+        return "";
+
+    }
+
+
+    if (
+        chat.read === true
+    ) {
 
         return `
-
-            <img
-                src="${escapeHtml(photo)}"
-                alt="${escapeHtml(name)}"
-                loading="lazy"
+            <span
+                class="chat-status-ticks read"
+                title="Read"
             >
-
+                ✓✓
+            </span>
         `;
 
     }
 
 
-    return escapeHtml(
-        initials(name)
-    );
+    if (
+        chat.delivered === true
+    ) {
+
+        return `
+            <span
+                class="chat-status-ticks"
+                title="Delivered"
+            >
+                ✓✓
+            </span>
+        `;
+
+    }
+
+
+    return `
+        <span
+            class="chat-status-ticks"
+            title="Sent"
+        >
+            ✓
+        </span>
+    `;
 
 }
 
 
 /* =========================================================
-   RENDER RECENT CHATS
+   RENDER CHATS
 ========================================================= */
 
-function renderChats(
-    chats
-) {
+function renderChats(chats) {
 
     const box =
         $("chatList");
 
 
     if (!box) {
-
         return;
-
     }
 
 
-    hideChatSkeleton();
+    box.setAttribute(
+        "aria-busy",
+        "false"
+    );
 
 
     if (!chats.length) {
@@ -3916,13 +3300,10 @@ function renderChats(
         box.innerHTML = `
 
             <div class="empty-state">
-
                 No conversations yet.
-
             </div>
 
         `;
-
 
         return;
 
@@ -3930,353 +3311,332 @@ function renderChats(
 
 
     box.innerHTML =
-        chats
-            .map(
-                chat => {
+        chats.map(
+            chat => {
 
-                    const isGroup =
-                        chat.type === "group";
-
-
-                    const name =
-                        isGroup
-
-                            ? (
-                                chat.groupName ||
-                                "Group"
-                            )
-
-                            : (
-                                chat.otherUserName ||
-                                "CONNECTA User"
-                            );
+                const isGroup =
+                    chat.type === "group";
 
 
-                    const photo =
-                        isGroup
+                const name =
+                    isGroup
 
-                            ? (
-                                chat.photoURL ||
-                                ""
-                            )
+                        ? (
+                            chat.groupName ||
+                            "Group"
+                        )
 
-                            : (
-                                chat.otherUserPhoto ||
-                                ""
-                            );
-
-
-                    const unread =
-                        Number(
-                            chat.unread || 0
+                        : (
+                            chat.otherUserName ||
+                            "CONNECTA User"
                         );
 
 
-                    const time =
-                        formatTimestamp(
-                            chat.lastMessageAt ||
-                            chat.updatedAt
+                const photo =
+                    isGroup
+
+                        ? (
+                            chat.photoURL ||
+                            ""
+                        )
+
+                        : (
+                            chat.otherUserPhoto ||
+                            ""
                         );
 
 
-                    let preview =
-                        chat.lastMessage ||
-                        "";
+                const avatar =
+                    photo
+
+                        ? `
+
+                            <img
+                                src="${escapeHtml(
+                                    photo
+                                )}"
+                                alt="${escapeHtml(
+                                    name
+                                )}"
+                                loading="lazy"
+                            >
+
+                          `
+
+                        : escapeHtml(
+                            initials(name)
+                        );
 
 
-                    if (
-                        chat.lastMessageType ===
-                        "image"
-                    ) {
-
-                        preview =
-                            "📷 Photo";
-
-                    }
+                const unread =
+                    Number(
+                        chat.unread || 0
+                    );
 
 
-                    if (
-                        !preview
-                    ) {
-
-                        preview =
-                            isGroup
-                                ? "No messages yet"
-                                : "Start a conversation";
-
-                    }
+                const time =
+                    formatTimestamp(
+                        chat.lastMessageAt ||
+                        chat.updatedAt
+                    );
 
 
-                    /*
-                     * Group sender prefix.
-                     */
-
-                    let previewMarkup;
+                let preview =
+                    chat.lastMessage ||
+                    "";
 
 
-                    if (
-                        isGroup &&
-                        chat.lastMessageSenderName
-                    ) {
+                if (
+                    chat.lastMessageType ===
+                    "image"
+                ) {
 
-                        const senderBadge =
-                            chat.lastMessageSenderVerified
+                    preview =
+                        "📷 Photo";
 
-                                ? verifiedBadge({
-                                    isVerified: true
-                                })
-
-                                : "";
+                }
 
 
-                        previewMarkup = `
+                if (
+                    !preview
+                ) {
 
-                            <span>
+                    preview =
+                        isGroup
+                            ? "No messages yet"
+                            : "Start a conversation";
 
-                                ${escapeHtml(
-                                    chat.lastMessageSenderName
-                                )}
-
-                                ${senderBadge}
-
-                            </span>
-
-                            <span>
-                                :
-                                ${escapeHtml(
-                                    preview
-                                )}
-                            </span>
-
-                        `;
-
-                    } else {
-
-                        previewMarkup =
-                            escapeHtml(
-                                preview
-                            );
-
-                    }
+                }
 
 
-                    /*
-                     * Private chat verified badge.
-                     */
+                /*
+                 * GROUP MESSAGE PREVIEW
+                 */
 
-                    const nameBadge =
-                        !isGroup
+                let previewMarkup =
+                    escapeHtml(
+                        preview
+                    );
+
+
+                if (
+                    isGroup &&
+                    chat.lastMessageSenderName
+                ) {
+
+                    const senderBadge =
+                        chat.lastMessageSenderVerified
 
                             ? verifiedBadge({
-
-                                isVerified:
-                                    chat.otherUserVerified
-
+                                isVerified: true
                             })
 
                             : "";
 
 
-                    return `
+                    previewMarkup = `
 
-                        <div
-                            class="
-                                chat-item
-                                chat-list-item
-                                ${isGroup ? "group-chat" : ""}
-                                ${
-                                    unread > 0
-                                        ? "unread"
-                                        : ""
-                                }
-                            "
-                            data-chat-type="${
-                                isGroup
-                                    ? "group"
-                                    : "private"
-                            }"
-                            data-chat-id="${escapeHtml(
-                                isGroup
-                                    ? chat.groupId
-                                    : chat.chatId
-                            )}"
-                            data-user-id="${escapeHtml(
-                                isGroup
-                                    ? ""
-                                    : chat.otherUid
-                            )}"
-                        >
+                        <span>
+                            ${escapeHtml(
+                                chat.lastMessageSenderName
+                            )}
+                        </span>
 
-                            <div
-                                class="
-                                    avatar
-                                    ${
-                                        isGroup
-                                            ? "avatar-green"
-                                            : ""
-                                    }
-                                "
-                            >
+                        ${senderBadge}
 
-                                ${chatAvatar(
-                                    name,
-                                    photo,
-                                    isGroup
-                                )}
-
-                            </div>
-
-
-                            <div
-                                class="chat-copy"
-                            >
-
-                                <strong>
-
-                                    ${escapeHtml(
-                                        name
-                                    )}
-
-                                    ${nameBadge}
-
-                                </strong>
-
-
-                                <p>
-
-                                    ${previewMarkup}
-
-                                </p>
-
-                            </div>
-
-
-                            <div
-                                class="chat-meta"
-                            >
-
-                                <time>
-
-                                    ${escapeHtml(
-                                        time
-                                    )}
-
-                                </time>
-
-
-                                ${
-                                    unread > 0
-
-                                        ? `
-
-                                            <span
-                                                class="
-                                                    unread
-                                                    connecta-dashboard-unread
-                                                "
-                                            >
-                                                ${
-                                                    unread > 99
-                                                        ? "99+"
-                                                        : unread
-                                                }
-                                            </span>
-
-                                          `
-
-                                        : ""
-                                }
-
-                            </div>
-
-                        </div>
+                        <span>
+                            :
+                            ${escapeHtml(
+                                preview
+                            )}
+                        </span>
 
                     `;
 
                 }
-            )
-            .join("");
 
 
-    /*
-     * Navigation.
-     */
+                const nameBadge =
+                    !isGroup
+                        ? verifiedBadge({
+                            isVerified:
+                                chat.otherUserVerified
+                        })
+                        : "";
+
+
+                return `
+
+                    <div
+                        class="chat-item"
+                        data-chat-type="${isGroup
+                            ? "group"
+                            : "private"}"
+                        data-chat-id="${escapeHtml(
+                            isGroup
+                                ? chat.groupId
+                                : chat.chatId
+                        )}"
+                        data-user-id="${escapeHtml(
+                            isGroup
+                                ? ""
+                                : chat.otherUid
+                        )}"
+                    >
+
+                        <div
+                            class="
+                                avatar
+                                ${
+                                    isGroup
+                                        ? "group-avatar"
+                                        : "avatar-green"
+                                }
+                            "
+                        >
+
+                            ${avatar}
+
+                        </div>
+
+
+                        <div
+                            class="chat-copy"
+                        >
+
+                            <strong>
+
+                                ${escapeHtml(
+                                    name
+                                )}
+
+                                ${nameBadge}
+
+                            </strong>
+
+
+                            <p>
+
+                                ${previewMarkup}
+
+                                ${
+                                    !isGroup
+                                        ? getMessageStatus(chat)
+                                        : ""
+                                }
+
+                            </p>
+
+                        </div>
+
+
+                        <div
+                            class="chat-meta"
+                        >
+
+                            <time>
+                                ${escapeHtml(
+                                    time
+                                )}
+                            </time>
+
+
+                            ${
+                                unread > 0
+
+                                    ? `
+
+                                        <span
+                                            class="unread"
+                                        >
+                                            ${
+                                                unread > 99
+                                                    ? "99+"
+                                                    : unread
+                                            }
+                                        </span>
+
+                                      `
+
+                                    : ""
+                            }
+
+                        </div>
+
+                    </div>
+
+                `;
+
+            }
+        ).join("");
+
 
     box
         .querySelectorAll(
             ".chat-item"
         )
-        .forEach(
-            item => {
+        .forEach(item => {
 
-                item.addEventListener(
-                    "click",
-                    () => {
+            item.addEventListener(
+                "click",
+                () => {
 
-                        const type =
-                            item.dataset.chatType;
-
-
-                        const chatId =
-                            item.dataset.chatId;
+                    const type =
+                        item.dataset.chatType;
 
 
-                        const userId =
-                            item.dataset.userId;
+                    const chatId =
+                        item.dataset.chatId;
 
 
-                        if (
-                            type === "group"
-                        ) {
-
-                            if (!chatId) {
-
-                                return;
-
-                            }
+                    const userId =
+                        item.dataset.userId;
 
 
-                            location.href =
-                                `group-chat.html?groupId=${encodeURIComponent(
-                                    chatId
-                                )}`;
+                    if (
+                        type === "group"
+                    ) {
 
-
+                        if (!chatId) {
                             return;
-
                         }
 
 
-                        if (userId) {
+                        location.href =
+                            `group-chat.html?groupId=${encodeURIComponent(
+                                chatId
+                            )}`;
 
-                            location.href =
-                                `chat.html?uid=${encodeURIComponent(
-                                    userId
-                                )}`;
-
-                        }
+                        return;
 
                     }
-                );
 
-            }
-        );
+
+                    if (userId) {
+
+                        location.href =
+                            `chat.html?uid=${encodeURIComponent(
+                                userId
+                            )}`;
+
+                    }
+
+                }
+            );
+
+        });
 
 }
 
 
 /* =========================================================
-   SEARCH CHATS
+   CHAT SEARCH
 ========================================================= */
 
-function searchChats(
-    term
-) {
+function searchChats(term) {
 
     const value =
-        String(
-            term || ""
-        )
+        String(term || "")
             .trim()
             .toLowerCase();
 
@@ -4340,14 +3700,10 @@ function searchChats(
    PRESENCE
 ========================================================= */
 
-async function setPresence(
-    online
-) {
+async function setPresence(online) {
 
     if (!currentUser) {
-
         return;
-
     }
 
 
@@ -4372,8 +3728,7 @@ async function setPresence(
             },
 
             {
-                merge:
-                    true
+                merge: true
             }
 
         );
@@ -4381,7 +3736,7 @@ async function setPresence(
     } catch (error) {
 
         console.warn(
-            "[CONNECTA] Presence update failed:",
+            "Presence update failed:",
             error
         );
 
@@ -4391,7 +3746,52 @@ async function setPresence(
 
 
 /* =========================================================
-   VISIBILITY PRESENCE
+   START PRESENCE
+========================================================= */
+
+function startPresence() {
+
+    if (!currentUser) {
+        return;
+    }
+
+
+    setPresence(true);
+
+
+    clearInterval(
+        presenceInterval
+    );
+
+
+    presenceInterval =
+        setInterval(
+            () => {
+
+                if (
+                    document.visibilityState ===
+                    "visible"
+                ) {
+
+                    setPresence(true);
+
+                }
+
+            },
+            60000
+        );
+
+
+    document.addEventListener(
+        "visibilitychange",
+        handleVisibilityPresence
+    );
+
+}
+
+
+/* =========================================================
+   VISIBILITY
 ========================================================= */
 
 function handleVisibilityPresence() {
@@ -4413,53 +3813,7 @@ function handleVisibilityPresence() {
 
 
 /* =========================================================
-   START PRESENCE
-========================================================= */
-
-function startPresence() {
-
-    if (!currentUser) {
-
-        return;
-
-    }
-
-
-    setPresence(true);
-
-
-    clearInterval(
-        presenceInterval
-    );
-
-
-    presenceInterval =
-        setInterval(
-            () => {
-
-                setPresence(true);
-
-            },
-            60000
-        );
-
-
-    document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityPresence
-    );
-
-
-    document.addEventListener(
-        "visibilitychange",
-        handleVisibilityPresence
-    );
-
-}
-
-
-/* =========================================================
-   STOP DASHBOARD LISTENERS
+   STOP EVERYTHING
 ========================================================= */
 
 function stopDashboardListeners() {
@@ -4482,31 +3836,23 @@ function stopDashboardListeners() {
     }
 
 
-    groupListeners.unsubscribers
-        .forEach(
-            unsubscribe => {
+    groupUnsubscribers.forEach(
+        unsubscribe => {
 
-                if (
-                    typeof unsubscribe ===
-                    "function"
-                ) {
+            if (
+                typeof unsubscribe ===
+                "function"
+            ) {
 
-                    unsubscribe();
-
-                }
+                unsubscribe();
 
             }
-        );
+
+        }
+    );
 
 
-    groupListeners = {
-
-        memberIds: [],
-        members: [],
-        owned: [],
-        unsubscribers: []
-
-    };
+    groupUnsubscribers = [];
 
 
     clearTimeout(
@@ -4519,8 +3865,7 @@ function stopDashboardListeners() {
     );
 
 
-    presenceInterval =
-        null;
+    presenceInterval = null;
 
 
     document.removeEventListener(
@@ -4532,2315 +3877,22 @@ function stopDashboardListeners() {
 
 
 /* =========================================================
-   DASHBOARD UI
-========================================================= */
-
-function setupUI() {
-
-    /*
-     * =====================================================
-     * MENU
-     * =====================================================
-     *
-     * IMPORTANT:
-     * dashboard.html uses:
-     *
-     * menuBtn
-     * sideMenu
-     * menuOverlay
-     *
-     * not menuButton/sidebar/sidebarOverlay.
-     */
-
-    const menuButton =
-        $("menuBtn");
-
-
-    const sidebar =
-        $("sideMenu");
-
-
-    const sidebarOverlay =
-        $("menuOverlay");
-
-
-    function openMenu() {
-
-        sidebar?.classList.add(
-            "open"
-        );
-
-
-        sidebarOverlay?.classList.add(
-            "open"
-        );
-
-
-        sidebar?.setAttribute(
-            "aria-hidden",
-            "false"
-        );
-
-    }
-
-
-    function closeMenu() {
-
-        sidebar?.classList.remove(
-            "open"
-        );
-
-
-        sidebarOverlay?.classList.remove(
-            "open"
-        );
-
-
-        sidebar?.setAttribute(
-            "aria-hidden",
-            "true"
-        );
-
-    }
-
-
-    menuButton?.addEventListener(
-        "click",
-        openMenu
-    );
-
-
-    sidebarOverlay?.addEventListener(
-        "click",
-        closeMenu
-    );
-
-
-    sidebar
-        ?.querySelectorAll(
-            "a"
-        )
-        .forEach(
-            item => {
-
-                item.addEventListener(
-                    "click",
-                    () => {
-
-                        closeMenu();
-
-                    }
-                );
-
-            }
-        );
-
-
-    /*
-     * =====================================================
-     * PROFILE
-     * =====================================================
-     */
-
-    $("profileBtn")?.addEventListener(
-        "click",
-        () => {
-
-            if (
-                currentUser?.uid
-            ) {
-
-                location.href =
-                    `profile.html?uid=${encodeURIComponent(
-                        currentUser.uid
-                    )}`;
-
-            }
-
-        }
-    );
-
-
-    /*
-     * =====================================================
-     * CONNECTION
-     * =====================================================
-     */
-
-    $("connectionBtn")?.addEventListener(
-        "click",
-        () => {
-
-            showToast(
-                "Connection feature coming soon."
-            );
-
-        }
-    );
-
-
-    /*
-     * =====================================================
-     * ONLINE SEARCH BUTTON
-     * =====================================================
-     */
-
-    $("onlineSearchBtn")?.addEventListener(
-        "click",
-        () => {
-
-            const wrap =
-                $("onlineSearchWrap");
-
-
-            wrap?.classList.toggle(
-                "open"
-            );
-
-
-            if (
-                wrap?.classList.contains(
-                    "open"
-                )
-            ) {
-
-                $("onlineSearch")?.focus();
-
-            }
-
-        }
-    );
-
-
-    /*
-     * =====================================================
-     * CHAT SEARCH BUTTON
-     * =====================================================
-     */
-
-    $("chatSearchBtn")?.addEventListener(
-        "click",
-        () => {
-
-            const wrap =
-                $("chatSearchWrap");
-
-
-            wrap?.classList.toggle(
-                "open"
-            );
-
-
-            if (
-                wrap?.classList.contains(
-                    "open"
-                )
-            ) {
-
-                $("chatSearch")?.focus();
-
-            }
-
-        }
-    );
-
-
-    /*
-     * =====================================================
-     * ONLINE SEARCH
-     * =====================================================
-     */
-
-    $("onlineSearch")?.addEventListener(
-        "input",
-        event => {
-
-            const term =
-                event.target.value
-                    .trim()
-                    .toLowerCase();
-
-
-            if (!term) {
-
-                renderOnline(
-                    onlineUsers
-                );
-
-                return;
-
-            }
-
-
-            const filtered =
-                onlineUsers.filter(
-                    user => {
-
-                        const text = [
-
-                            getFullName(
-                                user
-                            ),
-
-                            user.username,
-
-                            user.bio
-
-                        ]
-                            .filter(Boolean)
-                            .join(" ")
-                            .toLowerCase();
-
-
-                        return text.includes(
-                            term
-                        );
-
-                    }
-                );
-
-
-            renderOnline(
-                filtered
-            );
-
-        }
-    );
-
-
-    /*
-     * =====================================================
-     * CHAT SEARCH
-     * =====================================================
-     */
-
-    $("chatSearch")?.addEventListener(
-        "input",
-        event => {
-
-            searchChats(
-                event.target.value
-            );
-
-        }
-    );
-
-
-    /*
-     * =====================================================
-     * LOGOUT
-     * =====================================================
-     */
-
-    $("logoutBtn")?.addEventListener(
-        "click",
-        async () => {
-
-            await setPresence(
-                false
-            );
-
-
-            stopDashboardListeners();
-
-
-            await logout(
-                true
-            );
-
-        }
-    );
-
-
-    /*
-     * =====================================================
-     * COMING SOON LINKS
-     * =====================================================
-     */
-
-    document
-        .querySelectorAll(
-            "[data-coming]"
-        )
-        .forEach(
-            element => {
-
-                element.addEventListener(
-                    "click",
-                    event => {
-
-                        /*
-                         * Allow real links to work.
-                         */
-
-                        if (
-                            element.getAttribute(
-                                "href"
-                            ) !== "#"
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        event.preventDefault();
-
-
-                        showToast(
-                            `${element.dataset.coming} feature coming soon.`
-                        );
-
-                    }
-                );
-
-            }
-        );
-
-}
-
-
-/* =========================================================
-   USERS LISTENER
-========================================================= */
-
-function listenToUsers() {
-
-    if (stopUsers) {
-
-        stopUsers();
-
-        stopUsers = null;
-
-    }
-
-
-    const usersQuery =
-        query(
-
-            collection(
-                db,
-                "users"
-            ),
-
-            limit(100)
-
-        );
-
-
-    stopUsers =
-        onSnapshot(
-
-            usersQuery,
-
-            snapshot => {
-
-                const users =
-                    snapshot.docs.map(
-                        userDoc => {
-
-                            return {
-
-                                uid:
-                                    userDoc.id,
-
-                                ...publicProfileData(
-                                    userDoc.data()
-                                )
-
-                            };
-
-                        }
-                    );
-
-
-                onlineUsers =
-                    users;
-
-
-                /*
-                 * Own profile.
-                 */
-
-                const own =
-                    users.find(
-                        user =>
-                            user.uid ===
-                            currentUser?.uid
-                    );
-
-
-                if (own) {
-
-                    currentProfile = {
-
-                        ...currentProfile,
-
-                        ...own
-
-                    };
-
-
-                    saveProfileToCache(
-                        currentProfile
-                    );
-
-
-                    renderProfile();
-
-                }
-
-
-                /*
-                 * Render users.
-                 */
-
-                const searchTerm =
-                    $("onlineSearch")
-                        ?.value
-                        ?.trim()
-                        ?.toLowerCase() ||
-                    "";
-
-
-                if (searchTerm) {
-
-                    const filtered =
-                        users.filter(
-                            user => {
-
-                                const text = [
-
-                                    getFullName(
-                                        user
-                                    ),
-
-                                    user.username,
-
-                                    user.bio
-
-                                ]
-                                    .filter(Boolean)
-                                    .join(" ")
-                                    .toLowerCase();
-
-
-                                return text.includes(
-                                    searchTerm
-                                );
-
-                            }
-                        );
-
-
-                    renderOnline(
-                        filtered
-                    );
-
-                } else {
-
-                    renderOnline(
-                        users
-                    );
-
-                }
-
-
-                /*
-                 * Update private chat names.
-                 */
-
-                recentChats =
-                    recentChats.map(
-                        chat => {
-
-                            const profile =
-                                users.find(
-                                    user =>
-                                        user.uid ===
-                                        chat.otherUid
-                                );
-
-
-                            if (!profile) {
-
-                                return chat;
-
-                            }
-
-
-                            return {
-
-                                ...chat,
-
-                                otherUserName:
-                                    getFullName(
-                                        profile
-                                    ),
-
-                                otherUserPhoto:
-                                    profile.photoURL ||
-                                    "",
-
-                                otherUserVerified:
-                                    profile.isVerified ===
-                                    true
-
-                            };
-
-                        }
-                    );
-
-
-                /*
-                 * Update group sender names.
-                 */
-
-                recentGroups =
-                    recentGroups.map(
-                        group => {
-
-                            const profile =
-                                users.find(
-                                    user =>
-                                        user.uid ===
-                                        group.lastMessageSenderId
-                                );
-
-
-                            if (!profile) {
-
-                                return group;
-
-                            }
-
-
-                            return {
-
-                                ...group,
-
-                                lastMessageSenderName:
-                                    getFullName(
-                                        profile
-                                    ),
-
-                                lastMessageSenderVerified:
-                                    profile.isVerified ===
-                                    true
-
-                            };
-
-                        }
-                    );
-
-
-                mergeRecentChats();
-
-            },
-
-            error => {
-
-                console.error(
-                    "[CONNECTA] Users listener:",
-                    error
-                );
-
-
-                const box =
-                    $("onlineUsers");
-
-
-                hideOnlineSkeleton();
-
-
-                if (box) {
-
-                    box.innerHTML = `
-
-                        <div
-                            class="connecta-dashboard-error"
-                        >
-                            Users could not be loaded.
-                        </div>
-
-                    `;
-
-                }
-
-            }
-
-        );
-
-}
-
-
-/* =========================================================
-   INITIALIZE DASHBOARD
-========================================================= */
-
-async function initializeDashboard() {
-
-    try {
-
-        /*
-         * Authenticate.
-         */
-
-        const session =
-            await getCurrentConnectaUser({
-
-                redirect:
-                    true,
-
-                allowBlocked:
-                    true
-
-            });
-
-
-        if (!session) {
-
-            return;
-
-        }
-
-
-        currentUser =
-            session.authUser;
-
-
-        currentProfile =
-            session.profile || {
-
-                uid:
-                    currentUser.uid,
-
-                displayName:
-                    currentUser.displayName ||
-                    "",
-
-                photoURL:
-                    currentUser.photoURL ||
-                    "",
-
-                status:
-                    "active",
-
-                balance:
-                    0,
-
-                following:
-                    []
-
-            };
-
-
-        /*
-         * =================================================
-         * CACHE FIRST
-         * =================================================
-         */
-
-        loadDashboardCache();
-
-
-        renderProfile();
-
-
-        /*
-         * =================================================
-         * ACCOUNT CONTROL
-         * =================================================
-         */
-
-        const control =
-            getAccountControl(
-                currentProfile
-            );
-
-
-        if (
-            control.blocked
-        ) {
-
-            showAccountBlockedScreen(
-                control
-            );
-
-
-            return;
-
-        }
-
-
-        /*
-         * =================================================
-         * PRESENCE
-         * =================================================
-         */
-
-        startPresence();
-
-
-        /*
-         * =================================================
-         * LIVE USERS
-         * =================================================
-         */
-
-        listenToUsers();
-
-
-        /*
-         * =================================================
-         * LIVE PRIVATE CHATS
-         * =================================================
-         */
-
-        listenToChats(
-            currentUser.uid
-        );
-
-
-        /*
-         * =================================================
-         * LIVE GROUPS
-         * =================================================
-         */
-
-        listenToGroups(
-            currentUser.uid
-        );
-
-
-    } catch (error) {
-
-        console.error(
-            "[CONNECTA] Dashboard initialization failed:",
-            error
-        );
-
-
-        showToast(
-            "Could not initialize CONNECTA dashboard."
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   PAGE HIDE
-========================================================= */
-
-window.addEventListener(
-    "pagehide",
-    () => {
-
-        clearTimeout(
-            groupProcessTimer
-        );
-
-
-        clearInterval(
-            presenceInterval
-        );
-
-
-        if (
-            currentUser
-        ) {
-
-            setPresence(
-                false
-            );
-
-        }
-
-
-        stopDashboardListeners();
-
-    }
-);
-
-
-/* =========================================================
-   START
-========================================================= */
-
-installInstantDashboardStyles();
-
-showDashboardSkeleton();
-
-setupUI();
-
-initializeDashboard();/* =========================================================
-   CONNECTA DASHBOARD ENGINE
-   File: frontend/js/dashboard.js
-
-   Compatible with:
-   - dashboard.html
-   - dashboard.css
-   - chat.js
-   - group-chat.js
-   - globalAuth.js
-   - firebase.js
-
-   FEATURES
-   - Instant cache-first dashboard
-   - Skeleton/shimmer instead of Loading text
-   - Live users
-   - Online/offline status
-   - Live private chats
-   - Live groups
-   - Group membership via memberIds OR members
-   - Group unread counts
-   - Unified Recent Chats
-   - Private-chat unread counts
-   - Verified badges
-   - Follow system
-   - Profile cache
-   - Dashboard cache
-   - Presence heartbeat
-   - Account restriction protection
-   - Correct HTML/CSS IDs and classes
-========================================================= */
-
-
-/* =========================================================
-   FIREBASE
-========================================================= */
-
-import {
-    db
-} from "./firebase.js";
-
-
-/* =========================================================
-   GLOBAL AUTH
-========================================================= */
-
-import {
-    getCurrentConnectaUser,
-    logout
-} from "./globalAuth.js";
-
-
-/* =========================================================
-   FIRESTORE
-========================================================= */
-
-import {
-    collection,
-    doc,
-    getDoc,
-    getDocs,
-    onSnapshot,
-    query,
-    orderBy,
-    limit,
-    where,
-    runTransaction,
-    setDoc,
-    serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-
-
-/* =========================================================
-   DOM HELPER
-========================================================= */
-
-const $ = id =>
-    document.getElementById(id);
-
-
-/* =========================================================
-   STATE
-========================================================= */
-
-let currentUser = null;
-
-let currentProfile = null;
-
-let onlineUsers = [];
-
-let recentChats = [];
-
-let recentGroups = [];
-
-
-/*
- * Group listener state.
- */
-
-let groupListeners = {
-
-    memberIds: [],
-    members: [],
-    owned: [],
-    unsubscribers: []
-
-};
-
-
-let stopUsers = null;
-
-let stopChats = null;
-
-let presenceInterval = null;
-
-let groupProcessTimer = null;
-
-let groupProcessVersion = 0;
-
-
-/* =========================================================
-   CACHE
-========================================================= */
-
-const DASHBOARD_CACHE_PREFIX =
-    "connectaDashboardCache_v2_";
-
-const PROFILE_CACHE_KEY =
-    "connectaProfileCache";
-
-
-/* =========================================================
-   INSTANT DASHBOARD STYLES
-========================================================= */
-
-function installInstantDashboardStyles() {
-
-    if (
-        $("connectaDashboardInstantStyles")
-    ) {
-
-        return;
-
-    }
-
-
-    const style =
-        document.createElement("style");
-
-
-    style.id =
-        "connectaDashboardInstantStyles";
-
-
-    style.textContent = `
-
-        @keyframes connectaShimmer {
-
-            0% {
-                background-position:
-                    -500px 0;
-            }
-
-            100% {
-                background-position:
-                    500px 0;
-            }
-
-        }
-
-
-        .connecta-dashboard-skeleton {
-
-            background:
-                linear-gradient(
-                    90deg,
-                    #e9efeb 25%,
-                    #f8faf8 50%,
-                    #e9efeb 75%
-                );
-
-            background-size:
-                1000px 100%;
-
-            animation:
-                connectaShimmer
-                1.25s infinite linear;
-
-            border-radius:
-                14px;
-
-        }
-
-
-        .connecta-dashboard-skeleton-row {
-
-            display:
-                flex;
-
-            gap:
-                11px;
-
-            width:
-                100%;
-
-            overflow:
-                hidden;
-
-        }
-
-
-        .connecta-dashboard-skeleton-user {
-
-            flex:
-                0 0 122px;
-
-            height:
-                150px;
-
-            border-radius:
-                18px;
-
-        }
-
-
-        .connecta-dashboard-skeleton-chat {
-
-            width:
-                100%;
-
-            height:
-                66px;
-
-            margin-bottom:
-                9px;
-
-            border-radius:
-                15px;
-
-        }
-
-
-        .connecta-dashboard-empty {
-
-            width:
-                100%;
-
-            min-height:
-                100px;
-
-            display:
-                grid;
-
-            place-items:
-                center;
-
-            text-align:
-                center;
-
-            color:
-                #718078;
-
-            font-size:
-                13px;
-
-            padding:
-                20px;
-
-        }
-
-
-        .connecta-dashboard-error {
-
-            width:
-                100%;
-
-            padding:
-                18px;
-
-            text-align:
-                center;
-
-            color:
-                #718078;
-
-            font-size:
-                13px;
-
-        }
-
-
-        .connecta-dashboard-unread {
-
-            min-width:
-                21px;
-
-            height:
-                21px;
-
-            padding:
-                0 5px;
-
-            display:
-                grid;
-
-            place-items:
-                center;
-
-            border-radius:
-                999px;
-
-            background:
-                #22c55e;
-
-            color:
-                #fff;
-
-            font-size:
-                9px;
-
-            font-weight:
-                800;
-
-        }
-
-
-        .verified-badge {
-
-            display:
-                inline-flex;
-
-            align-items:
-                center;
-
-            justify-content:
-                center;
-
-            width:
-                16px;
-
-            height:
-                16px;
-
-            margin-left:
-                3px;
-
-            border-radius:
-                50%;
-
-            background:
-                #22c55e;
-
-            color:
-                #fff;
-
-            font-size:
-                10px;
-
-            font-weight:
-                900;
-
-            vertical-align:
-                middle;
-
-        }
-
-
-        .chat-list-item .avatar {
-
-            position:
-                relative;
-
-        }
-
-
-        .chat-list-item.group-chat .avatar {
-
-            background:
-                #dcfce7;
-
-            color:
-                #15803d;
-
-        }
-
-
-        .chat-list-item {
-
-            cursor:
-                pointer;
-
-        }
-
-
-        .chat-list-item.unread {
-
-            background:
-                #f7fff8;
-
-        }
-
-
-        .chat-list-preview {
-
-            min-width:
-                0;
-
-        }
-
-
-        .chat-list-preview
-        .verified-badge {
-
-            width:
-                14px;
-
-            height:
-                14px;
-
-            font-size:
-                8px;
-
-        }
-
-
-        .user-card {
-
-            cursor:
-                pointer;
-
-        }
-
-
-        .user-card button {
-
-            position:
-                relative;
-
-            z-index:
-                2;
-
-        }
-
-    `;
-
-
-    document.head.appendChild(
-        style
-    );
-
-}
-
-
-/* =========================================================
-   DASHBOARD SKELETON
-========================================================= */
-
-function showDashboardSkeleton() {
-
-    const onlineBox =
-        $("onlineUsers");
-
-
-    const chatBox =
-        $("chatList");
-
-
-    /*
-     * Online users.
-     *
-     * Replace the HTML "Loading online users..."
-     * placeholder immediately.
-     */
-
-    if (onlineBox) {
-
-        const loadingPlaceholder =
-            onlineBox.querySelector(
-                ".empty-state"
-            );
-
-
-        if (
-            loadingPlaceholder
-        ) {
-
-            loadingPlaceholder.remove();
-
-        }
-
-
-        if (
-            !onlineBox.children.length
-        ) {
-
-            onlineBox.innerHTML = `
-
-                <div
-                    class="
-                        connecta-dashboard-skeleton-row
-                    "
-                    aria-hidden="true"
-                >
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-user
-                        "
-                    ></div>
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-user
-                        "
-                    ></div>
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-user
-                        "
-                    ></div>
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-user
-                        "
-                    ></div>
-
-                </div>
-
-            `;
-
-        }
-
-
-        onlineBox.setAttribute(
-            "aria-busy",
-            "true"
-        );
-
-    }
-
-
-    /*
-     * Chats.
-     */
-
-    if (chatBox) {
-
-        const loadingPlaceholder =
-            chatBox.querySelector(
-                ".empty-state"
-            );
-
-
-        if (
-            loadingPlaceholder
-        ) {
-
-            loadingPlaceholder.remove();
-
-        }
-
-
-        if (
-            !chatBox.children.length
-        ) {
-
-            chatBox.innerHTML = `
-
-                <div aria-hidden="true">
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-chat
-                        "
-                    ></div>
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-chat
-                        "
-                    ></div>
-
-                    <div
-                        class="
-                            connecta-dashboard-skeleton
-                            connecta-dashboard-skeleton-chat
-                        "
-                    ></div>
-
-                </div>
-
-            `;
-
-        }
-
-
-        chatBox.setAttribute(
-            "aria-busy",
-            "true"
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   HIDE SKELETON
-========================================================= */
-
-function hideOnlineSkeleton() {
-
-    const box =
-        $("onlineUsers");
-
-
-    box?.setAttribute(
-        "aria-busy",
-        "false"
-    );
-
-}
-
-
-function hideChatSkeleton() {
-
-    const box =
-        $("chatList");
-
-
-    box?.setAttribute(
-        "aria-busy",
-        "false"
-    );
-
-}
-
-
-/* =========================================================
-   SAFE PUBLIC PROFILE
-========================================================= */
-
-function publicProfileData(
-    user = {}
-) {
-
-    return {
-
-        uid:
-            user.uid || "",
-
-        firstName:
-            user.firstName || "",
-
-        lastName:
-            user.lastName || "",
-
-        displayName:
-            user.displayName || "",
-
-        username:
-            user.username || "",
-
-        photoURL:
-            user.photoURL ||
-            user.photoUrl ||
-            "",
-
-        bio:
-            user.bio || "",
-
-        isOnline:
-            user.isOnline === true,
-
-        isVerified:
-            user.isVerified === true,
-
-        followersCount:
-            Number(
-                user.followersCount || 0
-            ),
-
-        followingCount:
-            Number(
-                user.followingCount || 0
-            ),
-
-        lastSeen:
-            user.lastSeen || null
-
-    };
-
-}
-
-
-/* =========================================================
-   CACHE KEY
-========================================================= */
-
-function getDashboardCacheKey(
-    uid
-) {
-
-    return (
-        `${DASHBOARD_CACHE_PREFIX}${uid}`
-    );
-
-}
-
-
-/* =========================================================
-   SAVE DASHBOARD CACHE
-========================================================= */
-
-function saveDashboardCache() {
-
-    if (
-        !currentUser
-    ) {
-
-        return;
-
-    }
-
-
-    try {
-
-        const safeProfile =
-            currentProfile
-
-                ? {
-
-                    ...publicProfileData(
-                        currentProfile
-                    ),
-
-                    following:
-                        Array.isArray(
-                            currentProfile.following
-                        )
-                            ? [
-                                ...currentProfile.following
-                            ]
-                            : [],
-
-                    balance:
-                        Number(
-                            currentProfile.balance ||
-                            0
-                        ),
-
-                    status:
-                        currentProfile.status ||
-                        "active"
-
-                }
-
-                : null;
-
-
-        const safeGroups =
-            recentGroups.map(
-                group => {
-
-                    const {
-                        readData,
-                        ...safeGroup
-                    } = group;
-
-
-                    return safeGroup;
-
-                }
-            );
-
-
-        const payload = {
-
-            profile:
-                safeProfile,
-
-            users:
-                onlineUsers.map(
-                    publicProfileData
-                ),
-
-            chats:
-                recentChats,
-
-            groups:
-                safeGroups,
-
-            cachedAt:
-                Date.now()
-
-        };
-
-
-        localStorage.setItem(
-
-            getDashboardCacheKey(
-                currentUser.uid
-            ),
-
-            JSON.stringify(
-                payload
-            )
-
-        );
-
-
-    } catch (error) {
-
-        console.warn(
-            "[CONNECTA] Dashboard cache save failed:",
-            error
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   LOAD DASHBOARD CACHE
-========================================================= */
-
-function loadDashboardCache() {
-
-    if (
-        !currentUser
-    ) {
-
-        return false;
-
-    }
-
-
-    try {
-
-        const raw =
-            localStorage.getItem(
-
-                getDashboardCacheKey(
-                    currentUser.uid
-                )
-
-            );
-
-
-        if (!raw) {
-
-            return false;
-
-        }
-
-
-        const cache =
-            JSON.parse(raw);
-
-
-        if (!cache) {
-
-            return false;
-
-        }
-
-
-        /*
-         * PROFILE
-         */
-
-        if (
-            cache.profile
-        ) {
-
-            currentProfile = {
-
-                ...cache.profile,
-
-                ...currentProfile
-
-            };
-
-
-            renderProfile();
-
-        }
-
-
-        /*
-         * USERS
-         */
-
-        if (
-            Array.isArray(
-                cache.users
-            )
-        ) {
-
-            onlineUsers =
-                cache.users;
-
-
-            renderOnline();
-
-        }
-
-
-        /*
-         * PRIVATE CHATS
-         */
-
-        if (
-            Array.isArray(
-                cache.chats
-            )
-        ) {
-
-            recentChats =
-                cache.chats;
-
-        }
-
-
-        /*
-         * GROUPS
-         */
-
-        if (
-            Array.isArray(
-                cache.groups
-            )
-        ) {
-
-            recentGroups =
-                cache.groups;
-
-        }
-
-
-        /*
-         * UNIFIED RECENT CHATS
-         */
-
-        if (
-            recentChats.length ||
-            recentGroups.length
-        ) {
-
-            mergeRecentChats();
-
-        }
-
-
-        return true;
-
-
-    } catch (error) {
-
-        console.warn(
-            "[CONNECTA] Dashboard cache load failed:",
-            error
-        );
-
-
-        return false;
-
-    }
-
-}
-
-
-/* =========================================================
-   PROFILE CACHE
-========================================================= */
-
-function getProfileCache() {
-
-    try {
-
-        return JSON.parse(
-
-            localStorage.getItem(
-                PROFILE_CACHE_KEY
-            ) || "{}"
-
-        );
-
-    } catch {
-
-        return {};
-
-    }
-
-}
-
-
-function saveProfileToCache(
-    profile
-) {
-
-    if (
-        !profile?.uid
-    ) {
-
-        return;
-
-    }
-
-
-    try {
-
-        const cache =
-            getProfileCache();
-
-
-        cache[
-            profile.uid
-        ] = {
-
-            ...publicProfileData(
-                profile
-            ),
-
-            cachedAt:
-                Date.now()
-
-        };
-
-
-        localStorage.setItem(
-
-            PROFILE_CACHE_KEY,
-
-            JSON.stringify(
-                cache
-            )
-
-        );
-
-    } catch {
-
-        /* Ignore cache errors */
-
-    }
-
-}
-
-
-function getCachedProfile(
-    uid
-) {
-
-    if (!uid) {
-
-        return null;
-
-    }
-
-
-    try {
-
-        const cache =
-            getProfileCache();
-
-
-        return (
-            cache[uid] ||
-            null
-        );
-
-    } catch {
-
-        return null;
-
-    }
-
-}
-
-
-/* =========================================================
-   INITIALS
-========================================================= */
-
-function initials(
-    name = "U"
-) {
-
-    const parts =
-        String(name)
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean);
-
-
-    if (
-        !parts.length
-    ) {
-
-        return "U";
-
-    }
-
-
-    if (
-        parts.length === 1
-    ) {
-
-        return parts[0]
-            .slice(0, 2)
-            .toUpperCase();
-
-    }
-
-
-    return (
-
-        parts[0][0] +
-
-        parts[
-            parts.length - 1
-        ][0]
-
-    ).toUpperCase();
-
-}
-
-
-/* =========================================================
-   FULL NAME
-========================================================= */
-
-function getFullName(
-    user = {}
-) {
-
-    const displayName =
-        String(
-            user.displayName || ""
-        ).trim();
-
-
-    if (
-        displayName &&
-        displayName !== "CONNECTA User"
-    ) {
-
-        return displayName;
-
-    }
-
-
-    const firstName =
-        String(
-            user.firstName || ""
-        ).trim();
-
-
-    const lastName =
-        String(
-            user.lastName || ""
-        ).trim();
-
-
-    const fullName =
-        `${firstName} ${lastName}`.trim();
-
-
-    if (fullName) {
-
-        return fullName;
-
-    }
-
-
-    const username =
-        String(
-            user.username || ""
-        ).trim();
-
-
-    if (username) {
-
-        return username.replace(
-            /^@/,
-            ""
-        );
-
-    }
-
-
-    return "CONNECTA User";
-
-}
-
-
-/* =========================================================
-   ESCAPE HTML
-========================================================= */
-
-function escapeHtml(
-    value
-) {
-
-    return String(
-        value ?? ""
-    )
-        .replace(
-            /[&<>"']/g,
-            character => ({
-
-                "&":
-                    "&amp;",
-
-                "<":
-                    "&lt;",
-
-                ">":
-                    "&gt;",
-
-                '"':
-                    "&quot;",
-
-                "'":
-                    "&#039;"
-
-            }[character])
-        );
-
-}
-
-
-/* =========================================================
-   VERIFIED BADGE
-========================================================= */
-
-function verifiedBadge(
-    user
-) {
-
-    if (
-        user?.isVerified !== true
-    ) {
-
-        return "";
-
-    }
-
-
-    return `
-
-        <span
-            class="verified-badge"
-            title="Verified account"
-            aria-label="Verified account"
-        >
-            ✓
-        </span>
-
-    `;
-
-}
-
-
-/* =========================================================
-   TIMESTAMP
-========================================================= */
-
-function timestampToDate(
-    value
-) {
-
-    if (!value) {
-
-        return null;
-
-    }
-
-
-    if (
-        value instanceof Date
-    ) {
-
-        return value;
-
-    }
-
-
-    if (
-        typeof value === "number"
-    ) {
-
-        const date =
-            new Date(value);
-
-
-        return Number.isNaN(
-            date.getTime()
-        )
-            ? null
-            : date;
-
-    }
-
-
-    if (
-        typeof value?.toDate ===
-        "function"
-    ) {
-
-        return value.toDate();
-
-    }
-
-
-    if (
-        typeof value?.seconds ===
-        "number"
-    ) {
-
-        return new Date(
-            value.seconds * 1000
-        );
-
-    }
-
-
-    if (
-        typeof value?._seconds ===
-        "number"
-    ) {
-
-        return new Date(
-            value._seconds * 1000
-        );
-
-    }
-
-
-    if (
-        typeof value === "string"
-    ) {
-
-        const date =
-            new Date(value);
-
-
-        return Number.isNaN(
-            date.getTime()
-        )
-            ? null
-            : date;
-
-    }
-
-
-    return null;
-
-}
-
-
-/* =========================================================
-   FORMAT TIME
-========================================================= */
-
-function formatTimestamp(
-    value
-) {
-
-    const date =
-        timestampToDate(value);
-
-
-    if (!date) {
-
-        return "";
-
-    }
-
-
-    const now =
-        new Date();
-
-
-    if (
-        date.toDateString() ===
-        now.toDateString()
-    ) {
-
-        return date.toLocaleTimeString(
-            [],
-            {
-                hour:
-                    "numeric",
-
-                minute:
-                    "2-digit"
-            }
-        );
-
-    }
-
-
-    const yesterday =
-        new Date();
-
-
-    yesterday.setDate(
-        yesterday.getDate() - 1
-    );
-
-
-    if (
-        date.toDateString() ===
-        yesterday.toDateString()
-    ) {
-
-        return "Yesterday";
-
-    }
-
-
-    return date.toLocaleDateString(
-        [],
-        {
-            day:
-                "numeric",
-
-            month:
-                "short"
-        }
-    );
-
-}
-
-
-/* =========================================================
    TOAST
 ========================================================= */
 
-function showToast(
-    message
-) {
+function showToast(message) {
 
     const toast =
         $("toast");
 
 
     if (!toast) {
-
         return;
-
     }
 
 
     toast.textContent =
-        message || "";
+        message;
 
 
     toast.classList.add(
@@ -6862,3048 +3914,8 @@ function showToast(
                 );
 
             },
-            2500
+            2600
         );
-
-}
-
-
-/* =========================================================
-   ACCOUNT CONTROL
-========================================================= */
-
-function getAccountControl(
-    profile
-) {
-
-    if (!profile) {
-
-        return {
-
-            blocked:
-                true,
-
-            status:
-                "unknown",
-
-            message:
-                "Your account could not be verified."
-
-        };
-
-    }
-
-
-    const status =
-        String(
-            profile.status ||
-            "active"
-        )
-            .trim()
-            .toLowerCase();
-
-
-    if (
-        status === "banned"
-    ) {
-
-        return {
-
-            blocked:
-                true,
-
-            status:
-                "banned",
-
-            message:
-                "Your CONNECTA account has been banned."
-
-        };
-
-    }
-
-
-    if (
-        status === "suspended"
-    ) {
-
-        return {
-
-            blocked:
-                true,
-
-            status:
-                "suspended",
-
-            message:
-                "Your CONNECTA account is currently suspended."
-
-        };
-
-    }
-
-
-    return {
-
-        blocked:
-            false,
-
-        status:
-            "active",
-
-        message:
-            ""
-
-    };
-
-}
-
-
-/* =========================================================
-   BLOCKED SCREEN
-========================================================= */
-
-function showAccountBlockedScreen(
-    control
-) {
-
-    stopDashboardListeners();
-
-
-    document.body.innerHTML = `
-
-        <div
-            style="
-                min-height:100vh;
-                display:flex;
-                align-items:center;
-                justify-content:center;
-                padding:24px;
-                background:#f4f8f5;
-                font-family:Arial,sans-serif;
-            "
-        >
-
-            <div
-                style="
-                    width:min(430px,100%);
-                    background:#fff;
-                    border-radius:24px;
-                    padding:32px 24px;
-                    text-align:center;
-                    box-shadow:0 15px 45px rgba(0,0,0,.08);
-                "
-            >
-
-                <div
-                    style="
-                        width:64px;
-                        height:64px;
-                        border-radius:50%;
-                        margin:0 auto 18px;
-                        display:flex;
-                        align-items:center;
-                        justify-content:center;
-                        background:#fff1f2;
-                        font-size:30px;
-                    "
-                >
-                    🔒
-                </div>
-
-                <h2
-                    style="
-                        margin:0 0 10px;
-                        color:#17211b;
-                    "
-                >
-                    ${
-                        control.status === "banned"
-                            ? "Account Banned"
-                            : "Account Suspended"
-                    }
-                </h2>
-
-                <p
-                    style="
-                        margin:0;
-                        line-height:1.6;
-                        color:#718078;
-                        font-size:14px;
-                    "
-                >
-                    ${escapeHtml(
-                        control.message
-                    )}
-                </p>
-
-                <button
-                    id="blockedLogout"
-                    style="
-                        width:100%;
-                        margin-top:22px;
-                        border:0;
-                        border-radius:14px;
-                        padding:13px;
-                        background:#16a34a;
-                        color:#fff;
-                        font-weight:800;
-                    "
-                >
-                    Logout
-                </button>
-
-            </div>
-
-        </div>
-
-    `;
-
-
-    $("blockedLogout")?.addEventListener(
-        "click",
-        () => logout(true)
-    );
-
-}
-
-
-/* =========================================================
-   AVATAR RENDER
-========================================================= */
-
-function renderAvatarElement(
-    element,
-    user
-) {
-
-    if (!element) {
-
-        return;
-
-    }
-
-
-    const name =
-        getFullName(user);
-
-
-    const photo =
-        user?.photoURL ||
-        user?.photoUrl ||
-        "";
-
-
-    if (photo) {
-
-        element.innerHTML = `
-
-            <img
-                src="${escapeHtml(photo)}"
-                alt="${escapeHtml(name)}"
-            >
-
-        `;
-
-    } else {
-
-        element.textContent =
-            initials(name);
-
-    }
-
-}
-
-
-/* =========================================================
-   RENDER PROFILE
-========================================================= */
-
-function renderProfile() {
-
-    if (!currentProfile) {
-
-        return;
-
-    }
-
-
-    const name =
-        getFullName(
-            currentProfile
-        );
-
-
-    const welcomeName =
-        $("welcomeName");
-
-
-    const welcomeAvatar =
-        $("welcomeAvatar");
-
-
-    const profileBtn =
-        $("profileBtn");
-
-
-    const menuAvatar =
-        $("menuAvatar");
-
-
-    const menuName =
-        $("menuName");
-
-
-    const menuUsername =
-        $("menuUsername");
-
-
-    const balanceAmount =
-        $("balanceAmount");
-
-
-    if (welcomeName) {
-
-        welcomeName.textContent =
-            name;
-
-    }
-
-
-    if (balanceAmount) {
-
-        balanceAmount.textContent =
-            Number(
-                currentProfile.balance ||
-                0
-            ).toLocaleString(
-                "en-KE",
-                {
-                    minimumFractionDigits:
-                        0,
-
-                    maximumFractionDigits:
-                        2
-                }
-            );
-
-    }
-
-
-    if (menuName) {
-
-        menuName.textContent =
-            name;
-
-    }
-
-
-    if (menuUsername) {
-
-        menuUsername.textContent =
-            currentProfile.username
-
-                ? `@${String(
-                    currentProfile.username
-                ).replace(
-                    /^@/,
-                    ""
-                )}`
-
-                : "";
-
-    }
-
-
-    renderAvatarElement(
-        welcomeAvatar,
-        currentProfile
-    );
-
-
-    renderAvatarElement(
-        menuAvatar,
-        currentProfile
-    );
-
-
-    renderAvatarElement(
-        profileBtn,
-        currentProfile
-    );
-
-
-    if (profileBtn) {
-
-        profileBtn.setAttribute(
-            "aria-label",
-            `${name} profile`
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   RENDER ONLINE USERS
-========================================================= */
-
-function renderOnline(
-    usersToRender = onlineUsers
-) {
-
-    const box =
-        $("onlineUsers");
-
-
-    if (!box) {
-
-        return;
-
-    }
-
-
-    hideOnlineSkeleton();
-
-
-    /*
-     * Online count should show actual online users,
-     * not the total users displayed.
-     */
-
-    const onlineCount =
-        onlineUsers.filter(
-            user =>
-                user.isOnline === true
-        ).length;
-
-
-    const countElement =
-        $("onlineCount");
-
-
-    if (countElement) {
-
-        countElement.textContent =
-            `(${onlineCount})`;
-
-    }
-
-
-    if (!usersToRender.length) {
-
-        box.innerHTML = `
-
-            <div class="empty-state small">
-
-                No users found.
-
-            </div>
-
-        `;
-
-
-        return;
-
-    }
-
-
-    const users =
-        [...usersToRender]
-            .sort(
-                (a, b) => {
-
-                    /*
-                     * Current user first.
-                     */
-
-                    if (
-                        a.uid ===
-                        currentUser?.uid
-                    ) {
-
-                        return -1;
-
-                    }
-
-
-                    if (
-                        b.uid ===
-                        currentUser?.uid
-                    ) {
-
-                        return 1;
-
-                    }
-
-
-                    /*
-                     * Online users before offline.
-                     */
-
-                    if (
-                        a.isOnline !==
-                        b.isOnline
-                    ) {
-
-                        return a.isOnline
-                            ? -1
-                            : 1;
-
-                    }
-
-
-                    return getFullName(a)
-                        .localeCompare(
-                            getFullName(b)
-                        );
-
-                }
-            );
-
-
-    box.innerHTML =
-        users
-            .map(
-                user => {
-
-                    const name =
-                        getFullName(user);
-
-
-                    const isSelf =
-                        user.uid ===
-                        currentUser?.uid;
-
-
-                    const following =
-                        Array.isArray(
-                            currentProfile?.following
-                        ) &&
-                        currentProfile.following.includes(
-                            user.uid
-                        );
-
-
-                    const photo =
-                        user.photoURL ||
-                        user.photoUrl ||
-                        "";
-
-
-                    return `
-
-                        <div
-                            class="user-card"
-                            data-uid="${escapeHtml(
-                                user.uid
-                            )}"
-                        >
-
-                            <div
-                                class="user-card-profile"
-                            >
-
-                                <div
-                                    class="
-                                        avatar
-                                        large
-                                        ${
-                                            user.isOnline
-                                                ? "avatar-green"
-                                                : ""
-                                        }
-                                    "
-                                >
-
-                                    ${
-                                        photo
-
-                                            ? `
-                                                <img
-                                                    src="${escapeHtml(
-                                                        photo
-                                                    )}"
-                                                    alt="${escapeHtml(
-                                                        name
-                                                    )}"
-                                                    loading="lazy"
-                                                >
-                                              `
-
-                                            : escapeHtml(
-                                                initials(name)
-                                            )
-                                    }
-
-                                </div>
-
-
-                                <strong>
-
-                                    ${escapeHtml(
-                                        name
-                                    )}
-
-                                    ${verifiedBadge(
-                                        user
-                                    )}
-
-                                </strong>
-
-
-                                <small
-                                    class="
-                                        online-text
-                                        ${
-                                            user.isOnline
-                                                ? "online"
-                                                : "offline"
-                                        }
-                                    "
-                                >
-
-                                    <span
-                                        class="
-                                            status-dot
-                                            ${
-                                                user.isOnline
-                                                    ? "online"
-                                                    : "offline"
-                                            }
-                                        "
-                                    ></span>
-
-                                    ${
-                                        user.isOnline
-                                            ? "Online"
-                                            : "Offline"
-                                    }
-
-                                </small>
-
-
-                                ${
-                                    !isSelf
-
-                                        ? `
-
-                                            <button
-                                                class="
-                                                    follow-btn
-                                                    ${
-                                                        following
-                                                            ? "following"
-                                                            : ""
-                                                    }
-                                                "
-                                                data-follow-uid="${escapeHtml(
-                                                    user.uid
-                                                )}"
-                                            >
-
-                                                ${
-                                                    following
-                                                        ? "Following"
-                                                        : "Follow"
-                                                }
-
-                                            </button>
-
-                                          `
-
-                                        : ""
-                                }
-
-                            </div>
-
-                        </div>
-
-                    `;
-
-                }
-            )
-            .join("");
-
-
-    /*
-     * Profile navigation.
-     */
-
-    box
-        .querySelectorAll(
-            ".user-card"
-        )
-        .forEach(
-            card => {
-
-                card.addEventListener(
-                    "click",
-                    event => {
-
-                        if (
-                            event.target.closest(
-                                ".follow-btn"
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        const uid =
-                            card.dataset.uid;
-
-
-                        if (!uid) {
-
-                            return;
-
-                        }
-
-
-                        location.href =
-                            `profile.html?uid=${encodeURIComponent(
-                                uid
-                            )}`;
-
-                    }
-                );
-
-            }
-        );
-
-
-    /*
-     * Follow buttons.
-     */
-
-    box
-        .querySelectorAll(
-            "[data-follow-uid]"
-        )
-        .forEach(
-            button => {
-
-                button.addEventListener(
-                    "click",
-                    async event => {
-
-                        event.stopPropagation();
-
-
-                        await toggleFollow(
-                            button.dataset.followUid
-                        );
-
-                    }
-                );
-
-            }
-        );
-
-}
-
-
-/* =========================================================
-   FOLLOW
-========================================================= */
-
-async function toggleFollow(
-    targetUid
-) {
-
-    if (
-        !currentUser ||
-        !targetUid ||
-        targetUid === currentUser.uid
-    ) {
-
-        return;
-
-    }
-
-
-    try {
-
-        const currentRef =
-            doc(
-                db,
-                "users",
-                currentUser.uid
-            );
-
-
-        const targetRef =
-            doc(
-                db,
-                "users",
-                targetUid
-            );
-
-
-        await runTransaction(
-            db,
-            async transaction => {
-
-                const currentSnap =
-                    await transaction.get(
-                        currentRef
-                    );
-
-
-                const targetSnap =
-                    await transaction.get(
-                        targetRef
-                    );
-
-
-                if (
-                    !currentSnap.exists() ||
-                    !targetSnap.exists()
-                ) {
-
-                    throw new Error(
-                        "User profile not found."
-                    );
-
-                }
-
-
-                const currentData =
-                    currentSnap.data();
-
-
-                const targetData =
-                    targetSnap.data();
-
-
-                const following =
-                    Array.isArray(
-                        currentData.following
-                    )
-                        ? [
-                            ...currentData.following
-                        ]
-                        : [];
-
-
-                const targetFollowers =
-                    Array.isArray(
-                        targetData.followers
-                    )
-                        ? [
-                            ...targetData.followers
-                        ]
-                        : [];
-
-
-                const alreadyFollowing =
-                    following.includes(
-                        targetUid
-                    );
-
-
-                if (
-                    alreadyFollowing
-                ) {
-
-                    const nextFollowing =
-                        following.filter(
-                            uid =>
-                                uid !==
-                                targetUid
-                        );
-
-
-                    const nextFollowers =
-                        targetFollowers.filter(
-                            uid =>
-                                uid !==
-                                currentUser.uid
-                        );
-
-
-                    transaction.update(
-                        currentRef,
-                        {
-
-                            following:
-                                nextFollowing,
-
-                            followingCount:
-                                Math.max(
-                                    0,
-                                    Number(
-                                        currentData.followingCount ||
-                                        0
-                                    ) - 1
-                                )
-
-                        }
-                    );
-
-
-                    transaction.update(
-                        targetRef,
-                        {
-
-                            followers:
-                                nextFollowers,
-
-                            followersCount:
-                                Math.max(
-                                    0,
-                                    Number(
-                                        targetData.followersCount ||
-                                        0
-                                    ) - 1
-                                )
-
-                        }
-                    );
-
-                } else {
-
-                    following.push(
-                        targetUid
-                    );
-
-
-                    if (
-                        !targetFollowers.includes(
-                            currentUser.uid
-                        )
-                    ) {
-
-                        targetFollowers.push(
-                            currentUser.uid
-                        );
-
-                    }
-
-
-                    transaction.update(
-                        currentRef,
-                        {
-
-                            following,
-
-                            followingCount:
-                                Number(
-                                    currentData.followingCount ||
-                                    0
-                                ) + 1
-
-                        }
-                    );
-
-
-                    transaction.update(
-                        targetRef,
-                        {
-
-                            followers:
-                                targetFollowers,
-
-                            followersCount:
-                                Number(
-                                    targetData.followersCount ||
-                                    0
-                                ) + 1
-
-                        }
-                    );
-
-                }
-
-            }
-        );
-
-
-        /*
-         * Refresh own profile.
-         */
-
-        const profileSnap =
-            await getDoc(
-                doc(
-                    db,
-                    "users",
-                    currentUser.uid
-                )
-            );
-
-
-        if (
-            profileSnap.exists()
-        ) {
-
-            currentProfile = {
-
-                uid:
-                    currentUser.uid,
-
-                ...profileSnap.data()
-
-            };
-
-
-            saveProfileToCache(
-                currentProfile
-            );
-
-
-            renderProfile();
-
-        }
-
-
-        renderOnline();
-
-        saveDashboardCache();
-
-
-    } catch (error) {
-
-        console.error(
-            "[CONNECTA] Follow error:",
-            error
-        );
-
-
-        showToast(
-            error?.message ||
-            "Could not update follow status."
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   GET USER PROFILE
-========================================================= */
-
-async function getUserProfile(
-    uid
-) {
-
-    if (!uid) {
-
-        return null;
-
-    }
-
-
-    /*
-     * Live users are the fastest source.
-     */
-
-    const live =
-        onlineUsers.find(
-            user =>
-                user.uid === uid
-        );
-
-
-    if (live) {
-
-        return live;
-
-    }
-
-
-    /*
-     * Cached profile.
-     */
-
-    const cached =
-        getCachedProfile(uid);
-
-
-    if (cached) {
-
-        return {
-
-            uid,
-
-            ...cached
-
-        };
-
-    }
-
-
-    try {
-
-        const snapshot =
-            await getDoc(
-                doc(
-                    db,
-                    "users",
-                    uid
-                )
-            );
-
-
-        if (
-            !snapshot.exists()
-        ) {
-
-            return null;
-
-        }
-
-
-        const profile = {
-
-            uid,
-
-            ...snapshot.data()
-
-        };
-
-
-        saveProfileToCache(
-            profile
-        );
-
-
-        return profile;
-
-    } catch {
-
-        return null;
-
-    }
-
-}
-
-
-/* =========================================================
-   REFRESH USER PROFILE
-========================================================= */
-
-async function refreshUserProfile(
-    uid
-) {
-
-    if (!uid) {
-
-        return null;
-
-    }
-
-
-    try {
-
-        const snapshot =
-            await getDoc(
-                doc(
-                    db,
-                    "users",
-                    uid
-                )
-            );
-
-
-        if (
-            !snapshot.exists()
-        ) {
-
-            return null;
-
-        }
-
-
-        const profile = {
-
-            uid,
-
-            ...snapshot.data()
-
-        };
-
-
-        saveProfileToCache(
-            profile
-        );
-
-
-        recentChats =
-            recentChats.map(
-                chat => {
-
-                    if (
-                        chat.otherUid !== uid
-                    ) {
-
-                        return chat;
-
-                    }
-
-
-                    return {
-
-                        ...chat,
-
-                        otherUserName:
-                            getFullName(
-                                profile
-                            ),
-
-                        otherUserPhoto:
-                            profile.photoURL ||
-                            profile.photoUrl ||
-                            "",
-
-                        otherUserVerified:
-                            profile.isVerified === true
-
-                    };
-
-                }
-            );
-
-
-        recentGroups =
-            recentGroups.map(
-                group => {
-
-                    if (
-                        group.lastMessageSenderId !==
-                        uid
-                    ) {
-
-                        return group;
-
-                    }
-
-
-                    return {
-
-                        ...group,
-
-                        lastMessageSenderName:
-                            getFullName(
-                                profile
-                            ),
-
-                        lastMessageSenderVerified:
-                            profile.isVerified === true
-
-                    };
-
-                }
-            );
-
-
-        mergeRecentChats();
-
-
-        return profile;
-
-    } catch {
-
-        return null;
-
-    }
-
-}
-
-
-/* =========================================================
-   PRIVATE CHAT LISTENER
-========================================================= */
-
-function listenToChats(
-    uid
-) {
-
-    if (stopChats) {
-
-        stopChats();
-
-        stopChats = null;
-
-    }
-
-
-    const chatsQuery =
-        query(
-
-            collection(
-                db,
-                "chats"
-            ),
-
-            orderBy(
-                "updatedAt",
-                "desc"
-            ),
-
-            limit(50)
-
-        );
-
-
-    stopChats =
-        onSnapshot(
-
-            chatsQuery,
-
-            async snapshot => {
-
-                const result = [];
-
-
-                for (
-                    const chatDoc
-                    of snapshot.docs
-                ) {
-
-                    const data =
-                        chatDoc.data();
-
-
-                    if (
-                        !Array.isArray(
-                            data.participants
-                        ) ||
-                        !data.participants.includes(
-                            uid
-                        )
-                    ) {
-
-                        continue;
-
-                    }
-
-
-                    const otherUid =
-                        data.participants.find(
-                            participant =>
-                                participant !== uid
-                        );
-
-
-                    if (!otherUid) {
-
-                        continue;
-
-                    }
-
-
-                    let profile =
-                        onlineUsers.find(
-                            user =>
-                                user.uid ===
-                                otherUid
-                        );
-
-
-                    if (!profile) {
-
-                        profile =
-                            getCachedProfile(
-                                otherUid
-                            );
-
-                    }
-
-
-                    const name =
-                        profile
-                            ? getFullName(profile)
-                            : (
-                                data.otherUserName ||
-                                "CONNECTA User"
-                            );
-
-
-                    const photo =
-                        profile?.photoURL ||
-                        profile?.photoUrl ||
-                        data.otherUserPhoto ||
-                        "";
-
-
-                    const verified =
-                        profile?.isVerified === true ||
-                        data.otherUserVerified === true;
-
-
-                    const unread =
-                        Number(
-                            data.unreadCount?.[uid] ||
-                            data.unread?.[uid] ||
-                            0
-                        );
-
-
-                    const lastSenderId =
-                        data.lastSenderId ||
-                        data.lastMessageSenderId ||
-                        "";
-
-
-                    const lastMessageType =
-                        data.lastMessageType ||
-                        "text";
-
-
-                    let preview =
-                        data.lastMessage ||
-                        "";
-
-
-                    if (
-                        lastMessageType ===
-                        "image"
-                    ) {
-
-                        preview =
-                            "📷 Photo";
-
-                    }
-
-
-                    if (
-                        !preview
-                    ) {
-
-                        preview =
-                            lastSenderId === uid
-                                ? "You started a conversation"
-                                : "Start a conversation";
-
-                    }
-
-
-                    result.push({
-
-                        type:
-                            "private",
-
-                        chatId:
-                            chatDoc.id,
-
-                        otherUid,
-
-                        otherUserName:
-                            name,
-
-                        otherUserPhoto:
-                            photo,
-
-                        otherUserVerified:
-                            verified,
-
-                        lastMessage:
-                            preview,
-
-                        lastMessageType,
-
-                        lastSenderId,
-
-                        unread,
-
-                        lastMessageAt:
-                            data.updatedAt ||
-                            data.lastMessageAt ||
-                            null,
-
-                        updatedAt:
-                            data.updatedAt ||
-                            null
-
-                    });
-
-                }
-
-
-                recentChats =
-                    result;
-
-
-                /*
-                 * IMPORTANT:
-                 * Use unified rendering.
-                 */
-
-                mergeRecentChats();
-
-
-                /*
-                 * Refresh profiles in background.
-                 */
-
-                result.forEach(
-                    chat => {
-
-                        refreshUserProfile(
-                            chat.otherUid
-                        );
-
-                    }
-                );
-
-            },
-
-            error => {
-
-                console.error(
-                    "[CONNECTA] Private chat listener:",
-                    error
-                );
-
-
-                /*
-                 * Keep groups visible even if
-                 * private chats fail.
-                 */
-
-                mergeRecentChats();
-
-            }
-
-        );
-
-}
-
-
-/* =========================================================
-   GROUP UNREAD COUNT
-========================================================= */
-
-async function getGroupUnreadCount(
-    groupId,
-    readData
-) {
-
-    if (
-        !groupId ||
-        !currentUser
-    ) {
-
-        return 0;
-
-    }
-
-
-    try {
-
-        const messagesRef =
-            collection(
-                db,
-                "groups",
-                groupId,
-                "groupMessages"
-            );
-
-
-        /*
-         * Read the latest messages.
-         *
-         * This avoids requiring a Firestore composite
-         * index for createdAt > date + orderBy.
-         */
-
-        const messagesQuery =
-            query(
-
-                messagesRef,
-
-                orderBy(
-                    "createdAt",
-                    "desc"
-                ),
-
-                limit(100)
-
-            );
-
-
-        const snapshot =
-            await getDocs(
-                messagesQuery
-            );
-
-
-        const readDate =
-            timestampToDate(
-                readData?.lastReadAt
-            );
-
-
-        return snapshot.docs.filter(
-            messageDoc => {
-
-                const data =
-                    messageDoc.data();
-
-
-                /*
-                 * Don't count own messages.
-                 */
-
-                if (
-                    data.senderId ===
-                    currentUser.uid
-                ) {
-
-                    return false;
-
-                }
-
-
-                /*
-                 * Never opened.
-                 */
-
-                if (!readDate) {
-
-                    return true;
-
-                }
-
-
-                const messageDate =
-                    timestampToDate(
-                        data.createdAt
-                    );
-
-
-                if (!messageDate) {
-
-                    return false;
-
-                }
-
-
-                return (
-                    messageDate.getTime() >
-                    readDate.getTime()
-                );
-
-            }
-        ).length;
-
-
-    } catch (error) {
-
-        console.warn(
-            `[CONNECTA] Group unread count failed for ${groupId}:`,
-            error
-        );
-
-
-        return 0;
-
-    }
-
-}
-
-
-/* =========================================================
-   PROCESS GROUPS
-========================================================= */
-
-async function processGroups() {
-
-    const version =
-        ++groupProcessVersion;
-
-
-    if (!currentUser) {
-
-        return;
-
-    }
-
-
-    const allGroups =
-        new Map();
-
-
-    [
-        ...groupListeners.memberIds,
-        ...groupListeners.members,
-        ...groupListeners.owned
-    ]
-        .forEach(
-            groupDoc => {
-
-                if (
-                    !groupDoc?.id
-                ) {
-
-                    return;
-
-                }
-
-
-                allGroups.set(
-
-                    groupDoc.id,
-
-                    {
-
-                        groupId:
-                            groupDoc.id,
-
-                        ...groupDoc.data()
-
-                    }
-
-                );
-
-            }
-        );
-
-
-    const groups =
-        Array.from(
-            allGroups.values()
-        );
-
-
-    const enriched = [];
-
-
-    for (
-        const group
-        of groups
-    ) {
-
-        const isMember =
-
-            (
-                Array.isArray(
-                    group.memberIds
-                ) &&
-                group.memberIds.includes(
-                    currentUser.uid
-                )
-            )
-
-            ||
-
-            (
-                Array.isArray(
-                    group.members
-                ) &&
-                group.members.includes(
-                    currentUser.uid
-                )
-            )
-
-            ||
-
-            group.ownerId ===
-            currentUser.uid;
-
-
-        if (!isMember) {
-
-            continue;
-
-        }
-
-
-        let readData = null;
-
-
-        try {
-
-            const readSnapshot =
-                await getDoc(
-                    doc(
-                        db,
-                        "groups",
-                        group.groupId,
-                        "reads",
-                        currentUser.uid
-                    )
-                );
-
-
-            if (
-                readSnapshot.exists()
-            ) {
-
-                readData =
-                    readSnapshot.data();
-
-            }
-
-        } catch {
-
-            readData = null;
-
-        }
-
-
-        const unread =
-            await getGroupUnreadCount(
-                group.groupId,
-                readData
-            );
-
-
-        let senderProfile =
-            null;
-
-
-        if (
-            group.lastMessageSenderId
-        ) {
-
-            senderProfile =
-                onlineUsers.find(
-                    user =>
-                        user.uid ===
-                        group.lastMessageSenderId
-                ) ||
-
-                getCachedProfile(
-                    group.lastMessageSenderId
-                );
-
-        }
-
-
-        const senderName =
-            group.lastMessageSenderName ||
-
-            (
-                senderProfile
-                    ? getFullName(
-                        senderProfile
-                    )
-                    : "User"
-            );
-
-
-        const senderVerified =
-            group.lastMessageSenderVerified ===
-                true ||
-
-            senderProfile?.isVerified ===
-                true;
-
-
-        enriched.push({
-
-            type:
-                "group",
-
-            groupId:
-                group.groupId,
-
-            groupName:
-                group.name ||
-                "Group",
-
-            photoURL:
-                group.photoURL ||
-                "",
-
-            lastMessage:
-                group.lastMessage ||
-                "",
-
-            lastMessageType:
-                group.lastMessageType ||
-                "",
-
-            lastMessageSenderId:
-                group.lastMessageSenderId ||
-                "",
-
-            lastMessageSenderName:
-                senderName,
-
-            lastMessageSenderVerified:
-                senderVerified,
-
-            lastMessageAt:
-                group.lastMessageAt ||
-                group.updatedAt ||
-                null,
-
-            updatedAt:
-                group.updatedAt ||
-                null,
-
-            unread,
-
-            readData,
-
-            status:
-                group.status ||
-                "",
-
-            chatLocked:
-                group.chatLocked === true
-
-        });
-
-    }
-
-
-    /*
-     * Ignore old async processing.
-     */
-
-    if (
-        version !==
-        groupProcessVersion
-    ) {
-
-        return;
-
-    }
-
-
-    recentGroups =
-        enriched;
-
-
-    /*
-     * Group badge.
-     */
-
-    const groupUnread =
-        recentGroups.reduce(
-            (
-                total,
-                group
-            ) =>
-                total +
-                Number(
-                    group.unread || 0
-                ),
-            0
-        );
-
-
-    const groupBadge =
-        $("groupBadge");
-
-
-    if (groupBadge) {
-
-        if (groupUnread > 0) {
-
-            groupBadge.hidden =
-                false;
-
-            groupBadge.textContent =
-                groupUnread > 99
-                    ? "99+"
-                    : String(groupUnread);
-
-        } else {
-
-            groupBadge.hidden =
-                true;
-
-        }
-
-    }
-
-
-    mergeRecentChats();
-
-}
-
-
-/* =========================================================
-   QUEUE GROUP PROCESSING
-========================================================= */
-
-function queueGroupProcessing() {
-
-    clearTimeout(
-        groupProcessTimer
-    );
-
-
-    groupProcessTimer =
-        setTimeout(
-            () => {
-
-                processGroups()
-                    .catch(
-                        error => {
-
-                            console.error(
-                                "[CONNECTA] Group processing:",
-                                error
-                            );
-
-                        }
-                    );
-
-            },
-            80
-        );
-
-}
-
-
-/* =========================================================
-   GROUP LISTENER
-========================================================= */
-
-function listenToGroups(
-    uid
-) {
-
-    /*
-     * Remove previous listeners.
-     */
-
-    groupListeners.unsubscribers
-        .forEach(
-            unsubscribe => {
-
-                if (
-                    typeof unsubscribe ===
-                    "function"
-                ) {
-
-                    unsubscribe();
-
-                }
-
-            }
-        );
-
-
-    groupListeners = {
-
-        memberIds: [],
-        members: [],
-        owned: [],
-        unsubscribers: []
-
-    };
-
-
-    /*
-     * MEMBER IDS
-     */
-
-    const memberIdsQuery =
-        query(
-
-            collection(
-                db,
-                "groups"
-            ),
-
-            where(
-                "memberIds",
-                "array-contains",
-                uid
-            ),
-
-            limit(30)
-
-        );
-
-
-    /*
-     * MEMBERS
-     */
-
-    const membersQuery =
-        query(
-
-            collection(
-                db,
-                "groups"
-            ),
-
-            where(
-                "members",
-                "array-contains",
-                uid
-            ),
-
-            limit(30)
-
-        );
-
-
-    /*
-     * OWNER
-     */
-
-    const ownerQuery =
-        query(
-
-            collection(
-                db,
-                "groups"
-            ),
-
-            where(
-                "ownerId",
-                "==",
-                uid
-            ),
-
-            limit(30)
-
-        );
-
-
-    /*
-     * Initial fetch.
-     */
-
-    Promise.allSettled([
-
-        getDocs(
-            memberIdsQuery
-        ),
-
-        getDocs(
-            membersQuery
-        ),
-
-        getDocs(
-            ownerQuery
-        )
-
-    ])
-        .then(
-            results => {
-
-                const [
-                    memberIdsResult,
-                    membersResult,
-                    ownerResult
-                ] = results;
-
-
-                if (
-                    memberIdsResult.status ===
-                    "fulfilled"
-                ) {
-
-                    groupListeners.memberIds =
-                        memberIdsResult.value.docs;
-
-                }
-
-
-                if (
-                    membersResult.status ===
-                    "fulfilled"
-                ) {
-
-                    groupListeners.members =
-                        membersResult.value.docs;
-
-                }
-
-
-                if (
-                    ownerResult.status ===
-                    "fulfilled"
-                ) {
-
-                    groupListeners.owned =
-                        ownerResult.value.docs;
-
-                }
-
-
-                queueGroupProcessing();
-
-            }
-        );
-
-
-    /*
-     * LIVE memberIds.
-     */
-
-    const stopMemberIds =
-        onSnapshot(
-
-            memberIdsQuery,
-
-            snapshot => {
-
-                groupListeners.memberIds =
-                    snapshot.docs;
-
-                queueGroupProcessing();
-
-            },
-
-            error => {
-
-                console.warn(
-                    "[CONNECTA] memberIds group listener:",
-                    error
-                );
-
-            }
-
-        );
-
-
-    /*
-     * LIVE members.
-     */
-
-    const stopMembers =
-        onSnapshot(
-
-            membersQuery,
-
-            snapshot => {
-
-                groupListeners.members =
-                    snapshot.docs;
-
-                queueGroupProcessing();
-
-            },
-
-            error => {
-
-                console.warn(
-                    "[CONNECTA] members group listener:",
-                    error
-                );
-
-            }
-
-        );
-
-
-    /*
-     * LIVE owner groups.
-     */
-
-    const stopOwned =
-        onSnapshot(
-
-            ownerQuery,
-
-            snapshot => {
-
-                groupListeners.owned =
-                    snapshot.docs;
-
-                queueGroupProcessing();
-
-            },
-
-            error => {
-
-                console.warn(
-                    "[CONNECTA] owner group listener:",
-                    error
-                );
-
-            }
-
-        );
-
-
-    groupListeners.unsubscribers = [
-
-        stopMemberIds,
-        stopMembers,
-        stopOwned
-
-    ];
-
-}
-
-
-/* =========================================================
-   MERGE PRIVATE CHATS + GROUPS
-========================================================= */
-
-function mergeRecentChats() {
-
-    const combined = [
-
-        ...recentChats,
-
-        ...recentGroups
-
-    ];
-
-
-    /*
-     * Remove duplicate private chats/groups.
-     */
-
-    const unique =
-        new Map();
-
-
-    combined.forEach(
-        item => {
-
-            const key =
-                item.type === "group"
-
-                    ? `group:${item.groupId}`
-
-                    : `private:${item.chatId}`;
-
-
-            unique.set(
-                key,
-                item
-            );
-
-        }
-    );
-
-
-    const sorted =
-        Array.from(
-            unique.values()
-        );
-
-
-    sorted.sort(
-        (
-            first,
-            second
-        ) => {
-
-            const firstDate =
-                timestampToDate(
-                    first.lastMessageAt ||
-                    first.updatedAt
-                );
-
-
-            const secondDate =
-                timestampToDate(
-                    second.lastMessageAt ||
-                    second.updatedAt
-                );
-
-
-            const firstTime =
-                firstDate
-                    ? firstDate.getTime()
-                    : 0;
-
-
-            const secondTime =
-                secondDate
-                    ? secondDate.getTime()
-                    : 0;
-
-
-            return (
-                secondTime -
-                firstTime
-            );
-
-        }
-    );
-
-
-    renderChats(
-        sorted
-    );
-
-
-    saveDashboardCache();
-
-}
-
-
-/* =========================================================
-   CHAT AVATAR
-========================================================= */
-
-function chatAvatar(
-    name,
-    photo,
-    isGroup = false
-) {
-
-    if (photo) {
-
-        return `
-
-            <img
-                src="${escapeHtml(photo)}"
-                alt="${escapeHtml(name)}"
-                loading="lazy"
-            >
-
-        `;
-
-    }
-
-
-    return escapeHtml(
-        initials(name)
-    );
-
-}
-
-
-/* =========================================================
-   RENDER RECENT CHATS
-========================================================= */
-
-function renderChats(
-    chats
-) {
-
-    const box =
-        $("chatList");
-
-
-    if (!box) {
-
-        return;
-
-    }
-
-
-    hideChatSkeleton();
-
-
-    if (!chats.length) {
-
-        box.innerHTML = `
-
-            <div class="empty-state">
-
-                No conversations yet.
-
-            </div>
-
-        `;
-
-
-        return;
-
-    }
-
-
-    box.innerHTML =
-        chats
-            .map(
-                chat => {
-
-                    const isGroup =
-                        chat.type === "group";
-
-
-                    const name =
-                        isGroup
-
-                            ? (
-                                chat.groupName ||
-                                "Group"
-                            )
-
-                            : (
-                                chat.otherUserName ||
-                                "CONNECTA User"
-                            );
-
-
-                    const photo =
-                        isGroup
-
-                            ? (
-                                chat.photoURL ||
-                                ""
-                            )
-
-                            : (
-                                chat.otherUserPhoto ||
-                                ""
-                            );
-
-
-                    const unread =
-                        Number(
-                            chat.unread || 0
-                        );
-
-
-                    const time =
-                        formatTimestamp(
-                            chat.lastMessageAt ||
-                            chat.updatedAt
-                        );
-
-
-                    let preview =
-                        chat.lastMessage ||
-                        "";
-
-
-                    if (
-                        chat.lastMessageType ===
-                        "image"
-                    ) {
-
-                        preview =
-                            "📷 Photo";
-
-                    }
-
-
-                    if (
-                        !preview
-                    ) {
-
-                        preview =
-                            isGroup
-                                ? "No messages yet"
-                                : "Start a conversation";
-
-                    }
-
-
-                    /*
-                     * Group sender prefix.
-                     */
-
-                    let previewMarkup;
-
-
-                    if (
-                        isGroup &&
-                        chat.lastMessageSenderName
-                    ) {
-
-                        const senderBadge =
-                            chat.lastMessageSenderVerified
-
-                                ? verifiedBadge({
-                                    isVerified: true
-                                })
-
-                                : "";
-
-
-                        previewMarkup = `
-
-                            <span>
-
-                                ${escapeHtml(
-                                    chat.lastMessageSenderName
-                                )}
-
-                                ${senderBadge}
-
-                            </span>
-
-                            <span>
-                                :
-                                ${escapeHtml(
-                                    preview
-                                )}
-                            </span>
-
-                        `;
-
-                    } else {
-
-                        previewMarkup =
-                            escapeHtml(
-                                preview
-                            );
-
-                    }
-
-
-                    /*
-                     * Private chat verified badge.
-                     */
-
-                    const nameBadge =
-                        !isGroup
-
-                            ? verifiedBadge({
-
-                                isVerified:
-                                    chat.otherUserVerified
-
-                            })
-
-                            : "";
-
-
-                    return `
-
-                        <div
-                            class="
-                                chat-item
-                                chat-list-item
-                                ${isGroup ? "group-chat" : ""}
-                                ${
-                                    unread > 0
-                                        ? "unread"
-                                        : ""
-                                }
-                            "
-                            data-chat-type="${
-                                isGroup
-                                    ? "group"
-                                    : "private"
-                            }"
-                            data-chat-id="${escapeHtml(
-                                isGroup
-                                    ? chat.groupId
-                                    : chat.chatId
-                            )}"
-                            data-user-id="${escapeHtml(
-                                isGroup
-                                    ? ""
-                                    : chat.otherUid
-                            )}"
-                        >
-
-                            <div
-                                class="
-                                    avatar
-                                    ${
-                                        isGroup
-                                            ? "avatar-green"
-                                            : ""
-                                    }
-                                "
-                            >
-
-                                ${chatAvatar(
-                                    name,
-                                    photo,
-                                    isGroup
-                                )}
-
-                            </div>
-
-
-                            <div
-                                class="chat-copy"
-                            >
-
-                                <strong>
-
-                                    ${escapeHtml(
-                                        name
-                                    )}
-
-                                    ${nameBadge}
-
-                                </strong>
-
-
-                                <p>
-
-                                    ${previewMarkup}
-
-                                </p>
-
-                            </div>
-
-
-                            <div
-                                class="chat-meta"
-                            >
-
-                                <time>
-
-                                    ${escapeHtml(
-                                        time
-                                    )}
-
-                                </time>
-
-
-                                ${
-                                    unread > 0
-
-                                        ? `
-
-                                            <span
-                                                class="
-                                                    unread
-                                                    connecta-dashboard-unread
-                                                "
-                                            >
-                                                ${
-                                                    unread > 99
-                                                        ? "99+"
-                                                        : unread
-                                                }
-                                            </span>
-
-                                          `
-
-                                        : ""
-                                }
-
-                            </div>
-
-                        </div>
-
-                    `;
-
-                }
-            )
-            .join("");
-
-
-    /*
-     * Navigation.
-     */
-
-    box
-        .querySelectorAll(
-            ".chat-item"
-        )
-        .forEach(
-            item => {
-
-                item.addEventListener(
-                    "click",
-                    () => {
-
-                        const type =
-                            item.dataset.chatType;
-
-
-                        const chatId =
-                            item.dataset.chatId;
-
-
-                        const userId =
-                            item.dataset.userId;
-
-
-                        if (
-                            type === "group"
-                        ) {
-
-                            if (!chatId) {
-
-                                return;
-
-                            }
-
-
-                            location.href =
-                                `group-chat.html?groupId=${encodeURIComponent(
-                                    chatId
-                                )}`;
-
-
-                            return;
-
-                        }
-
-
-                        if (userId) {
-
-                            location.href =
-                                `chat.html?uid=${encodeURIComponent(
-                                    userId
-                                )}`;
-
-                        }
-
-                    }
-                );
-
-            }
-        );
-
-}
-
-
-/* =========================================================
-   SEARCH CHATS
-========================================================= */
-
-function searchChats(
-    term
-) {
-
-    const value =
-        String(
-            term || ""
-        )
-            .trim()
-            .toLowerCase();
-
-
-    if (!value) {
-
-        mergeRecentChats();
-
-        return;
-
-    }
-
-
-    const combined = [
-
-        ...recentChats,
-
-        ...recentGroups
-
-    ];
-
-
-    const filtered =
-        combined.filter(
-            chat => {
-
-                const text = [
-
-                    chat.groupName,
-
-                    chat.otherUserName,
-
-                    chat.lastMessage,
-
-                    chat.lastMessageSenderName,
-
-                    chat.otherUid
-
-                ]
-                    .filter(Boolean)
-                    .join(" ")
-                    .toLowerCase();
-
-
-                return text.includes(
-                    value
-                );
-
-            }
-        );
-
-
-    renderChats(
-        filtered
-    );
-
-}
-
-
-/* =========================================================
-   PRESENCE
-========================================================= */
-
-async function setPresence(
-    online
-) {
-
-    if (!currentUser) {
-
-        return;
-
-    }
-
-
-    try {
-
-        await setDoc(
-
-            doc(
-                db,
-                "users",
-                currentUser.uid
-            ),
-
-            {
-
-                isOnline:
-                    online === true,
-
-                lastSeen:
-                    serverTimestamp()
-
-            },
-
-            {
-                merge:
-                    true
-            }
-
-        );
-
-    } catch (error) {
-
-        console.warn(
-            "[CONNECTA] Presence update failed:",
-            error
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   VISIBILITY PRESENCE
-========================================================= */
-
-function handleVisibilityPresence() {
-
-    if (
-        document.visibilityState ===
-        "visible"
-    ) {
-
-        setPresence(true);
-
-    } else {
-
-        setPresence(false);
-
-    }
-
-}
-
-
-/* =========================================================
-   START PRESENCE
-========================================================= */
-
-function startPresence() {
-
-    if (!currentUser) {
-
-        return;
-
-    }
-
-
-    setPresence(true);
-
-
-    clearInterval(
-        presenceInterval
-    );
-
-
-    presenceInterval =
-        setInterval(
-            () => {
-
-                setPresence(true);
-
-            },
-            60000
-        );
-
-
-    document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityPresence
-    );
-
-
-    document.addEventListener(
-        "visibilitychange",
-        handleVisibilityPresence
-    );
-
-}
-
-
-/* =========================================================
-   STOP DASHBOARD LISTENERS
-========================================================= */
-
-function stopDashboardListeners() {
-
-    if (stopUsers) {
-
-        stopUsers();
-
-        stopUsers = null;
-
-    }
-
-
-    if (stopChats) {
-
-        stopChats();
-
-        stopChats = null;
-
-    }
-
-
-    groupListeners.unsubscribers
-        .forEach(
-            unsubscribe => {
-
-                if (
-                    typeof unsubscribe ===
-                    "function"
-                ) {
-
-                    unsubscribe();
-
-                }
-
-            }
-        );
-
-
-    groupListeners = {
-
-        memberIds: [],
-        members: [],
-        owned: [],
-        unsubscribers: []
-
-    };
-
-
-    clearTimeout(
-        groupProcessTimer
-    );
-
-
-    clearInterval(
-        presenceInterval
-    );
-
-
-    presenceInterval =
-        null;
-
-
-    document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityPresence
-    );
 
 }
 
@@ -9914,46 +3926,29 @@ function stopDashboardListeners() {
 
 function setupUI() {
 
-    /*
-     * =====================================================
-     * MENU
-     * =====================================================
-     *
-     * IMPORTANT:
-     * dashboard.html uses:
-     *
-     * menuBtn
-     * sideMenu
-     * menuOverlay
-     *
-     * not menuButton/sidebar/sidebarOverlay.
-     */
+    /* MENU */
 
-    const menuButton =
+    const menuBtn =
         $("menuBtn");
 
-
-    const sidebar =
+    const sideMenu =
         $("sideMenu");
 
-
-    const sidebarOverlay =
+    const menuOverlay =
         $("menuOverlay");
 
 
     function openMenu() {
 
-        sidebar?.classList.add(
+        sideMenu?.classList.add(
             "open"
         );
 
-
-        sidebarOverlay?.classList.add(
+        menuOverlay?.classList.add(
             "open"
         );
 
-
-        sidebar?.setAttribute(
+        sideMenu?.setAttribute(
             "aria-hidden",
             "false"
         );
@@ -9963,17 +3958,15 @@ function setupUI() {
 
     function closeMenu() {
 
-        sidebar?.classList.remove(
+        sideMenu?.classList.remove(
             "open"
         );
 
-
-        sidebarOverlay?.classList.remove(
+        menuOverlay?.classList.remove(
             "open"
         );
 
-
-        sidebar?.setAttribute(
+        sideMenu?.setAttribute(
             "aria-hidden",
             "true"
         );
@@ -9981,43 +3974,31 @@ function setupUI() {
     }
 
 
-    menuButton?.addEventListener(
+    menuBtn?.addEventListener(
         "click",
         openMenu
     );
 
 
-    sidebarOverlay?.addEventListener(
+    menuOverlay?.addEventListener(
         "click",
         closeMenu
     );
 
 
-    sidebar
-        ?.querySelectorAll(
-            "a"
-        )
-        .forEach(
-            item => {
+    sideMenu
+        ?.querySelectorAll("a")
+        .forEach(link => {
 
-                item.addEventListener(
-                    "click",
-                    () => {
+            link.addEventListener(
+                "click",
+                closeMenu
+            );
 
-                        closeMenu();
-
-                    }
-                );
-
-            }
-        );
+        });
 
 
-    /*
-     * =====================================================
-     * PROFILE
-     * =====================================================
-     */
+    /* PROFILE */
 
     $("profileBtn")?.addEventListener(
         "click",
@@ -10038,11 +4019,7 @@ function setupUI() {
     );
 
 
-    /*
-     * =====================================================
-     * CONNECTION
-     * =====================================================
-     */
+    /* CONNECTION */
 
     $("connectionBtn")?.addEventListener(
         "click",
@@ -10056,11 +4033,7 @@ function setupUI() {
     );
 
 
-    /*
-     * =====================================================
-     * ONLINE SEARCH BUTTON
-     * =====================================================
-     */
+    /* ONLINE SEARCH BUTTON */
 
     $("onlineSearchBtn")?.addEventListener(
         "click",
@@ -10089,11 +4062,7 @@ function setupUI() {
     );
 
 
-    /*
-     * =====================================================
-     * CHAT SEARCH BUTTON
-     * =====================================================
-     */
+    /* CHAT SEARCH BUTTON */
 
     $("chatSearchBtn")?.addEventListener(
         "click",
@@ -10122,42 +4091,32 @@ function setupUI() {
     );
 
 
-    /*
-     * =====================================================
-     * ONLINE SEARCH
-     * =====================================================
-     */
+    /* ONLINE SEARCH */
 
     $("onlineSearch")?.addEventListener(
         "input",
         event => {
 
             const term =
-                event.target.value
+                String(
+                    event.target.value || ""
+                )
                     .trim()
                     .toLowerCase();
-
-
-            if (!term) {
-
-                renderOnline(
-                    onlineUsers
-                );
-
-                return;
-
-            }
 
 
             const filtered =
                 onlineUsers.filter(
                     user => {
 
+                        if (!term) {
+                            return true;
+                        }
+
+
                         const text = [
 
-                            getFullName(
-                                user
-                            ),
+                            getFullName(user),
 
                             user.username,
 
@@ -10177,19 +4136,25 @@ function setupUI() {
                 );
 
 
-            renderOnline(
-                filtered
-            );
+            const original =
+                onlineUsers;
+
+
+            onlineUsers =
+                filtered;
+
+
+            renderOnline();
+
+
+            onlineUsers =
+                original;
 
         }
     );
 
 
-    /*
-     * =====================================================
-     * CHAT SEARCH
-     * =====================================================
-     */
+    /* CHAT SEARCH */
 
     $("chatSearch")?.addEventListener(
         "input",
@@ -10203,76 +4168,56 @@ function setupUI() {
     );
 
 
-    /*
-     * =====================================================
-     * LOGOUT
-     * =====================================================
-     */
-
-    $("logoutBtn")?.addEventListener(
-        "click",
-        async () => {
-
-            await setPresence(
-                false
-            );
-
-
-            stopDashboardListeners();
-
-
-            await logout(
-                true
-            );
-
-        }
-    );
-
-
-    /*
-     * =====================================================
-     * COMING SOON LINKS
-     * =====================================================
-     */
+    /* COMING SOON */
 
     document
         .querySelectorAll(
             "[data-coming]"
         )
-        .forEach(
-            element => {
+        .forEach(element => {
 
-                element.addEventListener(
-                    "click",
-                    event => {
+            element.addEventListener(
+                "click",
+                event => {
 
-                        /*
-                         * Allow real links to work.
-                         */
-
-                        if (
-                            element.getAttribute(
-                                "href"
-                            ) !== "#"
-                        ) {
-
-                            return;
-
-                        }
-
+                    if (
+                        element.getAttribute(
+                            "href"
+                        ) === "#"
+                    ) {
 
                         event.preventDefault();
 
-
-                        showToast(
-                            `${element.dataset.coming} feature coming soon.`
-                        );
-
                     }
-                );
 
-            }
-        );
+
+                    closeMenu();
+
+
+                    showToast(
+                        `${element.dataset.coming} feature coming soon.`
+                    );
+
+                }
+            );
+
+        });
+
+
+    /* LOGOUT */
+
+    $("logoutBtn")?.addEventListener(
+        "click",
+        async () => {
+
+            await setPresence(false);
+
+            stopDashboardListeners();
+
+            await logout(true);
+
+        }
+    );
 
 }
 
@@ -10294,14 +4239,11 @@ function listenToUsers() {
 
     const usersQuery =
         query(
-
             collection(
                 db,
                 "users"
             ),
-
             limit(100)
-
         );
 
 
@@ -10312,7 +4254,7 @@ function listenToUsers() {
 
             snapshot => {
 
-                const users =
+                onlineUsers =
                     snapshot.docs.map(
                         userDoc => {
 
@@ -10331,16 +4273,10 @@ function listenToUsers() {
                     );
 
 
-                onlineUsers =
-                    users;
-
-
-                /*
-                 * Own profile.
-                 */
+                /* OWN PROFILE */
 
                 const own =
-                    users.find(
+                    onlineUsers.find(
                         user =>
                             user.uid ===
                             currentUser?.uid
@@ -10368,71 +4304,17 @@ function listenToUsers() {
                 }
 
 
-                /*
-                 * Render users.
-                 */
-
-                const searchTerm =
-                    $("onlineSearch")
-                        ?.value
-                        ?.trim()
-                        ?.toLowerCase() ||
-                    "";
+                renderOnline();
 
 
-                if (searchTerm) {
-
-                    const filtered =
-                        users.filter(
-                            user => {
-
-                                const text = [
-
-                                    getFullName(
-                                        user
-                                    ),
-
-                                    user.username,
-
-                                    user.bio
-
-                                ]
-                                    .filter(Boolean)
-                                    .join(" ")
-                                    .toLowerCase();
-
-
-                                return text.includes(
-                                    searchTerm
-                                );
-
-                            }
-                        );
-
-
-                    renderOnline(
-                        filtered
-                    );
-
-                } else {
-
-                    renderOnline(
-                        users
-                    );
-
-                }
-
-
-                /*
-                 * Update private chat names.
-                 */
+                /* UPDATE PRIVATE CHAT NAMES */
 
                 recentChats =
                     recentChats.map(
                         chat => {
 
                             const profile =
-                                users.find(
+                                onlineUsers.find(
                                     user =>
                                         user.uid ===
                                         chat.otherUid
@@ -10440,9 +4322,7 @@ function listenToUsers() {
 
 
                             if (!profile) {
-
                                 return chat;
-
                             }
 
 
@@ -10457,6 +4337,7 @@ function listenToUsers() {
 
                                 otherUserPhoto:
                                     profile.photoURL ||
+                                    profile.photoUrl ||
                                     "",
 
                                 otherUserVerified:
@@ -10469,16 +4350,14 @@ function listenToUsers() {
                     );
 
 
-                /*
-                 * Update group sender names.
-                 */
+                /* UPDATE GROUP SENDERS */
 
                 recentGroups =
                     recentGroups.map(
                         group => {
 
                             const profile =
-                                users.find(
+                                onlineUsers.find(
                                     user =>
                                         user.uid ===
                                         group.lastMessageSenderId
@@ -10486,9 +4365,7 @@ function listenToUsers() {
 
 
                             if (!profile) {
-
                                 return group;
-
                             }
 
 
@@ -10518,7 +4395,7 @@ function listenToUsers() {
             error => {
 
                 console.error(
-                    "[CONNECTA] Users listener:",
+                    "Users listener:",
                     error
                 );
 
@@ -10527,16 +4404,11 @@ function listenToUsers() {
                     $("onlineUsers");
 
 
-                hideOnlineSkeleton();
-
-
                 if (box) {
 
                     box.innerHTML = `
 
-                        <div
-                            class="connecta-dashboard-error"
-                        >
+                        <div class="connecta-error">
                             Users could not be loaded.
                         </div>
 
@@ -10559,26 +4431,18 @@ async function initializeDashboard() {
 
     try {
 
-        /*
-         * Authenticate.
-         */
-
         const session =
             await getCurrentConnectaUser({
 
-                redirect:
-                    true,
+                redirect: true,
 
-                allowBlocked:
-                    true
+                allowBlocked: true
 
             });
 
 
         if (!session) {
-
             return;
-
         }
 
 
@@ -10613,9 +4477,10 @@ async function initializeDashboard() {
 
 
         /*
-         * =================================================
          * CACHE FIRST
-         * =================================================
+         *
+         * This happens before live Firestore
+         * listeners start.
          */
 
         loadDashboardCache();
@@ -10625,9 +4490,7 @@ async function initializeDashboard() {
 
 
         /*
-         * =================================================
-         * ACCOUNT CONTROL
-         * =================================================
+         * ACCOUNT STATUS
          */
 
         const control =
@@ -10636,14 +4499,11 @@ async function initializeDashboard() {
             );
 
 
-        if (
-            control.blocked
-        ) {
+        if (control.blocked) {
 
             showAccountBlockedScreen(
                 control
             );
-
 
             return;
 
@@ -10651,27 +4511,21 @@ async function initializeDashboard() {
 
 
         /*
-         * =================================================
          * PRESENCE
-         * =================================================
          */
 
         startPresence();
 
 
         /*
-         * =================================================
          * LIVE USERS
-         * =================================================
          */
 
         listenToUsers();
 
 
         /*
-         * =================================================
          * LIVE PRIVATE CHATS
-         * =================================================
          */
 
         listenToChats(
@@ -10680,26 +4534,23 @@ async function initializeDashboard() {
 
 
         /*
-         * =================================================
          * LIVE GROUPS
-         * =================================================
          */
 
         listenToGroups(
             currentUser.uid
         );
 
-
     } catch (error) {
 
         console.error(
-            "[CONNECTA] Dashboard initialization failed:",
+            "Dashboard initialization failed:",
             error
         );
 
 
         showToast(
-            "Could not initialize CONNECTA dashboard."
+            "Unable to load CONNECTA dashboard."
         );
 
     }
@@ -10725,13 +4576,9 @@ window.addEventListener(
         );
 
 
-        if (
-            currentUser
-        ) {
+        if (currentUser) {
 
-            setPresence(
-                false
-            );
+            setPresence(false);
 
         }
 
