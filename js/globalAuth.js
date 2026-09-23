@@ -27,6 +27,7 @@ import {
     doc,
     getDoc,
     setDoc,
+    updateDoc,
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
@@ -307,41 +308,24 @@ async function markUserOnline(
 ) {
 
     if (!user?.uid) {
-
         return;
     }
 
-
     try {
 
-        await setDoc(
-
+        await updateDoc(
             doc(
                 db,
                 USER_COLLECTION,
                 user.uid
             ),
-
             {
-
-                isOnline:
-                    true,
-
-                lastSeen:
-                    serverTimestamp()
-            },
-
-            {
-                merge: true
+                isOnline: true,
+                lastSeen: serverTimestamp()
             }
         );
 
     } catch (error) {
-
-        /*
-         * Presence failure should NOT log the user
-         * out of CONNECTA.
-         */
 
         console.warn(
             "CONNECTA presence update failed:",
