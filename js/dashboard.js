@@ -4686,19 +4686,7 @@ function listenToUsers() {
         userDoc => {
 
             return {
-
-                /*
-                 * IMPORTANT:
-                 * Always use the Firestore document ID
-                 * as the authoritative Firebase UID.
-                 *
-                 * This prevents the current user's card
-                 * from being mistaken for another user.
-                 */
-
-                uid:
-                    userDoc.id,
-
+               
                 ...publicProfileData(
                     userDoc.data()
                 ),
@@ -5641,8 +5629,6 @@ function resumeDashboardLive() {
 ========================================================= */
 
 installInstantDashboardStyles();
-
-showDashboardSkeleton();
 
 setupUI();
 
