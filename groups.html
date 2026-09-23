@@ -17,7 +17,7 @@
 
   <meta
     name="description"
-    content="CONNECTA Groups — Discover, create and join communities."
+    content="CONNECTA Groups — Discover communities, join conversations and connect with people."
   >
 
   <title>Groups — CONNECTA</title>
@@ -32,76 +32,141 @@
     href="css/dashboard.css"
   >
 
-  <style>
+
+<style>
 
 /* =========================================================
-   CONNECTA GROUPS PAGE
+   CONNECTA — GROUPS PAGE
 ========================================================= */
 
-.groups-page {
-  padding-bottom: 95px;
-}
-
-
-/* =========================================================
-   GROUP HERO
-========================================================= */
-
-.groups-hero {
-  margin: 16px;
-  padding: 22px;
-  border-radius: 22px;
-  background: linear-gradient(
-    135deg,
-    #ecfdf5,
-    #ffffff
-  );
-  border: 1px solid #d1fae5;
-}
-
-.groups-hero .eyebrow {
-  display: block;
-  color: #16a34a;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  margin-bottom: 6px;
-}
-
-.groups-hero h1 {
-  margin: 0;
-  color: #166534;
-  font-size: 26px;
-}
-
-.groups-hero p {
-  margin: 8px 0 0;
-  color: #6b7280;
-  font-size: 14px;
-  line-height: 1.5;
+.groups-page{
+  min-height:calc(100vh - 68px);
+  padding:14px 0 100px;
 }
 
 
 /* =========================================================
-   CREATE GROUP BUTTON
+   HERO
 ========================================================= */
 
-.create-group-btn {
-  width: calc(100% - 32px);
-  margin: 0 16px 16px;
-  min-height: 52px;
-  border: 0;
-  border-radius: 16px;
-  background: #22c55e;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.20);
+.groups-hero{
+  margin:0 16px 14px;
+  padding:23px 20px;
+  border-radius:24px;
+  background:
+    linear-gradient(
+      135deg,
+      #ecfdf5 0%,
+      #f7fff9 55%,
+      #ffffff 100%
+    );
+  border:1px solid #d1fae5;
+  box-shadow:0 5px 18px rgba(22,101,52,.05);
 }
 
-.create-group-btn:active {
-  transform: scale(0.98);
+.groups-hero .eyebrow{
+  display:block;
+  margin-bottom:7px;
+  color:#15803d;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:1.7px;
+}
+
+.groups-hero h1{
+  margin:0;
+  color:#14532d;
+  font-size:27px;
+  line-height:1.15;
+  letter-spacing:-.6px;
+}
+
+.groups-hero p{
+  margin:9px 0 0;
+  color:#6b7280;
+  font-size:13px;
+  line-height:1.55;
+}
+
+
+/* =========================================================
+   QUICK GROUP RULES
+========================================================= */
+
+.group-rules{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+  margin:0 16px 15px;
+}
+
+.group-rule{
+  min-width:0;
+  padding:12px;
+  border-radius:16px;
+  background:#ffffff;
+  border:1px solid #e5e7eb;
+  box-shadow:0 3px 12px rgba(0,0,0,.035);
+}
+
+.group-rule-icon{
+  width:32px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  margin-bottom:7px;
+  border-radius:10px;
+  background:#ecfdf5;
+  font-size:16px;
+}
+
+.group-rule strong{
+  display:block;
+  color:#166534;
+  font-size:12px;
+  font-weight:900;
+}
+
+.group-rule small{
+  display:block;
+  margin-top:3px;
+  color:#9ca3af;
+  font-size:10px;
+  line-height:1.4;
+}
+
+
+/* =========================================================
+   CREATE GROUP
+========================================================= */
+
+.create-group-btn{
+  width:calc(100% - 32px);
+  min-height:53px;
+  margin:0 16px 15px;
+  border:0;
+  border-radius:17px;
+  background:#22c55e;
+  color:#ffffff;
+  font-size:15px;
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:0 9px 22px rgba(34,197,94,.20);
+  transition:.18s ease;
+}
+
+.create-group-btn:hover{
+  background:#16a34a;
+}
+
+.create-group-btn:active{
+  transform:scale(.98);
+}
+
+.create-group-btn:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+  box-shadow:none;
 }
 
 
@@ -109,31 +174,32 @@
    TABS
 ========================================================= */
 
-.groups-tabs {
-  display: flex;
-  gap: 8px;
-  margin: 0 16px 16px;
-  padding: 5px;
-  border-radius: 15px;
-  background: #f0fdf4;
+.groups-tabs{
+  display:flex;
+  gap:6px;
+  margin:0 16px 14px;
+  padding:5px;
+  border-radius:16px;
+  background:#ecfdf5;
 }
 
-.groups-tab {
-  flex: 1;
-  min-height: 42px;
-  border: 0;
-  border-radius: 11px;
-  background: transparent;
-  color: #6b7280;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
+.groups-tab{
+  flex:1;
+  min-height:43px;
+  border:0;
+  border-radius:12px;
+  background:transparent;
+  color:#6b7280;
+  font-size:13px;
+  font-weight:800;
+  cursor:pointer;
+  transition:.18s ease;
 }
 
-.groups-tab.active {
-  background: #ffffff;
-  color: #16a34a;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+.groups-tab.active{
+  background:#ffffff;
+  color:#15803d;
+  box-shadow:0 3px 10px rgba(0,0,0,.06);
 }
 
 
@@ -141,53 +207,77 @@
    SEARCH
 ========================================================= */
 
-.groups-search {
-  margin: 0 16px 16px;
+.groups-search{
+  margin:0 16px 17px;
 }
 
-.groups-search input {
-  width: 100%;
-  min-height: 46px;
-  padding: 0 15px;
-  border: 1px solid #d1d5db;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #111827;
-  font-size: 14px;
-  outline: none;
+.groups-search-wrap{
+  position:relative;
 }
 
-.groups-search input:focus {
-  border-color: #22c55e;
-  box-shadow: 0 0 0 3px rgba(34,197,94,0.10);
+.groups-search-icon{
+  position:absolute;
+  left:14px;
+  top:50%;
+  transform:translateY(-50%);
+  color:#9ca3af;
+  font-size:18px;
+  pointer-events:none;
+}
+
+.groups-search input{
+  width:100%;
+  min-height:47px;
+  padding:0 15px 0 42px;
+  border:1px solid #d9e1dc;
+  border-radius:15px;
+  background:#ffffff;
+  color:#111827;
+  font-size:14px;
+  outline:none;
+  box-shadow:0 3px 10px rgba(0,0,0,.025);
+}
+
+.groups-search input::placeholder{
+  color:#a1a9a5;
+}
+
+.groups-search input:focus{
+  border-color:#22c55e;
+  box-shadow:
+    0 0 0 3px rgba(34,197,94,.09),
+    0 3px 10px rgba(0,0,0,.025);
 }
 
 
 /* =========================================================
-   SECTION
+   SECTIONS
 ========================================================= */
 
-.groups-section {
-  margin: 0 16px 18px;
+.groups-section{
+  margin:0 16px 18px;
 }
 
-.groups-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
+.groups-section-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:11px;
 }
 
-.groups-section-header h2 {
-  margin: 0;
-  color: #166534;
-  font-size: 19px;
+.groups-section-header h2{
+  margin:0;
+  color:#166534;
+  font-size:19px;
+  font-weight:900;
+  letter-spacing:-.3px;
 }
 
-.groups-section-header span {
-  color: #9ca3af;
-  font-size: 12px;
+.groups-section-header span{
+  color:#9ca3af;
+  font-size:11px;
+  font-weight:700;
 }
 
 
@@ -195,98 +285,154 @@
    GROUP CARD
 ========================================================= */
 
-.group-card {
-  display: flex;
-  gap: 13px;
-  padding: 15px;
-  margin-bottom: 11px;
-  border-radius: 18px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+.group-card{
+  position:relative;
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:14px;
+  margin-bottom:10px;
+  border-radius:19px;
+  background:#ffffff;
+  border:1px solid #e4e9e5;
+  box-shadow:0 4px 15px rgba(0,0,0,.045);
+  transition:.18s ease;
+  overflow:hidden;
 }
 
-.group-avatar {
-  width: 58px;
-  height: 58px;
-  min-width: 58px;
-  border-radius: 17px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #dcfce7;
-  color: #15803d;
-  font-size: 21px;
-  font-weight: 800;
-  overflow: hidden;
+.group-card:hover{
+  border-color:#bbf7d0;
+  box-shadow:0 7px 20px rgba(22,101,52,.07);
 }
 
-.group-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.group-card.has-unread{
+  border-color:#86efac;
+  background:#fbfffc;
 }
 
-.group-content {
-  min-width: 0;
-  flex: 1;
+.group-avatar{
+  width:61px;
+  height:61px;
+  min-width:61px;
+  border-radius:17px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#dcfce7;
+  color:#15803d;
+  font-size:21px;
+  font-weight:900;
+  overflow:hidden;
 }
 
-.group-name-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.group-avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
 }
 
-.group-name {
-  margin: 0;
-  color: #111827;
-  font-size: 15px;
-  font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.group-content{
+  min-width:0;
+  flex:1;
 }
 
-.group-description {
-  margin: 5px 0;
-  color: #6b7280;
-  font-size: 12px;
-  line-height: 1.4;
+.group-name-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
 }
 
-.group-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  align-items: center;
+.group-name{
+  min-width:0;
+  margin:0;
+  color:#111827;
+  font-size:15px;
+  font-weight:900;
+  line-height:1.25;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 
-.group-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: #f0fdf4;
-  color: #15803d;
-  font-size: 10px;
-  font-weight: 800;
+.group-description{
+  margin:5px 0 7px;
+  color:#6b7280;
+  font-size:11px;
+  line-height:1.45;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
 }
 
-.group-badge.private {
-  background: #fff7ed;
-  color: #c2410c;
+
+/* =========================================================
+   GROUP META
+========================================================= */
+
+.group-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  align-items:center;
 }
 
-.group-badge.paid {
-  background: #eff6ff;
-  color: #2563eb;
+.group-badge{
+  display:inline-flex;
+  align-items:center;
+  min-height:22px;
+  padding:0 8px;
+  border-radius:999px;
+  background:#ecfdf5;
+  color:#15803d;
+  font-size:9px;
+  font-weight:900;
 }
 
-.group-members {
-  color: #9ca3af;
-  font-size: 11px;
+.group-badge.private{
+  background:#fff7ed;
+  color:#c2410c;
+}
+
+.group-badge.paid{
+  background:#eff6ff;
+  color:#2563eb;
+}
+
+.group-members{
+  color:#9ca3af;
+  font-size:10px;
+  font-weight:600;
+}
+
+
+/* =========================================================
+   LAST MESSAGE
+========================================================= */
+
+.group-last-message{
+  max-width:100%;
+}
+
+.group-last-message-empty{
+  color:#9ca3af;
+  font-style:italic;
+}
+
+.group-unread-badge{
+  flex-shrink:0;
+  min-width:20px;
+  height:20px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0 5px;
+  border-radius:999px;
+  background:#22c55e;
+  color:#ffffff;
+  font-size:9px;
+  font-weight:900;
 }
 
 
@@ -294,32 +440,38 @@
    GROUP ACTION
 ========================================================= */
 
-.group-action {
-  display: flex;
-  align-items: center;
+.group-action{
+  display:flex;
+  align-items:center;
+  flex-shrink:0;
 }
 
-.group-action button {
-  min-width: 72px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 10px;
-  background: #22c55e;
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 800;
-  cursor: pointer;
+.group-action button{
+  min-width:70px;
+  min-height:35px;
+  padding:0 11px;
+  border:0;
+  border-radius:11px;
+  background:#22c55e;
+  color:#ffffff;
+  font-size:10px;
+  font-weight:900;
+  cursor:pointer;
+  transition:.18s ease;
 }
 
-.group-action button.secondary {
-  background: #ecfdf5;
-  color: #15803d;
+.group-action button:hover{
+  background:#16a34a;
 }
 
-.group-action button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+.group-action button.secondary{
+  background:#ecfdf5;
+  color:#15803d;
+}
+
+.group-action button:disabled{
+  opacity:.55;
+  cursor:not-allowed;
 }
 
 
@@ -327,29 +479,43 @@
    EMPTY STATE
 ========================================================= */
 
-.groups-empty {
-  padding: 35px 20px;
-  text-align: center;
-  border-radius: 18px;
-  background: #ffffff;
-  border: 1px dashed #d1d5db;
+.groups-empty{
+  min-height:155px;
+  padding:30px 20px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  border-radius:19px;
+  background:#ffffff;
+  border:1px dashed #d4ddd7;
 }
 
-.groups-empty-icon {
-  font-size: 32px;
-  margin-bottom: 8px;
+.groups-empty-icon{
+  width:52px;
+  height:52px;
+  display:grid;
+  place-items:center;
+  margin-bottom:10px;
+  border-radius:16px;
+  background:#ecfdf5;
+  font-size:25px;
 }
 
-.groups-empty strong {
-  display: block;
-  color: #374151;
-  font-size: 14px;
+.groups-empty strong{
+  display:block;
+  color:#374151;
+  font-size:14px;
+  font-weight:900;
 }
 
-.groups-empty p {
-  margin: 6px 0 0;
-  color: #9ca3af;
-  font-size: 12px;
+.groups-empty p{
+  max-width:280px;
+  margin:6px 0 0;
+  color:#9ca3af;
+  font-size:11px;
+  line-height:1.5;
 }
 
 
@@ -357,247 +523,97 @@
    CREATE GROUP MODAL
 ========================================================= */
 
-.group-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 5000;
-  display: none;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(0,0,0,0.48);
+.group-modal{
+  position:fixed;
+  inset:0;
+  z-index:5000;
+  display:none;
+  align-items:flex-end;
+  justify-content:center;
+  background:rgba(15,23,42,.52);
+  backdrop-filter:blur(3px);
 }
 
-.group-modal.open {
-  display: flex;
+.group-modal.open{
+  display:flex;
 }
 
-.group-modal-card {
-  width: 100%;
-  max-width: 560px;
-  max-height: 92vh;
-  overflow-y: auto;
-  padding: 22px;
-  border-radius: 25px 25px 0 0;
-  background: #ffffff;
+.group-modal-card{
+  width:100%;
+  max-width:570px;
+  max-height:94vh;
+  overflow-y:auto;
+  padding:21px;
+  border-radius:27px 27px 0 0;
+  background:#ffffff;
+  box-shadow:0 -10px 40px rgba(0,0,0,.16);
 }
 
-.group-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 18px;
+.group-modal-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:17px;
 }
 
-.group-modal-header h2 {
-  margin: 0;
-  color: #166534;
-  font-size: 20px;
+.group-modal-header h2{
+  margin:0;
+  color:#14532d;
+  font-size:21px;
+  font-weight:900;
 }
 
-.group-close {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 50%;
-  background: #f3f4f6;
-  color: #374151;
-  font-size: 20px;
-  cursor: pointer;
-}
-
-
-/* =========================================================
-   FORM
-========================================================= */
-
-.group-form-group {
-  margin-bottom: 15px;
-}
-
-.group-form-group label {
-  display: block;
-  margin-bottom: 7px;
-  color: #374151;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.group-form-group input,
-.group-form-group textarea,
-.group-form-group select {
-  width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 13px;
-  padding: 12px 13px;
-  background: #ffffff;
-  color: #111827;
-  font-size: 14px;
-  outline: none;
-}
-
-.group-form-group textarea {
-  min-height: 90px;
-  resize: vertical;
-}
-
-.group-form-group input:focus,
-.group-form-group textarea:focus,
-.group-form-group select:focus {
-  border-color: #22c55e;
-  box-shadow: 0 0 0 3px rgba(34,197,94,0.10);
+.group-close{
+  width:37px;
+  height:37px;
+  border:0;
+  border-radius:50%;
+  background:#f3f4f6;
+  color:#374151;
+  font-size:21px;
+  cursor:pointer;
 }
 
 
 /* =========================================================
-   GROUP TYPE CARDS
+   CREATOR VERIFICATION NOTICE
 ========================================================= */
 
-.group-type-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+.creator-verification-notice{
+  display:flex;
+  gap:10px;
+  padding:13px;
+  margin-bottom:15px;
+  border-radius:16px;
+  background:#eff6ff;
+  border:1px solid #bfdbfe;
 }
 
-.group-type-option {
-  position: relative;
+.creator-verification-notice .notice-icon{
+  width:29px;
+  height:29px;
+  min-width:29px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#dbeafe;
+  color:#2563eb;
+  font-weight:900;
 }
 
-.group-type-option input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
+.creator-verification-notice strong{
+  display:block;
+  color:#1e40af;
+  font-size:12px;
+  font-weight:900;
 }
 
-.group-type-label {
-  display: block;
-  padding: 14px;
-  border: 2px solid #e5e7eb;
-  border-radius: 15px;
-  cursor: pointer;
-}
-
-.group-type-option input:checked + .group-type-label {
-  border-color: #22c55e;
-  background: #f0fdf4;
-}
-
-.group-type-label strong {
-  display: block;
-  color: #166534;
-  font-size: 14px;
-}
-
-.group-type-label small {
-  display: block;
-  margin-top: 5px;
-  color: #6b7280;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-
-/* =========================================================
-   PAYMENT SECTION
-========================================================= */
-
-.subscription-box {
-  display: none;
-  margin-top: 10px;
-  padding: 14px;
-  border-radius: 15px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-}
-
-.subscription-box.show {
-  display: block;
-}
-
-.subscription-box p {
-  margin: 0 0 10px;
-  color: #1e40af;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-
-/* =========================================================
-   VERIFICATION NOTICE
-========================================================= */
-
-.creator-verification-notice {
-  display: flex;
-  gap: 10px;
-  padding: 13px;
-  margin-bottom: 17px;
-  border-radius: 15px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-}
-
-.creator-verification-notice .notice-icon {
-  font-size: 19px;
-}
-
-.creator-verification-notice strong {
-  display: block;
-  color: #1e40af;
-  font-size: 13px;
-}
-
-.creator-verification-notice p {
-  margin: 4px 0 0;
-  color: #3b82f6;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-
-/* =========================================================
-   MODAL ACTIONS
-========================================================= */
-
-.group-form-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.group-form-actions button {
-  flex: 1;
-  min-height: 48px;
-  border-radius: 13px;
-  font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.group-cancel-btn {
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #374151;
-}
-
-.group-submit-btn {
-  border: 0;
-  background: #22c55e;
-  color: #ffffff;
-}
-
-
-/* =========================================================
-   PENDING REVIEW CARD
-========================================================= */
-
-.pending-group {
-  background: #fffbeb;
-  border-color: #fde68a;
-}
-
-.pending-badge {
-  background: #fef3c7;
-  color: #92400e;
+.creator-verification-notice p{
+  margin:4px 0 0;
+  color:#3b82f6;
+  font-size:10px;
+  line-height:1.5;
 }
 
 
@@ -605,20 +621,247 @@
    ACCESS NOTICE
 ========================================================= */
 
-.access-notice {
-  display: none;
-  padding: 12px 14px;
-  margin-bottom: 15px;
-  border-radius: 14px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  color: #9a3412;
-  font-size: 12px;
-  line-height: 1.45;
+.access-notice{
+  display:none;
+  padding:12px 14px;
+  margin-bottom:15px;
+  border-radius:14px;
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+  color:#9a3412;
+  font-size:11px;
+  line-height:1.5;
 }
 
-.access-notice.show {
-  display: block;
+.access-notice.show{
+  display:block;
+}
+
+
+/* =========================================================
+   FORM
+========================================================= */
+
+.group-form-group{
+  margin-bottom:15px;
+}
+
+.group-form-group label.form-label{
+  display:block;
+  margin-bottom:7px;
+  color:#374151;
+  font-size:12px;
+  font-weight:900;
+}
+
+.group-form-group input,
+.group-form-group textarea{
+  width:100%;
+  border:1px solid #d1d5db;
+  border-radius:13px;
+  padding:12px 13px;
+  background:#ffffff;
+  color:#111827;
+  font-size:13px;
+  outline:none;
+}
+
+.group-form-group textarea{
+  min-height:90px;
+  resize:vertical;
+}
+
+.group-form-group input:focus,
+.group-form-group textarea:focus{
+  border-color:#22c55e;
+  box-shadow:0 0 0 3px rgba(34,197,94,.09);
+}
+
+
+/* =========================================================
+   GROUP TYPE
+========================================================= */
+
+.group-type-options{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+
+.group-type-option{
+  position:relative;
+}
+
+.group-type-option input{
+  position:absolute;
+  opacity:0;
+  pointer-events:none;
+}
+
+.group-type-label{
+  display:block;
+  min-height:104px;
+  padding:13px;
+  border:2px solid #e5e7eb;
+  border-radius:15px;
+  cursor:pointer;
+  transition:.18s ease;
+}
+
+.group-type-option input:checked + .group-type-label{
+  border-color:#22c55e;
+  background:#f0fdf4;
+  box-shadow:0 3px 12px rgba(34,197,94,.08);
+}
+
+.group-type-label .type-icon{
+  display:block;
+  margin-bottom:6px;
+  font-size:20px;
+}
+
+.group-type-label strong{
+  display:block;
+  color:#166534;
+  font-size:13px;
+  font-weight:900;
+}
+
+.group-type-label small{
+  display:block;
+  margin-top:5px;
+  color:#6b7280;
+  font-size:10px;
+  line-height:1.45;
+}
+
+
+/* =========================================================
+   PRIVATE FEE
+========================================================= */
+
+.private-fee-box{
+  display:none;
+  margin-top:10px;
+  padding:14px;
+  border-radius:15px;
+  background:#fff7ed;
+  border:1px solid #fed7aa;
+}
+
+.private-fee-box.show{
+  display:block;
+}
+
+.private-fee-box .fee-title{
+  color:#9a3412;
+  font-size:12px;
+  font-weight:900;
+}
+
+.private-fee-box .fee-description{
+  margin:4px 0 10px;
+  color:#c2410c;
+  font-size:10px;
+  line-height:1.45;
+}
+
+.private-fee-box input{
+  width:100%;
+  min-height:43px;
+  border:1px solid #fdba74;
+  border-radius:12px;
+  padding:0 12px;
+  outline:none;
+  background:#ffffff;
+  font-size:13px;
+}
+
+.private-fee-box input:focus{
+  border-color:#f97316;
+  box-shadow:0 0 0 3px rgba(249,115,22,.09);
+}
+
+
+/* =========================================================
+   GROUP RULE NOTICE
+========================================================= */
+
+.group-policy-box{
+  padding:13px 14px;
+  margin-top:5px;
+  border-radius:15px;
+  background:#f0fdf4;
+  border:1px solid #bbf7d0;
+}
+
+.group-policy-box strong{
+  display:block;
+  margin-bottom:5px;
+  color:#166534;
+  font-size:11px;
+  font-weight:900;
+}
+
+.group-policy-box ul{
+  margin:0;
+  padding-left:17px;
+  color:#15803d;
+  font-size:10px;
+  line-height:1.65;
+}
+
+
+/* =========================================================
+   MODAL ACTIONS
+========================================================= */
+
+.group-form-actions{
+  display:flex;
+  gap:9px;
+  margin-top:19px;
+}
+
+.group-form-actions button{
+  flex:1;
+  min-height:48px;
+  border-radius:13px;
+  font-size:13px;
+  font-weight:900;
+  cursor:pointer;
+}
+
+.group-cancel-btn{
+  border:1px solid #d1d5db;
+  background:#ffffff;
+  color:#374151;
+}
+
+.group-submit-btn{
+  border:0;
+  background:#22c55e;
+  color:#ffffff;
+  box-shadow:0 6px 16px rgba(34,197,94,.16);
+}
+
+.group-submit-btn:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+}
+
+
+/* =========================================================
+   PENDING GROUP
+========================================================= */
+
+.pending-group{
+  background:#fffbeb;
+  border-color:#fde68a;
+}
+
+.pending-badge{
+  background:#fef3c7;
+  color:#92400e;
 }
 
 
@@ -626,27 +869,29 @@
    TOAST
 ========================================================= */
 
-.groups-toast {
-  position: fixed;
-  left: 50%;
-  bottom: 90px;
-  z-index: 7000;
-  max-width: calc(100% - 32px);
-  padding: 12px 17px;
-  border-radius: 999px;
-  background: #111827;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 700;
-  transform: translate(-50%, 20px);
-  opacity: 0;
-  pointer-events: none;
-  transition: 0.25s ease;
+.groups-toast{
+  position:fixed;
+  left:50%;
+  bottom:88px;
+  z-index:7000;
+  width:max-content;
+  max-width:calc(100% - 32px);
+  padding:12px 17px;
+  border-radius:999px;
+  background:#111827;
+  color:#ffffff;
+  font-size:11px;
+  font-weight:800;
+  text-align:center;
+  transform:translate(-50%,20px);
+  opacity:0;
+  pointer-events:none;
+  transition:.25s ease;
 }
 
-.groups-toast.show {
-  opacity: 1;
-  transform: translate(-50%, 0);
+.groups-toast.show{
+  opacity:1;
+  transform:translate(-50%,0);
 }
 
 
@@ -654,25 +899,102 @@
    RESPONSIVE
 ========================================================= */
 
-@media (min-width: 700px) {
+@media(min-width:700px){
 
-  .group-modal {
-    align-items: center;
-    padding: 20px;
+  .groups-page{
+    max-width:900px;
+    margin:0 auto;
   }
 
-  .group-modal-card {
-    border-radius: 25px;
+  .group-modal{
+    align-items:center;
+    padding:20px;
+  }
+
+  .group-modal-card{
+    border-radius:27px;
   }
 
 }
 
-  </style>
+
+@media(max-width:500px){
+
+  .groups-hero{
+    margin-left:12px;
+    margin-right:12px;
+  }
+
+  .group-rules{
+    margin-left:12px;
+    margin-right:12px;
+  }
+
+  .create-group-btn{
+    width:calc(100% - 24px);
+    margin-left:12px;
+    margin-right:12px;
+  }
+
+  .groups-tabs,
+  .groups-search,
+  .groups-section{
+    margin-left:12px;
+    margin-right:12px;
+  }
+
+  .group-card{
+    padding:12px;
+    gap:9px;
+  }
+
+  .group-avatar{
+    width:55px;
+    height:55px;
+    min-width:55px;
+    border-radius:15px;
+  }
+
+  .group-action button{
+    min-width:63px;
+    padding:0 8px;
+  }
+
+}
+
+
+@media(max-width:370px){
+
+  .group-type-options{
+    grid-template-columns:1fr;
+  }
+
+  .group-type-label{
+    min-height:auto;
+  }
+
+  .group-card{
+    flex-wrap:wrap;
+  }
+
+  .group-content{
+    min-width:calc(100% - 68px);
+  }
+
+  .group-action{
+    width:100%;
+    justify-content:flex-end;
+    padding-left:67px;
+  }
+
+}
+
+</style>
 
 </head>
 
 
-<body class="app-page">
+<body class="app-page groups-page">
 
 
 <!-- =======================================================
@@ -705,9 +1027,7 @@
       id="balancePill"
     >
       KSh.
-      <span id="balanceAmount">
-        0.00
-      </span>
+      <span id="balanceAmount">0.00</span>
     </div>
 
 
@@ -788,8 +1108,7 @@
 
 
   <a
-    href="#"
-    data-coming="Stories"
+    href="stories.html"
   >
     ◉
     <span>Stories</span>
@@ -797,8 +1116,7 @@
 
 
   <a
-    href="#"
-    data-coming="Friends"
+    href="friends.html"
   >
     👤
     <span>Friends</span>
@@ -806,34 +1124,26 @@
 
 
   <a
-    href="#"
-    data-coming="Online Users"
+    href="online.html"
   >
     🟢
     <span>Online Users</span>
   </a>
 
 
-  <a
-    href="verification.html"
-  >
+  <a href="verification.html">
     ✓
     <span>Verification</span>
   </a>
 
 
-  <a
-    href="referrals.html"
-  >
+  <a href="referrals.html">
     🎁
     <span>Refer & Earn</span>
   </a>
 
 
-  <a
-    href="#"
-    data-coming="Settings"
-  >
+  <a href="settings.html">
     ⚙
     <span>Settings</span>
   </a>
@@ -860,7 +1170,7 @@
      MAIN
 ======================================================== -->
 
-<main class="groups-page">
+<main>
 
 
   <!-- =====================================================
@@ -878,9 +1188,54 @@
     </h1>
 
     <p>
-      Join communities, meet people and share
-      conversations around topics you care about.
+      Find communities, join conversations and
+      connect with people around topics you care about.
     </p>
+
+  </section>
+
+
+  <!-- =====================================================
+       QUICK RULES
+  ====================================================== -->
+
+  <section
+    class="group-rules"
+    aria-label="Group rules"
+  >
+
+    <div class="group-rule">
+
+      <div class="group-rule-icon">
+        🌍
+      </div>
+
+      <strong>
+        Public Groups
+      </strong>
+
+      <small>
+        Free to join for every CONNECTA user.
+      </small>
+
+    </div>
+
+
+    <div class="group-rule">
+
+      <div class="group-rule-icon">
+        🔒
+      </div>
+
+      <strong>
+        Private Groups
+      </strong>
+
+      <small>
+        Verified users only with a joining fee.
+      </small>
+
+    </div>
 
   </section>
 
@@ -892,6 +1247,7 @@
   <button
     class="create-group-btn"
     id="createGroupBtn"
+    type="button"
   >
     + Create a Group
   </button>
@@ -911,6 +1267,8 @@
       id="discoverTab"
       data-tab="discover"
       role="tab"
+      aria-selected="true"
+      type="button"
     >
       Discover
     </button>
@@ -921,6 +1279,8 @@
       id="myGroupsTab"
       data-tab="mine"
       role="tab"
+      aria-selected="false"
+      type="button"
     >
       My Groups
     </button>
@@ -934,18 +1294,30 @@
 
   <div class="groups-search">
 
-    <input
-      type="search"
-      id="groupSearch"
-      placeholder="Search groups..."
-      autocomplete="off"
-    >
+    <div class="groups-search-wrap">
+
+      <span
+        class="groups-search-icon"
+        aria-hidden="true"
+      >
+        ⌕
+      </span>
+
+      <input
+        type="search"
+        id="groupSearch"
+        placeholder="Search groups..."
+        autocomplete="off"
+        aria-label="Search groups"
+      >
+
+    </div>
 
   </div>
 
 
   <!-- =====================================================
-       DISCOVER GROUPS
+       DISCOVER
   ====================================================== -->
 
   <section
@@ -956,7 +1328,7 @@
     <div class="groups-section-header">
 
       <h2>
-        Public Groups
+        CONNECTA Groups
       </h2>
 
       <span id="publicGroupCount">
@@ -975,11 +1347,11 @@
         </div>
 
         <strong>
-          Loading groups...
+          Groups are ready
         </strong>
 
         <p>
-          Finding approved CONNECTA communities.
+          Approved CONNECTA communities will appear here.
         </p>
 
       </div>
@@ -1021,11 +1393,11 @@
         </div>
 
         <strong>
-          You haven't joined any groups yet.
+          Your groups will appear here
         </strong>
 
         <p>
-          Groups you join or create will appear here.
+          Groups you join or create will appear in this section.
         </p>
 
       </div>
@@ -1078,10 +1450,7 @@
   </a>
 
 
-  <a
-    href="#"
-    data-coming="Stories"
-  >
+  <a href="stories.html">
 
     <span>◉</span>
 
@@ -1092,10 +1461,7 @@
   </a>
 
 
-  <a
-    href="#"
-    data-coming="Friends"
-  >
+  <a href="friends.html">
 
     <span>👤</span>
 
@@ -1106,9 +1472,7 @@
   </a>
 
 
-  <a
-    href="referrals.html"
-  >
+  <a href="referrals.html">
 
     <span>🎁</span>
 
@@ -1142,7 +1506,7 @@
     <div class="group-modal-header">
 
       <h2 id="createGroupTitle">
-        Create Group
+        Create a Group
       </h2>
 
 
@@ -1159,7 +1523,7 @@
 
 
     <!-- =================================================
-         CREATOR VERIFICATION NOTICE
+         VERIFICATION NOTICE
     ================================================== -->
 
     <div class="creator-verification-notice">
@@ -1171,14 +1535,13 @@
       <div>
 
         <strong>
-          Verified accounts only
+          Verified CONNECTA accounts only
         </strong>
 
         <p>
-          Only verified CONNECTA users can create
-          groups. Every new group must be reviewed
-          and approved by an administrator before
-          it becomes publicly available.
+          Only verified users can create groups.
+          Every group is reviewed by an administrator
+          before it becomes available to the community.
         </p>
 
       </div>
@@ -1210,7 +1573,10 @@
 
       <div class="group-form-group">
 
-        <label for="groupName">
+        <label
+          class="form-label"
+          for="groupName"
+        >
           Group Name
         </label>
 
@@ -1219,7 +1585,7 @@
           name="groupName"
           type="text"
           maxlength="80"
-          placeholder="e.g. CONNECTA Business Hub"
+          placeholder="e.g. KCSE 2026 Revision"
           autocomplete="off"
           required
         >
@@ -1231,8 +1597,11 @@
 
       <div class="group-form-group">
 
-        <label for="groupDescription">
-          Description
+        <label
+          class="form-label"
+          for="groupDescription"
+        >
+          Group Description
         </label>
 
         <textarea
@@ -1250,7 +1619,7 @@
 
       <div class="group-form-group">
 
-        <label>
+        <label class="form-label">
           Group Type
         </label>
 
@@ -1275,13 +1644,17 @@
               for="publicGroup"
             >
 
+              <span class="type-icon">
+                🌍
+              </span>
+
               <strong>
-                🌍 Public
+                Public Group
               </strong>
 
               <small>
-                All CONNECTA users can join
-                after the group is approved.
+                Visible to everyone and always
+                free to join after admin approval.
               </small>
 
             </label>
@@ -1305,13 +1678,17 @@
               for="privateGroup"
             >
 
+              <span class="type-icon">
+                🔒
+              </span>
+
               <strong>
-                🔒 Private
+                Private Group
               </strong>
 
               <small>
-                Only verified CONNECTA users
-                can join.
+                Visible in Discover, but only
+                verified users can join.
               </small>
 
             </label>
@@ -1323,101 +1700,90 @@
       </div>
 
 
-      <!-- SUBSCRIPTION -->
-
-      <div class="group-form-group">
-
-        <label for="subscriptionEnabled">
-          Subscription
-        </label>
-
-
-        <select
-          id="subscriptionEnabled"
-          name="subscriptionEnabled"
-        >
-
-          <option value="false">
-            Free — No subscription fee
-          </option>
-
-          <option value="true">
-            Paid — Require subscription
-          </option>
-
-        </select>
-
-
-        <div
-          class="subscription-box"
-          id="subscriptionBox"
-        >
-
-          <p>
-            Users will be required to complete
-            payment before joining this group.
-            Paid private groups are restricted
-            to verified users.
-          </p>
-
-
-          <label
-            for="subscriptionFee"
-            style="
-              display:block;
-              margin-bottom:7px;
-              color:#1e40af;
-              font-size:12px;
-              font-weight:800;
-            "
-          >
-            Subscription Fee (KSh)
-          </label>
-
-
-          <input
-            id="subscriptionFee"
-            name="subscriptionFee"
-            type="number"
-            min="1"
-            max="100000"
-            step="1"
-            placeholder="e.g. 100"
-          >
-
-        </div>
-
-      </div>
-
-
-      <!-- SUBMISSION NOTICE -->
+      <!-- =================================================
+           PRIVATE GROUP FEE
+      ================================================== -->
 
       <div
-        style="
-          padding:12px 14px;
-          border-radius:14px;
-          background:#f0fdf4;
-          border:1px solid #bbf7d0;
-          color:#166534;
-          font-size:11px;
-          line-height:1.5;
-        "
+        class="private-fee-box"
+        id="privateFeeBox"
       >
 
-        <strong>
-          Admin review required.
-        </strong>
+        <div class="fee-title">
+          🔐 Private Group Joining Fee
+        </div>
 
-        Your group will initially be marked
-        <strong>Pending Review</strong>.
-        It will not be published to the public
-        Groups directory until an administrator
-        approves it.
+        <p class="fee-description">
+          Verified users must pay this one-time joining
+          fee before they can enter the group.
+        </p>
+
+        <label
+          class="form-label"
+          for="subscriptionFee"
+          style="
+            display:block;
+            margin-bottom:7px;
+            color:#9a3412;
+            font-size:11px;
+            font-weight:900;
+          "
+        >
+          Joining Fee — KSh
+        </label>
+
+        <input
+          id="subscriptionFee"
+          name="subscriptionFee"
+          type="number"
+          min="1"
+          max="100000"
+          step="1"
+          placeholder="e.g. 100"
+          inputmode="numeric"
+        >
 
       </div>
 
 
-      <!-- ACTIONS -->
+      <!-- =================================================
+           GROUP POLICY
+      ================================================== -->
+
+      <div class="group-policy-box">
+
+        <strong>
+          CONNECTA Group Policy
+        </strong>
+
+        <ul>
+
+          <li>
+            Public groups are free to join.
+          </li>
+
+          <li>
+            Private groups require account verification
+            and the specified joining fee.
+          </li>
+
+          <li>
+            Only verified users can create groups.
+          </li>
+
+          <li>
+            New groups remain pending until an administrator
+            approves them.
+          </li>
+
+        </ul>
+
+      </div>
+
+
+      <!-- =================================================
+           ACTIONS
+      ================================================= -->
 
       <div class="group-form-actions">
 
@@ -1471,4 +1837,4 @@
 
 
 </body>
-</html>
+      </html>
