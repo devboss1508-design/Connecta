@@ -2889,6 +2889,10 @@ async function processGroups() {
         new Map();
 
 
+    /* =====================================================
+       COLLECT GROUPS FROM ALL MEMBERSHIP SOURCES
+    ===================================================== */
+
     for (
         const groupDoc
         of groupListeners.memberIds
@@ -2949,181 +2953,179 @@ async function processGroups() {
         );
 
 
-    const enriched = [];
+    /* =====================================================
+       BUILD GROUPS IMMEDIATELY
+       
+       IMPORTANT:
+       Do NOT wait for unread-count queries before
+       rendering Recent Chats.
+       
+       This makes:
+       - newly joined groups appear immediately
+       - new group messages appear immediately
+       - group preview/time update immediately
+    ===================================================== */
 
+    const enriched =
+        groups
+            .filter(group => {
 
-    for (
-        const group
-        of groups
-    ) {
+                const isMember =
 
-        const isMember =
+                    (
+                        Array.isArray(
+                            group.memberIds
+                        ) &&
+                        group.memberIds.includes(
+                            currentUser.uid
+                        )
+                    )
 
-            (
-                Array.isArray(
-                    group.memberIds
-                ) &&
-                group.memberIds.includes(
-                    currentUser.uid
-                )
-            )
+                    ||
 
-            ||
+                    (
+                        Array.isArray(
+                            group.members
+                        ) &&
+                        group.members.includes(
+                            currentUser.uid
+                        )
+                    )
 
-            (
-                Array.isArray(
-                    group.members
-                ) &&
-                group.members.includes(
-                    currentUser.uid
-                )
-            )
+                    ||
 
-            ||
-
-            group.ownerId ===
-                currentUser.uid;
-
-
-        if (!isMember) {
-            continue;
-        }
-
-
-        let readData = null;
-
-
-        try {
-
-            const readSnapshot =
-                await getDoc(
-                    doc(
-                        db,
-                        "groups",
-                        group.groupId,
-                        "reads",
+                    String(
+                        group.ownerId || ""
+                    ) ===
+                    String(
                         currentUser.uid
-                    )
-                );
+                    );
 
 
-            if (readSnapshot.exists()) {
+                return isMember;
 
-                readData =
-                    readSnapshot.data();
+            })
+            .map(group => {
 
-            }
-
-        } catch {
-
-            readData = null;
-
-        }
+                let senderProfile = null;
 
 
-        const unread =
-            await getGroupUnreadCount(
-                group.groupId,
-                readData
-            );
-
-
-        let senderProfile = null;
-
-
-        if (
-            group.lastMessageSenderId
-        ) {
-
-            senderProfile =
-                onlineUsers.find(
-                    user =>
-                        user.uid ===
-                        group.lastMessageSenderId
-                ) ||
-                getCachedProfile(
+                if (
                     group.lastMessageSenderId
-                );
+                ) {
 
-        }
+                    senderProfile =
+                        onlineUsers.find(
+                            user =>
+                                user.uid ===
+                                group.lastMessageSenderId
+                        ) ||
+                        getCachedProfile(
+                            group.lastMessageSenderId
+                        );
+
+                }
 
 
-        const senderName =
-            group.lastMessageSenderName ||
+                const senderName =
+                    group.lastMessageSenderName ||
 
-            (
-                senderProfile
-                    ? getFullName(
+                    (
                         senderProfile
-                    )
-                    : "User"
-            );
+                            ? getFullName(
+                                senderProfile
+                            )
+                            : "User"
+                    );
 
 
-        const senderVerified =
-            group.lastMessageSenderVerified === true ||
+                const senderVerified =
+                    group.lastMessageSenderVerified === true ||
 
-            senderProfile?.isVerified === true;
+                    senderProfile?.isVerified === true;
 
 
-        enriched.push({
+                return {
 
-            type:
-                "group",
+                    type:
+                        "group",
 
-            groupId:
-                group.groupId,
+                    groupId:
+                        group.groupId,
 
-            groupName:
-                group.name ||
-                "Group",
+                    groupName:
+                        group.name ||
+                        "Group",
 
-            photoURL:
-                group.photoURL ||
-                "",
+                    photoURL:
+                        group.photoURL ||
+                        "",
 
-            lastMessage:
-                group.lastMessage ||
-                "",
+                    lastMessage:
+                        group.lastMessage ||
+                        "",
 
-            lastMessageType:
-                group.lastMessageType ||
-                "text",
+                    lastMessageType:
+                        group.lastMessageType ||
+                        (
+                            String(
+                                group.lastMessage ||
+                                ""
+                            ).startsWith("📷")
+                                ? "image"
+                                : "text"
+                        ),
 
-            lastMessageSenderId:
-                group.lastMessageSenderId ||
-                "",
+                    lastMessageSenderId:
+                        group.lastMessageSenderId ||
+                        "",
 
-            lastMessageSenderName:
-                senderName,
+                    lastMessageSenderName:
+                        senderName,
 
-            lastMessageSenderVerified:
-                senderVerified,
+                    lastMessageSenderVerified:
+                        senderVerified,
 
-            lastMessageAt:
-                group.lastMessageAt ||
-                group.updatedAt ||
-                null,
+                    lastMessageAt:
+                        group.lastMessageAt ||
+                        group.updatedAt ||
+                        null,
 
-            updatedAt:
-                group.updatedAt ||
-                null,
+                    updatedAt:
+                        group.updatedAt ||
+                        null,
 
-            unread,
+                    /*
+                     * Keep the previous unread value while
+                     * the realtime group preview is rendered.
+                     */
+                    unread:
+                        Number(
+                            recentGroups.find(
+                                item =>
+                                    item.groupId ===
+                                    group.groupId
+                            )?.unread || 0
+                        ),
 
-            readData,
+                    readData:
+                        null,
 
-            status:
-                group.status ||
-                "",
+                    status:
+                        group.status ||
+                        "",
 
-            chatLocked:
-                group.chatLocked === true
+                    chatLocked:
+                        group.chatLocked === true
 
-        });
+                };
 
-    }
+            });
 
+
+    /* =====================================================
+       CANCEL STALE PROCESS
+    ===================================================== */
 
     if (
         version !==
@@ -3135,17 +3137,168 @@ async function processGroups() {
     }
 
 
+    /* =====================================================
+       RENDER IMMEDIATELY
+    ===================================================== */
+
     recentGroups =
         enriched;
 
 
     updateGroupBadge();
 
+    mergeRecentChats();
+
+
+    /* =====================================================
+       LOAD READ / UNREAD DATA IN BACKGROUND
+       
+       This happens AFTER Recent Chats has already
+       rendered.
+    ===================================================== */
+
+    const unreadTasks =
+        enriched.map(
+            async group => {
+
+                try {
+
+                    const readSnapshot =
+                        await getDoc(
+                            doc(
+                                db,
+                                "groups",
+                                group.groupId,
+                                "reads",
+                                currentUser.uid
+                            )
+                        );
+
+
+                    const readData =
+                        readSnapshot.exists()
+                            ? readSnapshot.data()
+                            : null;
+
+
+                    const unread =
+                        await getGroupUnreadCount(
+                            group.groupId,
+                            readData
+                        );
+
+
+                    return {
+
+                        groupId:
+                            group.groupId,
+
+                        unread,
+
+                        readData
+
+                    };
+
+                } catch (error) {
+
+                    console.warn(
+                        "Group unread background update failed:",
+                        group.groupId,
+                        error
+                    );
+
+
+                    return {
+
+                        groupId:
+                            group.groupId,
+
+                        unread:
+                            Number(
+                                group.unread || 0
+                            ),
+
+                        readData:
+                            null
+
+                    };
+
+                }
+
+            }
+        );
+
+
+    const unreadResults =
+        await Promise.all(
+            unreadTasks
+        );
+
+
+    /*
+     * The user may have received another realtime
+     * group update while unread counts were loading.
+     *
+     * Never overwrite newer data.
+     */
+
+    if (
+        version !==
+        groupProcessVersion
+    ) {
+
+        return;
+
+    }
+
+
+    const unreadMap =
+        new Map(
+            unreadResults.map(
+                item => [
+                    item.groupId,
+                    item
+                ]
+            )
+        );
+
+
+    recentGroups =
+        recentGroups.map(
+            group => {
+
+                const unreadData =
+                    unreadMap.get(
+                        group.groupId
+                    );
+
+
+                if (!unreadData) {
+                    return group;
+                }
+
+
+                return {
+
+                    ...group,
+
+                    unread:
+                        unreadData.unread,
+
+                    readData:
+                        unreadData.readData
+
+                };
+
+            }
+        );
+
+
+    updateGroupBadge();
 
     mergeRecentChats();
 
 }
-
 
 /* =========================================================
    QUEUE GROUP PROCESSING
@@ -3173,7 +3326,7 @@ function queueGroupProcessing() {
                     });
 
             },
-            60
+            0
         );
 
 }
@@ -3224,39 +3377,39 @@ function listenToGroups(uid) {
 
 
     const memberIdsQuery =
-        query(
-            groupsRef,
-            where(
-                "memberIds",
-                "array-contains",
-                uid
-            ),
-            limit(30)
-        );
+    query(
+        groupsRef,
+        where(
+            "memberIds",
+            "array-contains",
+            uid
+        ),
+        limit(100)
+    );
 
 
-    const membersQuery =
-        query(
-            groupsRef,
-            where(
-                "members",
-                "array-contains",
-                uid
-            ),
-            limit(30)
-        );
+const membersQuery =
+    query(
+        groupsRef,
+        where(
+            "members",
+            "array-contains",
+            uid
+        ),
+        limit(100)
+    );
 
 
-    const ownerQuery =
-        query(
-            groupsRef,
-            where(
-                "ownerId",
-                "==",
-                uid
-            ),
-            limit(30)
-        );
+const ownerQuery =
+    query(
+        groupsRef,
+        where(
+            "ownerId",
+            "==",
+            uid
+        ),
+        limit(100)
+    );
 
 
     /*
