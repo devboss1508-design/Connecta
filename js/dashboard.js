@@ -4866,14 +4866,311 @@ function listenToUsers() {
 
 }
 
+/* =========================================================
+   HYDRATE OWN PROFILE
+   =========================================================
+   New accounts can reach dashboard immediately after
+   registration. Firebase Auth already knows the user's
+   displayName, so use it immediately while Firestore
+   profile data is being confirmed in the background.
+========================================================= */
+
+async function hydrateOwnProfile() {
+
+    if (!currentUser?.uid) {
+        return;
+    }
+
+    const uid =
+        currentUser.uid;
+
+    const authDisplayName =
+        String(
+            currentUser.displayName || ""
+        ).trim();
+
+    const authPhotoURL =
+        currentUser.photoURL || "";
+
+    /*
+     * -----------------------------------------------------
+     * STEP 1
+     * Immediately use Firebase Auth information.
+     * -----------------------------------------------------
+     */
+
+    if (
+        authDisplayName &&
+        authDisplayName !== "CONNECTA User"
+    ) {
+
+        currentProfile = {
+
+            ...currentProfile,
+
+            uid,
+
+            displayName:
+                authDisplayName,
+
+            photoURL:
+                currentProfile?.photoURL ||
+                authPhotoURL ||
+                ""
+
+        };
+
+        saveProfileToCache(
+            currentProfile
+        );
+
+        renderProfile();
+
+    }
+
+
+    /*
+     * -----------------------------------------------------
+     * STEP 2
+     * Get the real Firestore profile.
+     * -----------------------------------------------------
+     */
+
+    try {
+
+        const profileRef =
+            doc(
+                db,
+                "users",
+                uid
+            );
+
+        const snapshot =
+            await getDoc(
+                profileRef
+            );
+
+
+        if (
+            !snapshot.exists()
+        ) {
+
+            console.warn(
+                "[CONNECTA] Firestore profile does not exist yet:",
+                uid
+            );
+
+            return;
+
+        }
+
+
+        const firestoreProfile = {
+
+            uid,
+
+            ...snapshot.data()
+
+        };
+
+
+        /*
+         * -------------------------------------------------
+         * STEP 3
+         * Never allow an empty/"CONNECTA User" Firestore
+         * value to replace a valid Firebase Auth name.
+         * -------------------------------------------------
+         */
+
+        const firestoreName =
+            String(
+                firestoreProfile.displayName || ""
+            ).trim();
+
+
+        const firestoreFirstName =
+            String(
+                firestoreProfile.firstName || ""
+            ).trim();
+
+
+        const firestoreLastName =
+            String(
+                firestoreProfile.lastName || ""
+            ).trim();
+
+
+        let finalDisplayName =
+            firestoreName;
+
+
+        /*
+         * If Firestore has the placeholder, reconstruct
+         * the name from firstName + lastName.
+         */
+
+        if (
+            !finalDisplayName ||
+            finalDisplayName === "CONNECTA User"
+        ) {
+
+            const constructedName =
+                `${firestoreFirstName} ${firestoreLastName}`
+                    .trim();
+
+
+            if (constructedName) {
+
+                finalDisplayName =
+                    constructedName;
+
+            }
+
+        }
+
+
+        /*
+         * If Firestore still has no usable name,
+         * preserve Firebase Auth's real name.
+         */
+
+        if (
+            !finalDisplayName ||
+            finalDisplayName === "CONNECTA User"
+        ) {
+
+            if (
+                authDisplayName &&
+                authDisplayName !== "CONNECTA User"
+            ) {
+
+                finalDisplayName =
+                    authDisplayName;
+
+            }
+
+        }
+
+
+        currentProfile = {
+
+            ...currentProfile,
+
+            ...firestoreProfile,
+
+            uid,
+
+            displayName:
+                finalDisplayName ||
+                authDisplayName ||
+                "CONNECTA User",
+
+            photoURL:
+                firestoreProfile.photoURL ||
+                firestoreProfile.photoUrl ||
+                currentProfile?.photoURL ||
+                authPhotoURL ||
+                "",
+
+            balance:
+                Number(
+                    firestoreProfile.balance ?? 
+                    currentProfile?.balance ??
+                    0
+                ),
+
+            following:
+                Array.isArray(
+                    firestoreProfile.following
+                )
+                    ? firestoreProfile.following
+                    : (
+                        Array.isArray(
+                            currentProfile?.following
+                        )
+                            ? currentProfile.following
+                            : []
+                    )
+
+        };
+
+
+        /*
+         * -------------------------------------------------
+         * STEP 4
+         * Save immediately for the next dashboard visit.
+         * -------------------------------------------------
+         */
+
+        saveProfileToCache(
+            currentProfile
+        );
+
+        saveDashboardCache();
+
+
+        /*
+         * -------------------------------------------------
+         * STEP 5
+         * Update dashboard immediately.
+         * -------------------------------------------------
+         */
+
+        renderProfile();
+
+        renderOnline();
+
+
+        console.log(
+            "[CONNECTA] Own profile hydrated:",
+            currentProfile.displayName
+        );
+
+
+    } catch (error) {
+
+        console.warn(
+            "[CONNECTA] Own profile hydration failed:",
+            error
+        );
+
+        /*
+         * Firebase Auth name remains visible, so the
+         * dashboard does not need to show "Loading..."
+         * or break if Firestore takes longer.
+         */
+
+        renderProfile();
+
+    }
+
+}
 
 /* =========================================================
    INITIALIZE DASHBOARD
+   =========================================================
+   Profile-first startup.
+
+   The dashboard never waits for Firestore before showing
+   the user's basic identity.
+
+   Priority:
+
+   1. Firebase Auth
+   2. Dashboard cache
+   3. Firestore profile
+   4. Live listeners
 ========================================================= */
 
 async function initializeDashboard() {
 
     try {
+
+        /*
+         * -------------------------------------------------
+         * AUTHENTICATION
+         * -------------------------------------------------
+         */
 
         const session =
             await getCurrentConnectaUser({
@@ -4894,47 +5191,194 @@ async function initializeDashboard() {
             session.authUser;
 
 
-        currentProfile =
-            session.profile || {
+        /*
+         * -------------------------------------------------
+         * FIREBASE AUTH PROFILE
+         * -------------------------------------------------
+         *
+         * Firebase Auth already knows displayName directly
+         * after registration.
+         */
 
-                uid:
-                    currentUser.uid,
+        const authDisplayName =
+            String(
+                currentUser?.displayName || ""
+            ).trim();
 
-                displayName:
-                    currentUser.displayName ||
-                    "",
 
-                photoURL:
-                    currentUser.photoURL ||
-                    "",
-
-                status:
-                    "active",
-
-                balance:
-                    0,
-
-                following:
-                    []
-
-            };
+        const authPhotoURL =
+            currentUser?.photoURL ||
+            "";
 
 
         /*
-         * CACHE FIRST
+         * -------------------------------------------------
+         * EXISTING SESSION PROFILE
+         * -------------------------------------------------
+         */
+
+        const sessionProfile =
+            session.profile || {};
+
+
+        /*
+         * -------------------------------------------------
+         * DETERMINE INITIAL NAME
+         * -------------------------------------------------
          *
-         * This happens before live Firestore
-         * listeners start.
+         * Never start a new account with CONNECTA User when
+         * Firebase Auth already contains the real name.
+         */
+
+        let initialName =
+            String(
+                sessionProfile.displayName || ""
+            ).trim();
+
+
+        if (
+            !initialName ||
+            initialName === "CONNECTA User"
+        ) {
+
+            initialName =
+                authDisplayName;
+
+        }
+
+
+        /*
+         * -------------------------------------------------
+         * INITIAL PROFILE
+         * -------------------------------------------------
+         *
+         * This object is rendered immediately.
+         */
+
+        currentProfile = {
+
+            ...sessionProfile,
+
+            uid:
+                currentUser.uid,
+
+            displayName:
+                initialName ||
+                "",
+
+            photoURL:
+                sessionProfile.photoURL ||
+                sessionProfile.photoUrl ||
+                authPhotoURL ||
+                "",
+
+            status:
+                sessionProfile.status ||
+                "active",
+
+            balance:
+                Number(
+                    sessionProfile.balance ?? 0
+                ),
+
+            following:
+                Array.isArray(
+                    sessionProfile.following
+                )
+                    ? sessionProfile.following
+                    : []
+
+        };
+
+
+        /*
+         * -------------------------------------------------
+         * CACHE
+         * -------------------------------------------------
+         *
+         * Load any previous dashboard data.
+         *
+         * Important:
+         * We only allow the cache to improve the profile,
+         * not replace a valid Firebase Auth name with
+         * "CONNECTA User".
          */
 
         loadDashboardCache();
 
 
+        /*
+         * -------------------------------------------------
+         * RESTORE AUTH NAME AFTER CACHE
+         * -------------------------------------------------
+         *
+         * loadDashboardCache() may contain an old profile.
+         * Make sure a valid Auth name wins over the
+         * placeholder.
+         */
+
+        const cachedName =
+            String(
+                currentProfile?.displayName || ""
+            ).trim();
+
+
+        if (
+            authDisplayName &&
+            authDisplayName !== "CONNECTA User" &&
+            (
+                !cachedName ||
+                cachedName === "CONNECTA User"
+            )
+        ) {
+
+            currentProfile.displayName =
+                authDisplayName;
+
+        }
+
+
+        /*
+         * -------------------------------------------------
+         * RESTORE AUTH PHOTO
+         * -------------------------------------------------
+         */
+
+        if (
+            !currentProfile.photoURL &&
+            authPhotoURL
+        ) {
+
+            currentProfile.photoURL =
+                authPhotoURL;
+
+        }
+
+
+        /*
+         * -------------------------------------------------
+         * INSTANT PROFILE RENDER
+         * -------------------------------------------------
+         *
+         * This happens before waiting for Firestore.
+         */
+
         renderProfile();
 
 
         /*
+         * Save the usable initial profile immediately.
+         */
+
+        saveProfileToCache(
+            currentProfile
+        );
+
+
+        /*
+         * -------------------------------------------------
          * ACCOUNT STATUS
+         * -------------------------------------------------
          */
 
         const control =
@@ -4955,21 +5399,40 @@ async function initializeDashboard() {
 
 
         /*
+         * -------------------------------------------------
+         * FIRESTORE PROFILE HYDRATION
+         * -------------------------------------------------
+         *
+         * This runs in the background.
+         *
+         * The dashboard is already visible.
+         */
+
+        hydrateOwnProfile();
+
+
+        /*
+         * -------------------------------------------------
          * PRESENCE
+         * -------------------------------------------------
          */
 
         startPresence();
 
 
         /*
+         * -------------------------------------------------
          * LIVE USERS
+         * -------------------------------------------------
          */
 
         listenToUsers();
 
 
         /*
+         * -------------------------------------------------
          * LIVE PRIVATE CHATS
+         * -------------------------------------------------
          */
 
         listenToChats(
@@ -4978,29 +5441,73 @@ async function initializeDashboard() {
 
 
         /*
+         * -------------------------------------------------
          * LIVE GROUPS
+         * -------------------------------------------------
          */
 
         listenToGroups(
             currentUser.uid
         );
 
+
+        console.log(
+            "[CONNECTA] Dashboard started for:",
+            currentProfile.displayName ||
+            currentUser.displayName ||
+            currentUser.uid
+        );
+
+
     } catch (error) {
 
         console.error(
-            "Dashboard initialization failed:",
+            "[CONNECTA] Dashboard initialization failed:",
             error
         );
 
 
-        showToast(
-            "Unable to load CONNECTA dashboard."
-        );
+        /*
+         * Do NOT replace the dashboard with a loading
+         * screen. The user can still see their basic
+         * Firebase Auth profile if it was available.
+         */
+
+        if (
+            currentUser?.displayName
+        ) {
+
+            currentProfile = {
+
+                ...currentProfile,
+
+                uid:
+                    currentUser.uid,
+
+                displayName:
+                    currentUser.displayName,
+
+                photoURL:
+                    currentUser.photoURL ||
+                    currentProfile?.photoURL ||
+                    ""
+
+            };
+
+
+            renderProfile();
+
+        } else {
+
+            showToast(
+                "Unable to load CONNECTA dashboard."
+            );
+
+        }
 
     }
 
 }
-
 
 /* =========================================================
    PAGE LIFECYCLE
