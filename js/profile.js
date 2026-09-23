@@ -349,6 +349,109 @@ function getFullName(user = {}) {
 
 }
 
+/* =====================================================
+   REPAIR OWN PROFILE NAME
+===================================================== */
+
+async function repairOwnProfileName(profile) {
+
+  if (
+    !currentUser ||
+    !profile ||
+    profile.uid !== currentUser.uid
+  ) {
+    return profile;
+  }
+
+  const authDisplayName =
+    String(
+      currentUser.displayName || ""
+    ).trim();
+
+  /*
+  If Firebase Authentication already has
+  the real name, use it when Firestore is
+  missing the name or still has the placeholder.
+  */
+
+  if (
+    authDisplayName &&
+    (
+      !profile.displayName ||
+      profile.displayName === "CONNECTA User"
+    )
+  ) {
+
+    const nameParts =
+      authDisplayName
+        .split(/\s+/)
+        .filter(Boolean);
+
+    const repairedFirstName =
+      profile.firstName ||
+      nameParts[0] ||
+      "";
+
+    const repairedLastName =
+      profile.lastName ||
+      nameParts.slice(1).join(" ") ||
+      "";
+
+    const repairedProfile = {
+
+      ...profile,
+
+      displayName:
+        authDisplayName,
+
+      firstName:
+        repairedFirstName,
+
+      lastName:
+        repairedLastName
+
+    };
+
+    try {
+
+      await updateDoc(
+        doc(
+          db,
+          "users",
+          currentUser.uid
+        ),
+        {
+          displayName:
+            authDisplayName,
+
+          firstName:
+            repairedFirstName,
+
+          lastName:
+            repairedLastName
+        }
+      );
+
+      console.log(
+        "CONNECTA profile name repaired:",
+        authDisplayName
+      );
+
+    } catch (error) {
+
+      console.warn(
+        "Unable to repair Firestore profile name:",
+        error
+      );
+
+    }
+
+    return repairedProfile;
+  }
+
+  return profile;
+}
+
 
 /* =====================================================
    ESCAPE HTML
@@ -3054,44 +3157,54 @@ async function loadProfile(
     */
 
     if (
-      isOwnProfile(uid)
-    ) {
+  isOwnProfile(uid)
+) {
 
-      profile.email =
-        profile.email ||
-        currentUser?.email ||
-        "";
+  profile.email =
+    profile.email ||
+    currentUser?.email ||
+    "";
 
-
-      profile.isOnline =
-        true;
-
-
-      currentUserFollowing =
-        Array.isArray(
-          profile.following
-        )
-          ? [
-              ...profile.following
-            ]
-          : [];
+  profile.isOnline =
+    true;
 
 
-      viewedUser =
-        profile;
+  /*
+  ================================================
+  REPAIR OLD / INCOMPLETE PROFILE NAME
+  ================================================
+  */
+
+  const repairedProfile =
+    await repairOwnProfileName(
+      profile
+    );
 
 
-      saveOwnProfileCache(
-        profile
-      );
+  currentUserFollowing =
+    Array.isArray(
+      repairedProfile.following
+    )
+      ? [
+          ...repairedProfile.following
+        ]
+      : [];
 
 
-      renderProfile(
-        profile
-      );
+  viewedUser =
+    repairedProfile;
 
 
-    }
+  saveOwnProfileCache(
+    repairedProfile
+  );
+
+
+  renderProfile(
+    repairedProfile
+  );
+
+}
 
 
     /*
@@ -3224,46 +3337,57 @@ function listenToProfile(uid) {
         */
 
         if (
-          isOwnProfile(uid)
-        ) {
+  isOwnProfile(uid)
+) {
 
-          profile.email =
-            profile.email ||
-            currentUser?.email ||
-            "";
+  profile.email =
+    profile.email ||
+    currentUser?.email ||
+    "";
 
-
-          profile.isOnline =
-            true;
-
-
-          currentUserFollowing =
-            Array.isArray(
-              profile.following
-            )
-              ? [
-                  ...profile.following
-                ]
-              : [];
+  profile.isOnline =
+    true;
 
 
-          viewedUser =
-            profile;
+  /*
+  ================================================
+  REPAIR OLD / INCOMPLETE PROFILE NAME
+  ================================================
+  */
+
+  const repairedProfile =
+    await repairOwnProfileName(
+      profile
+    );
 
 
-          saveOwnProfileCache(
-            profile
-          );
+  currentUserFollowing =
+    Array.isArray(
+      repairedProfile.following
+    )
+      ? [
+          ...repairedProfile.following
+        ]
+      : [];
 
 
-          renderProfile(
-            profile
-          );
+  viewedUser =
+    repairedProfile;
 
 
-          return;
+  saveOwnProfileCache(
+    repairedProfile
+  );
 
-        }
+
+  renderProfile(
+    repairedProfile
+  );
+
+
+  return;
+
+  }
 
 
         /*
