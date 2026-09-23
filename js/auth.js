@@ -29,10 +29,27 @@ const REFERRAL_REWARD = 5;
 
 
 /* =========================================================
+   REGISTRATION STATE
+=========================================================
+
+   IMPORTANT:
+
+   Firebase Auth changes to "signed in" immediately after
+   createUserWithEmailAndPassword() succeeds.
+
+   We MUST prevent onAuthStateChanged() from redirecting
+   to dashboard while the Firestore profile is still being
+   created.
+========================================================= */
+
+let registrationInProgress = false;
+
+
+/* =========================================================
    HELPERS
 ========================================================= */
 
-const $ = (id) =>
+const $ = id =>
   document.getElementById(id);
 
 
@@ -48,20 +65,22 @@ function showMessage(
 
   const el = $(id);
 
-  if (!el) return;
+  if (!el) {
+    return;
+  }
 
-  el.textContent = message;
+  el.textContent =
+    message;
 
   el.style.color =
     success
       ? "#15803D"
       : "#DC2626";
-
 }
 
 
 /* =========================================================
-   REFERRAL CODE GENERATOR
+   REFERRAL CODE
 ========================================================= */
 
 function makeReferralCode(
@@ -87,7 +106,6 @@ function makeReferralCode(
 
 
   return `${clean}${random}`;
-
 }
 
 
@@ -106,12 +124,11 @@ function getReferralFromUrl() {
   return ref
     ? ref.trim().slice(0, 50)
     : "";
-
 }
 
 
 /* =========================================================
-   FIND REFERRER BY REFERRAL CODE
+   FIND REFERRER
 ========================================================= */
 
 async function findReferrerByCode(
@@ -164,27 +181,16 @@ async function findReferrerByCode(
 
 
   return {
-    uid: referrerDoc.id,
+    uid:
+      referrerDoc.id,
+
     ...referrerDoc.data()
   };
-
 }
 
 
 /* =========================================================
    CREATE REFERRAL RECORD
-=========================================================
-
-   IMPORTANT:
-
-   This creates the referral event.
-
-   It does NOT directly add money to the
-   user's wallet.
-
-   The actual KSh 5 financial credit should
-   be performed by a trusted backend/admin
-   transaction after verifying the referral.
 ========================================================= */
 
 async function createReferralRecord({
@@ -193,12 +199,7 @@ async function createReferralRecord({
   referredProfile
 }) {
 
-  if (!referrer) {
-    return null;
-  }
-
-
-  if (!referrer.uid) {
+  if (!referrer?.uid) {
     return null;
   }
 
@@ -208,26 +209,14 @@ async function createReferralRecord({
   }
 
 
-  /* -----------------------------------------------
-     Prevent self referral
-  ------------------------------------------------ */
-
   if (
     referrer.uid ===
     referredUser.uid
   ) {
 
     return null;
-
   }
 
-
-  /* -----------------------------------------------
-     Referral document ID
-
-     Using referred UID makes the referral
-     naturally unique for this registration.
-  ------------------------------------------------ */
 
   const referralRef =
     doc(
@@ -237,26 +226,20 @@ async function createReferralRecord({
     );
 
 
-  /* -----------------------------------------------
-     Check if referral already exists
-  ------------------------------------------------ */
-
   const existingReferral =
     await getDoc(
       referralRef
     );
 
 
-  if (existingReferral.exists()) {
+  if (
+    existingReferral.exists()
+  ) {
 
     return existingReferral.data();
 
   }
 
-
-  /* -----------------------------------------------
-     Create referral record
-  ------------------------------------------------ */
 
   const referralData = {
 
@@ -314,7 +297,6 @@ async function createReferralRecord({
 
 
   return referralData;
-
 }
 
 
@@ -335,11 +317,13 @@ const usernamePattern =
 
 
 /* =========================================================
-   SHOW / HIDE PASSWORD
+   PASSWORD SHOW / HIDE
 ========================================================= */
 
 document
-  .querySelectorAll(".show-password")
+  .querySelectorAll(
+    ".show-password"
+  )
   .forEach(btn => {
 
     btn.addEventListener(
@@ -349,17 +333,22 @@ document
         const input =
           $(btn.dataset.target);
 
-        if (!input) return;
+
+        if (!input) {
+          return;
+        }
 
 
         input.type =
-          input.type === "password"
+          input.type ===
+          "password"
             ? "text"
             : "password";
 
 
         btn.textContent =
-          input.type === "password"
+          input.type ===
+          "password"
             ? "Show"
             : "Hide";
 
@@ -370,7 +359,7 @@ document
 
 
 /* =========================================================
-   PASSWORD MATCH LIVE VALIDATION
+   PASSWORD MATCH
 ========================================================= */
 
 const registerPassword =
@@ -390,12 +379,15 @@ function checkPasswordMatch() {
     !confirmPassword ||
     !passwordMatchMessage
   ) {
+
     return true;
+
   }
 
 
   const password =
     registerPassword.value;
+
 
   const confirmation =
     confirmPassword.value;
@@ -412,7 +404,8 @@ function checkPasswordMatch() {
 
 
   if (
-    password === confirmation
+    password ===
+    confirmation
   ) {
 
     passwordMatchMessage.textContent =
@@ -433,28 +426,19 @@ function checkPasswordMatch() {
     "#DC2626";
 
   return false;
-
 }
 
 
-if (registerPassword) {
-
-  registerPassword.addEventListener(
-    "input",
-    checkPasswordMatch
-  );
-
-}
+registerPassword?.addEventListener(
+  "input",
+  checkPasswordMatch
+);
 
 
-if (confirmPassword) {
-
-  confirmPassword.addEventListener(
-    "input",
-    checkPasswordMatch
-  );
-
-}
+confirmPassword?.addEventListener(
+  "input",
+  checkPasswordMatch
+);
 
 
 /* =========================================================
@@ -472,6 +456,19 @@ if (registerForm) {
     async event => {
 
       event.preventDefault();
+
+
+      /*
+       * IMPORTANT:
+       *
+       * Set this BEFORE creating the Firebase account.
+       *
+       * This prevents onAuthStateChanged() from opening
+       * dashboard.html prematurely.
+       */
+
+      registrationInProgress =
+        true;
 
 
       const submit =
@@ -494,28 +491,37 @@ if (registerForm) {
       try {
 
         /* ======================================
-           GET FORM VALUES
+           FORM VALUES
         ====================================== */
 
         const firstName =
           $("firstName")
             .value
             .trim()
-            .replace(/\s+/g, " ");
+            .replace(
+              /\s+/g,
+              " "
+            );
 
 
         const lastName =
           $("lastName")
             .value
             .trim()
-            .replace(/\s+/g, " ");
+            .replace(
+              /\s+/g,
+              " "
+            );
 
 
         const username =
           $("username")
             .value
             .trim()
-            .replace(/^@/, "");
+            .replace(
+              /^@/,
+              ""
+            );
 
 
         const email =
@@ -538,8 +544,7 @@ if (registerForm) {
 
         const confirmation =
           $("confirmPassword")
-            ? $("confirmPassword").value
-            : "";
+            ?.value || "";
 
 
         const terms =
@@ -683,7 +688,8 @@ if (registerForm) {
 
 
         if (
-          password !== confirmation
+          password !==
+          confirmation
         ) {
 
           throw new Error(
@@ -707,14 +713,15 @@ if (registerForm) {
 
 
         /* ======================================
-           GET REFERRAL BEFORE ACCOUNT CREATION
+           REFERRAL
         ====================================== */
 
         const referralFromUrl =
           getReferralFromUrl();
 
 
-        let referrer = null;
+        let referrer =
+          null;
 
 
         if (referralFromUrl) {
@@ -726,7 +733,9 @@ if (registerForm) {
                 referralFromUrl
               );
 
-          } catch (referralLookupError) {
+          } catch (
+            referralLookupError
+          ) {
 
             console.warn(
               "Referral lookup failed:",
@@ -739,7 +748,7 @@ if (registerForm) {
 
 
         /* ======================================
-           CREATE FIREBASE AUTH ACCOUNT
+           CREATE FIREBASE AUTH USER
         ====================================== */
 
         const credential =
@@ -755,23 +764,37 @@ if (registerForm) {
 
 
         /* ======================================
-           DISPLAY NAME
+           REAL DISPLAY NAME
         ====================================== */
 
         const displayName =
-          `${firstName} ${lastName}`.trim();
+          `${firstName} ${lastName}`
+            .trim();
 
+
+        /*
+         * Wait for Firebase Auth profile update.
+         */
 
         await updateProfile(
           user,
           {
-            displayName
+            displayName:
+              displayName
           }
         );
 
 
+        /*
+         * Verify that Firebase Auth now contains
+         * the real display name.
+         */
+
+        await user.reload();
+
+
         /* ======================================
-           GENERATE REFERRAL CODE
+           REFERRAL CODE
         ====================================== */
 
         const referralCode =
@@ -781,21 +804,24 @@ if (registerForm) {
 
 
         /* ======================================
-           VALIDATED REFERRED BY
+           REFERRED BY
         ====================================== */
 
         const referredBy =
           referrer
+
             ? String(
-                referrer.referralCode || ""
+                referrer.referralCode ||
+                ""
               )
                 .trim()
                 .toUpperCase()
+
             : "";
 
 
         /* ======================================
-           USER PROFILE
+           COMPLETE USER PROFILE
         ====================================== */
 
         const userProfile = {
@@ -803,20 +829,26 @@ if (registerForm) {
           uid:
             user.uid,
 
-          firstName,
+          firstName:
+            firstName,
 
-          lastName,
+          lastName:
+            lastName,
 
-          displayName,
+          displayName:
+            displayName,
 
-          username,
+          username:
+            username,
 
           usernameLower:
             username.toLowerCase(),
 
-          email,
+          email:
+            email,
 
-          phone,
+          phone:
+            phone,
 
           photoURL:
             "",
@@ -845,9 +877,11 @@ if (registerForm) {
           verifiedAt:
             null,
 
-          referralCode,
+          referralCode:
+            referralCode,
 
-          referredBy,
+          referredBy:
+            referredBy,
 
           following:
             [],
@@ -860,14 +894,6 @@ if (registerForm) {
 
           balance:
             0,
-
-          /*
-           * Referral statistics.
-           *
-           * The secure backend will eventually
-           * update these after successful referral
-           * verification.
-           */
 
           referralCount:
             0,
@@ -885,21 +911,211 @@ if (registerForm) {
 
 
         /* ======================================
-           CREATE USER PROFILE
+           CREATE FIRESTORE PROFILE
         ====================================== */
 
-        await setDoc(
+        const userRef =
           doc(
             db,
             "users",
             user.uid
-          ),
+          );
+
+
+        await setDoc(
+          userRef,
           userProfile
         );
 
 
         /* ======================================
-           CREATE REFERRAL RECORD
+           VERIFY PROFILE WAS ACTUALLY SAVED
+        ====================================== */
+
+        const savedProfile =
+          await getDoc(
+            userRef
+          );
+
+
+        if (
+          !savedProfile.exists()
+        ) {
+
+          throw new Error(
+            "Your account was created, but your CONNECTA profile could not be saved. Please try again."
+          );
+
+        }
+
+
+        const savedData =
+          savedProfile.data();
+
+
+        /*
+         * Make absolutely sure the name exists.
+         */
+
+        if (
+          !savedData.displayName ||
+          savedData.displayName ===
+            "CONNECTA User"
+        ) {
+
+          throw new Error(
+            "Your CONNECTA profile was created without your name. Please try again."
+          );
+
+        }
+
+
+        /* ======================================
+           CACHE PROFILE IMMEDIATELY
+        ======================================
+
+           This allows dashboard.js/profile.js to
+           display the profile instantly while the
+           live Firestore listeners start.
+        */
+
+        try {
+
+          const profileCache =
+            JSON.parse(
+              localStorage.getItem(
+                "connectaProfileCache"
+              ) || "{}"
+            );
+
+
+          profileCache[user.uid] = {
+
+            uid:
+              user.uid,
+
+            firstName:
+              savedData.firstName ||
+              firstName,
+
+            lastName:
+              savedData.lastName ||
+              lastName,
+
+            displayName:
+              savedData.displayName ||
+              displayName,
+
+            username:
+              savedData.username ||
+              username,
+
+            photoURL:
+              savedData.photoURL ||
+              "",
+
+            bio:
+              savedData.bio ||
+              "",
+
+            isOnline:
+              true,
+
+            isVerified:
+              savedData.isVerified ===
+              true,
+
+            followersCount:
+              Number(
+                savedData.followersCount ||
+                0
+              ),
+
+            followingCount:
+              Number(
+                savedData.followingCount ||
+                0
+              ),
+
+            following:
+              Array.isArray(
+                savedData.following
+              )
+                ? savedData.following
+                : [],
+
+            balance:
+              Number(
+                savedData.balance ||
+                0
+              ),
+
+            status:
+              savedData.status ||
+              "active",
+
+            cachedAt:
+              Date.now()
+
+          };
+
+
+          localStorage.setItem(
+            "connectaProfileCache",
+            JSON.stringify(
+              profileCache
+            )
+          );
+
+
+          /*
+           * Also save the last logged-in user.
+           */
+
+          localStorage.setItem(
+            "connectaLastUser",
+            JSON.stringify({
+
+              uid:
+                user.uid,
+
+              email:
+                user.email ||
+                email,
+
+              displayName:
+                savedData.displayName ||
+                displayName,
+
+              firstName:
+                savedData.firstName ||
+                firstName,
+
+              lastName:
+                savedData.lastName ||
+                lastName,
+
+              username:
+                savedData.username ||
+                username
+
+            })
+          );
+
+        } catch (
+          cacheError
+        ) {
+
+          console.warn(
+            "Profile cache unavailable:",
+            cacheError
+          );
+
+        }
+
+
+        /* ======================================
+           REFERRAL RECORD
         ====================================== */
 
         if (
@@ -910,9 +1126,15 @@ if (registerForm) {
           try {
 
             await createReferralRecord({
+
               referrer,
-              referredUser: user,
-              referredProfile: userProfile
+
+              referredUser:
+                user,
+
+              referredProfile:
+                userProfile
+
             });
 
 
@@ -930,14 +1152,13 @@ if (registerForm) {
               }
             );
 
-          } catch (referralError) {
+          } catch (
+            referralError
+          ) {
 
             /*
-             * Do NOT fail registration because
-             * referral-record creation failed.
-
-             * The user's CONNECTA account has
-             * already been successfully created.
+             * Referral failure must NOT prevent
+             * the user from entering CONNECTA.
              */
 
             console.error(
@@ -951,27 +1172,29 @@ if (registerForm) {
 
 
         /* ======================================
-           SUCCESS
+           REGISTRATION COMPLETE
         ====================================== */
 
         showMessage(
           "registerMessage",
-          "Account created successfully. Opening CONNECTA...",
+          `Welcome to CONNECTA, ${displayName}! Opening your dashboard...`,
           true
         );
 
 
-        setTimeout(
-          () => {
+        /*
+         * IMPORTANT:
+         *
+         * registrationInProgress stays true until
+         * we actually leave this page.
+         *
+         * Therefore onAuthStateChanged() cannot
+         * race us.
+         */
 
-            location.replace(
-              "dashboard.html"
-            );
-
-          },
-          700
+        location.replace(
+          "dashboard.html"
         );
-
 
       } catch (error) {
 
@@ -981,11 +1204,21 @@ if (registerForm) {
         );
 
 
+        /*
+         * Registration failed.
+         */
+
+        registrationInProgress =
+          false;
+
+
         let message =
           "Unable to create account. Please try again.";
 
 
-        switch (error.code) {
+        switch (
+          error.code
+        ) {
 
           case "auth/email-already-in-use":
 
@@ -1021,6 +1254,8 @@ if (registerForm) {
 
           case "permission-denied":
 
+          case "firestore/permission-denied":
+
             message =
               "Firestore permission denied. Check your Firebase rules.";
 
@@ -1029,7 +1264,9 @@ if (registerForm) {
 
           default:
 
-            if (error.message) {
+            if (
+              error.message
+            ) {
 
               message =
                 error.message;
@@ -1099,10 +1336,6 @@ if (loginForm) {
 
       try {
 
-        /* ======================================
-           GET LOGIN VALUES
-        ====================================== */
-
         const email =
           $("loginIdentifier")
             .value
@@ -1115,11 +1348,9 @@ if (loginForm) {
             .value;
 
 
-        /* ======================================
-           VALIDATE EMAIL
-        ====================================== */
-
-        if (!email.includes("@")) {
+        if (
+          !email.includes("@")
+        ) {
 
           throw new Error(
             "For now, please login using the email used during registration."
@@ -1127,10 +1358,6 @@ if (loginForm) {
 
         }
 
-
-        /* ======================================
-           FIREBASE LOGIN
-        ====================================== */
 
         const credential =
           await signInWithEmailAndPassword(
@@ -1145,7 +1372,7 @@ if (loginForm) {
 
 
         /* ======================================
-           BACKGROUND ONLINE STATUS
+           LOAD PROFILE BEFORE DASHBOARD
         ====================================== */
 
         const userRef =
@@ -1155,6 +1382,72 @@ if (loginForm) {
             uid
           );
 
+
+        const profileSnapshot =
+          await getDoc(
+            userRef
+          );
+
+
+        if (
+          profileSnapshot.exists()
+        ) {
+
+          const profile =
+            profileSnapshot.data();
+
+
+          /*
+           * Cache the real profile so the dashboard
+           * can display it immediately.
+           */
+
+          try {
+
+            const profileCache =
+              JSON.parse(
+                localStorage.getItem(
+                  "connectaProfileCache"
+                ) || "{}"
+              );
+
+
+            profileCache[uid] = {
+
+              uid,
+
+              ...profile,
+
+              cachedAt:
+                Date.now()
+
+            };
+
+
+            localStorage.setItem(
+              "connectaProfileCache",
+              JSON.stringify(
+                profileCache
+              )
+            );
+
+          } catch (
+            cacheError
+          ) {
+
+            console.warn(
+              "Login profile cache failed:",
+              cacheError
+            );
+
+          }
+
+        }
+
+
+        /* ======================================
+           PRESENCE
+        ====================================== */
 
         setDoc(
           userRef,
@@ -1168,7 +1461,8 @@ if (loginForm) {
 
           },
           {
-            merge: true
+            merge:
+              true
           }
         ).catch(
           error => {
@@ -1183,7 +1477,7 @@ if (loginForm) {
 
 
         /* ======================================
-           SAVE SESSION DATA
+           SESSION CACHE
         ====================================== */
 
         try {
@@ -1196,15 +1490,19 @@ if (loginForm) {
                 credential.user.uid,
 
               email:
-                credential.user.email || "",
+                credential.user.email ||
+                "",
 
               displayName:
-                credential.user.displayName || ""
+                credential.user.displayName ||
+                ""
 
             })
           );
 
-        } catch (storageError) {
+        } catch (
+          storageError
+        ) {
 
           console.warn(
             "Session cache unavailable:",
@@ -1222,7 +1520,6 @@ if (loginForm) {
           "dashboard.html"
         );
 
-
       } catch (error) {
 
         console.error(
@@ -1235,7 +1532,9 @@ if (loginForm) {
           "Unable to login. Please check your details.";
 
 
-        switch (error.code) {
+        switch (
+          error.code
+        ) {
 
           case "auth/invalid-credential":
 
@@ -1275,7 +1574,9 @@ if (loginForm) {
 
           default:
 
-            if (error.message) {
+            if (
+              error.message
+            ) {
 
               message =
                 error.message;
@@ -1311,6 +1612,16 @@ if (loginForm) {
 
 /* =========================================================
    AUTH STATE
+=========================================================
+
+   IMPORTANT FIX:
+
+   Do NOT redirect while registration is still being
+   completed.
+
+   Firebase can fire onAuthStateChanged() immediately
+   after createUserWithEmailAndPassword(), before the
+   Firestore profile has finished saving.
 ========================================================= */
 
 onAuthStateChanged(
@@ -1330,6 +1641,20 @@ onAuthStateChanged(
         page === "register.html"
       )
     ) {
+
+      /*
+       * Registration owns the redirect while it is
+       * creating the account and saving the profile.
+       */
+
+      if (
+        registrationInProgress
+      ) {
+
+        return;
+
+      }
+
 
       location.replace(
         "dashboard.html"
@@ -1351,6 +1676,7 @@ window.connectaLogout =
     await signOut(
       auth
     );
+
 
     location.replace(
       "login.html"
