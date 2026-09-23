@@ -8,24 +8,21 @@
    - JPG / JPEG / PNG / WebP only
    - No videos
    - Compact message bubbles
-   - No custom emoji button
-   - Gallery/file picker for photos
-   - Admin group chat lock
-   - Admin group messaging restriction
-   - Admin group participation restriction
-   - Suspended / banned account protection
+   - Gallery/file picker
+   - Realtime group messages
+   - Realtime group controls
+   - Realtime account controls
+   - Admin chat lock
+   - Admin messaging restriction
+   - Admin participation restriction
+   - Owner controls
+   - Announcement-only groups
+   - Public/private group rules
+   - Private groups: verified users only
    - Group membership protection
-   - Live group controls
-   - Live user controls
    - Cached group/messages fallback
-   - GROUP OWNER CONTROLS
-     • Edit group name
-     • Edit description
-     • Change group photo
-     • Delete messages for everyone
-     • Delete group
-   - Group read state / unread support
-   - Global CONNECTA authentication
+   - Group read state
+   - Typing state
 ========================================================= */
 
 import {
@@ -66,11 +63,8 @@ import {
 ========================================================= */
 
 const GROUPS_COLLECTION = "groups";
-
 const GROUP_MESSAGES_COLLECTION = "groupMessages";
-
 const GROUP_READS_COLLECTION = "reads";
-
 const GROUP_TYPING_COLLECTION = "typing";
 
 const MAX_MESSAGES = 100;
@@ -104,8 +98,10 @@ let currentGroup = null;
 let stopGroup = null;
 let stopMessages = null;
 let stopOwnProfile = null;
+let stopTypingUsers = null;
 
 let messages = [];
+let typingUsers = [];
 
 let isSending = false;
 let isUploadingPhoto = false;
@@ -118,36 +114,26 @@ let typingTimer = null;
 let selectedMessageId = "";
 
 let ownerPhotoFile = null;
-
 let photoInputMode = "message";
-
 let ownerPreviewURL = "";
 
-
 let accountControl = {
-
     loaded: false,
-
     blocked: true,
-
     messagingRestricted: true,
-
     groupParticipationRestricted: true,
-
     reason: "checking"
 };
 
-
 let groupControl = {
-
     loaded: false,
-
     chatLocked: true,
-
+    messagingLocked: true,
+    announcementOnly: false,
     approved: false,
-
     member: false,
-
+    verifiedRequired: false,
+    verified: false,
     allowed: false
 };
 
@@ -177,6 +163,9 @@ const messagesInner =
 const chatLoading =
     document.getElementById("chatLoading");
 
+const typingArea =
+    document.getElementById("typingArea");
+
 const messageInput =
     document.getElementById("messageInput");
 
@@ -188,6 +177,9 @@ const infoBtn =
 
 const accessBlock =
     document.getElementById("accessBlock");
+
+const accessIcon =
+    document.getElementById("accessIcon");
 
 const accessTitle =
     document.getElementById("accessTitle");
@@ -206,6 +198,35 @@ const closeInfoBtn =
 
 const toast =
     document.getElementById("toast");
+
+
+/* =========================================================
+   MODE / COMPOSER DOM
+========================================================= */
+
+const groupModeBanner =
+    document.getElementById("groupModeBanner");
+
+const groupModeIcon =
+    document.getElementById("groupModeIcon");
+
+const groupModeText =
+    document.getElementById("groupModeText");
+
+const composerWrap =
+    document.getElementById("composerWrap");
+
+const composerLockMessage =
+    document.getElementById("composerLockMessage");
+
+const composerLockIcon =
+    document.getElementById("composerLockIcon");
+
+const composerLockText =
+    document.getElementById("composerLockText");
+
+const messageForm =
+    document.getElementById("messageForm");
 
 
 /* =========================================================
@@ -519,6 +540,49 @@ function formatTime(value) {
 }
 
 
+function getTimestampMillis(value) {
+
+    if (!value) {
+        return 0;
+    }
+
+    if (
+        typeof value.toMillis === "function"
+    ) {
+
+        return value.toMillis();
+    }
+
+    if (
+        typeof value.toDate === "function"
+    ) {
+
+        return value.toDate().getTime();
+    }
+
+    if (
+        typeof value.seconds === "number"
+    ) {
+
+        return value.seconds * 1000;
+    }
+
+    if (
+        typeof value._seconds === "number"
+    ) {
+
+        return value._seconds * 1000;
+    }
+
+    const parsed =
+        new Date(value).getTime();
+
+    return Number.isNaN(parsed)
+        ? 0
+        : parsed;
+}
+
+
 function showToast(message) {
 
     if (!toast) {
@@ -678,6 +742,18 @@ function getAccountControl(profile) {
 
 
 /* =========================================================
+   VERIFIED USER
+========================================================= */
+
+function isVerifiedUser() {
+
+    return (
+        currentProfile?.isVerified === true
+    );
+}
+
+
+/* =========================================================
    OWNER CHECK
 ========================================================= */
 
@@ -763,9 +839,17 @@ function getGroupControl(group) {
 
             chatLocked: true,
 
+            messagingLocked: true,
+
+            announcementOnly: false,
+
             approved: false,
 
             member: false,
+
+            verifiedRequired: false,
+
+            verified: false,
 
             allowed: false
         };
@@ -780,25 +864,81 @@ function getGroupControl(group) {
             .toLowerCase();
 
 
+    const type =
+        String(
+            group.type || "public"
+        )
+            .trim()
+            .toLowerCase();
+
+
+    const privateGroup =
+        type === "private";
+
+
     const member =
         isUserGroupMember(group);
+
+
+    const verified =
+        isVerifiedUser();
+
+
+    /*
+     * A private group is intended for verified
+     * members only.
+     */
+    const verifiedRequired =
+        privateGroup;
+
+
+    /*
+     * Support both fields because older group
+     * documents may only contain chatLocked.
+     */
+    const chatLocked =
+        group.chatLocked === true;
+
+
+    const messagingLocked =
+        group.messagingLocked === true ||
+        chatLocked;
+
+
+    const announcementOnly =
+        group.announcementOnly === true;
+
+
+    const verifiedAllowed =
+        !verifiedRequired ||
+        verified ||
+        String(group.ownerId || "") ===
+            String(currentUser?.uid || "");
 
 
     return {
 
         loaded: true,
 
-        chatLocked:
-            group.chatLocked === true,
+        chatLocked,
+
+        messagingLocked,
+
+        announcementOnly,
 
         approved:
             status === "approved",
 
         member,
 
+        verifiedRequired,
+
+        verified,
+
         allowed:
             status === "approved" &&
-            member
+            member &&
+            verifiedAllowed
     };
 }
 
@@ -820,6 +960,8 @@ function updateAccessUI() {
 
     let message = "";
 
+    let icon = "🔒";
+
 
     if (!accountControl.loaded) {
 
@@ -830,6 +972,8 @@ function updateAccessUI() {
 
         message =
             "Checking your CONNECTA account permissions...";
+
+        icon = "⏳";
 
     } else if (
         accountControl.blocked
@@ -845,6 +989,11 @@ function updateAccessUI() {
         message =
             "Your account cannot participate in group conversations.";
 
+        icon =
+            accountControl.reason === "banned"
+                ? "🚫"
+                : "⛔";
+
     } else if (
         accountControl.groupParticipationRestricted
     ) {
@@ -856,6 +1005,8 @@ function updateAccessUI() {
 
         message =
             "Your account is currently restricted from participating in groups.";
+
+        icon = "🚫";
 
     } else if (
         !groupControl.loaded
@@ -869,6 +1020,8 @@ function updateAccessUI() {
         message =
             "Checking group access...";
 
+        icon = "⏳";
+
     } else if (
         !groupControl.approved
     ) {
@@ -881,6 +1034,8 @@ function updateAccessUI() {
         message =
             "This group is not currently available for conversation.";
 
+        icon = "⚠️";
+
     } else if (
         !groupControl.member
     ) {
@@ -891,19 +1046,34 @@ function updateAccessUI() {
             "Group Membership Required";
 
         message =
-            "Join this group to participate in the conversation.";
+            groupControl.verifiedRequired
+                ? "You must be a verified member of this private group to participate."
+                : "Join this group to participate in the conversation.";
+
+        icon = "👥";
 
     } else if (
-        groupControl.chatLocked
+        groupControl.verifiedRequired &&
+        !groupControl.verified
     ) {
 
         show = true;
 
         title =
-            "Chat Locked";
+            "Verification Required";
 
         message =
-            "An administrator has temporarily locked this group chat.";
+            "This private group is available only to verified CONNECTA users.";
+
+        icon = "✓";
+
+    }
+
+
+    if (accessIcon) {
+
+        accessIcon.textContent =
+            icon;
     }
 
 
@@ -927,10 +1097,10 @@ function updateAccessUI() {
 
 
 /* =========================================================
-   CAN SEND
+   CAN VIEW GROUP
 ========================================================= */
 
-function canSendMessages() {
+function canAccessGroup() {
 
     if (!accountControl.loaded) {
         return false;
@@ -944,17 +1114,9 @@ function canSendMessages() {
         return false;
     }
 
-    if (accountControl.messagingRestricted) {
-        return false;
-    }
-
     if (
         accountControl.groupParticipationRestricted
     ) {
-        return false;
-    }
-
-    if (groupControl.chatLocked) {
         return false;
     }
 
@@ -966,7 +1128,279 @@ function canSendMessages() {
         return false;
     }
 
+    if (
+        groupControl.verifiedRequired &&
+        !groupControl.verified
+    ) {
+        return false;
+    }
+
     return true;
+}
+
+
+/* =========================================================
+   CAN SEND
+========================================================= */
+
+function canSendMessages() {
+
+    if (!canAccessGroup()) {
+        return false;
+    }
+
+    if (
+        accountControl.messagingRestricted
+    ) {
+        return false;
+    }
+
+    if (
+        groupControl.messagingLocked
+    ) {
+        return false;
+    }
+
+    /*
+     * Announcement-only means only the group
+     * owner can send messages.
+     */
+    if (
+        groupControl.announcementOnly &&
+        !isGroupOwner()
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+
+/* =========================================================
+   COMPOSER LOCK MESSAGE
+========================================================= */
+
+function getComposerLockState() {
+
+    if (!accountControl.loaded) {
+
+        return {
+            locked: true,
+            icon: "⏳",
+            text:
+                "Checking your CONNECTA permissions..."
+        };
+    }
+
+
+    if (accountControl.blocked) {
+
+        return {
+            locked: true,
+            icon: "🚫",
+            text:
+                accountControl.reason === "banned"
+                    ? "Your account is banned."
+                    : "Your account is suspended."
+        };
+    }
+
+
+    if (
+        accountControl.groupParticipationRestricted
+    ) {
+
+        return {
+            locked: true,
+            icon: "🚫",
+            text:
+                "Group participation is restricted for your account."
+        };
+    }
+
+
+    if (!groupControl.loaded) {
+
+        return {
+            locked: true,
+            icon: "⏳",
+            text:
+                "Checking group access..."
+        };
+    }
+
+
+    if (!groupControl.approved) {
+
+        return {
+            locked: true,
+            icon: "⚠️",
+            text:
+                "This group is currently unavailable."
+        };
+    }
+
+
+    if (!groupControl.member) {
+
+        return {
+            locked: true,
+            icon: "👥",
+            text:
+                "Join the group to participate."
+        };
+    }
+
+
+    if (
+        groupControl.verifiedRequired &&
+        !groupControl.verified
+    ) {
+
+        return {
+            locked: true,
+            icon: "✓",
+            text:
+                "Verified CONNECTA users only."
+        };
+    }
+
+
+    if (
+        accountControl.messagingRestricted
+    ) {
+
+        return {
+            locked: true,
+            icon: "🚫",
+            text:
+                "Your group messaging access is restricted."
+        };
+    }
+
+
+    if (
+        groupControl.messagingLocked
+    ) {
+
+        return {
+            locked: true,
+            icon: "🔒",
+            text:
+                "Messaging has been locked in this group."
+        };
+    }
+
+
+    if (
+        groupControl.announcementOnly &&
+        !isGroupOwner()
+    ) {
+
+        return {
+            locked: true,
+            icon: "📢",
+            text:
+                "This group is in announcement-only mode. Only the owner can send messages."
+        };
+    }
+
+
+    return {
+        locked: false,
+        icon: "",
+        text: ""
+    };
+}
+
+
+/* =========================================================
+   GROUP MODE BANNER
+========================================================= */
+
+function updateGroupModeBanner() {
+
+    if (!groupModeBanner) {
+        return;
+    }
+
+
+    let show = false;
+
+    let icon = "";
+    let text = "";
+
+
+    if (!currentGroup) {
+
+        groupModeBanner.classList.remove(
+            "open"
+        );
+
+        groupModeBanner.style.display =
+            "none";
+
+        return;
+    }
+
+
+    if (
+        groupControl.messagingLocked
+    ) {
+
+        show = true;
+
+        icon = "🔒";
+
+        text =
+            currentGroup.messagingLocked === true &&
+            currentGroup.chatLocked !== true
+                ? "Messaging is locked for this group."
+                : "Group chat is locked.";
+
+    } else if (
+        groupControl.announcementOnly
+    ) {
+
+        show = true;
+
+        icon = "📢";
+
+        text =
+            isGroupOwner()
+                ? "Announcement-only mode is active. You can still send messages."
+                : "Announcement-only mode is active. Only the group owner can send messages.";
+    }
+
+
+    if (show) {
+
+        if (groupModeIcon) {
+            groupModeIcon.textContent =
+                icon;
+        }
+
+        if (groupModeText) {
+            groupModeText.textContent =
+                text;
+        }
+
+        groupModeBanner.style.display =
+            "";
+
+        groupModeBanner.classList.add(
+            "open"
+        );
+
+    } else {
+
+        groupModeBanner.classList.remove(
+            "open"
+        );
+
+        groupModeBanner.style.display =
+            "none";
+    }
 }
 
 
@@ -976,91 +1410,83 @@ function canSendMessages() {
 
 function updateComposerState() {
 
-    const blocked =
-        !canSendMessages();
+    const canSend =
+        canSendMessages();
+
+    const lock =
+        getComposerLockState();
 
 
     if (messageInput) {
 
         messageInput.disabled =
-            blocked;
+            !canSend;
 
-
-        if (blocked) {
-
-            if (!accountControl.loaded) {
-
-                messageInput.placeholder =
-                    "Checking permissions...";
-
-            } else if (
-                accountControl.blocked
-            ) {
-
-                messageInput.placeholder =
-                    "Your account cannot send messages";
-
-            } else if (
-                accountControl.messagingRestricted
-            ) {
-
-                messageInput.placeholder =
-                    "Group messaging is restricted";
-
-            } else if (
-                accountControl.groupParticipationRestricted
-            ) {
-
-                messageInput.placeholder =
-                    "Group participation is restricted";
-
-            } else if (
-                !groupControl.approved
-            ) {
-
-                messageInput.placeholder =
-                    "This group is unavailable";
-
-            } else if (
-                !groupControl.member
-            ) {
-
-                messageInput.placeholder =
-                    "Join this group to participate";
-
-            } else if (
-                groupControl.chatLocked
-            ) {
-
-                messageInput.placeholder =
-                    "Group chat is locked by an admin";
-
-            } else {
-
-                messageInput.placeholder =
-                    "Messaging unavailable";
-            }
-
-        } else {
-
-            messageInput.placeholder =
-                "Type a message...";
-        }
+        messageInput.placeholder =
+            canSend
+                ? "Type a message..."
+                : lock.text;
     }
 
 
     if (sendBtn) {
 
         sendBtn.disabled =
-            blocked;
+            !canSend;
     }
 
 
     if (photoBtn) {
 
         photoBtn.disabled =
-            blocked;
+            !canSend;
     }
+
+
+    /*
+     * New HTML has a dedicated composer lock
+     * message. Use it whenever the user cannot
+     * send.
+     */
+    if (composerLockMessage) {
+
+        composerLockMessage.style.display =
+            canSend ? "none" : "";
+
+        if (composerLockIcon) {
+
+            composerLockIcon.textContent =
+                lock.icon;
+        }
+
+        if (composerLockText) {
+
+            composerLockText.textContent =
+                lock.text;
+        }
+    }
+
+
+    /*
+     * Keep the form hidden while locked.
+     */
+    if (messageForm) {
+
+        messageForm.style.display =
+            canSend ? "" : "none";
+    }
+
+
+    if (composerWrap) {
+
+        composerWrap.classList.toggle(
+            "locked",
+            !canSend
+        );
+    }
+
+
+    updateGroupModeBanner();
 }
 
 
@@ -1162,6 +1588,15 @@ function listenToOwnProfile() {
                     );
 
 
+                if (currentGroup) {
+
+                    groupControl =
+                        getGroupControl(
+                            currentGroup
+                        );
+                }
+
+
                 updateComposerState();
                 updateAccessUI();
 
@@ -1247,7 +1682,7 @@ async function loadGroup() {
         renderGroup();
 
         updateOwnerControls();
-
+        updateComposerState();
         updateAccessUI();
 
         loadCachedMessages();
@@ -1302,13 +1737,13 @@ async function loadGroup() {
         renderGroup();
 
         updateOwnerControls();
-
+        updateComposerState();
         updateAccessUI();
 
 
         setupGroupListener();
-
         setupMessageListener();
+        setupTypingListener();
 
 
         hideLoading();
@@ -1328,8 +1763,8 @@ async function loadGroup() {
             hideLoading();
 
             setupGroupListener();
-
             setupMessageListener();
+            setupTypingListener();
 
             return true;
         }
@@ -1457,18 +1892,24 @@ function setupGroupListener() {
 
                         chatLocked: true,
 
+                        messagingLocked: true,
+
+                        announcementOnly: false,
+
                         approved: false,
 
                         member: false,
+
+                        verifiedRequired: false,
+
+                        verified: false,
 
                         allowed: false
                     };
 
 
                     updateOwnerControls();
-
                     updateComposerState();
-
                     updateAccessUI();
 
 
@@ -1505,10 +1946,20 @@ function setupGroupListener() {
                 renderGroup();
 
                 updateOwnerControls();
-
                 updateComposerState();
-
                 updateAccessUI();
+
+
+                /*
+                 * If the group is deleted or the
+                 * current user is removed, stop typing.
+                 */
+                if (
+                    !canAccessGroup()
+                ) {
+
+                    stopTyping();
+                }
             },
 
             error => {
@@ -1525,16 +1976,23 @@ function setupGroupListener() {
 
                     chatLocked: true,
 
+                    messagingLocked: true,
+
+                    announcementOnly: false,
+
                     approved: false,
 
                     member: false,
+
+                    verifiedRequired: false,
+
+                    verified: false,
 
                     allowed: false
                 };
 
 
                 updateComposerState();
-
                 updateAccessUI();
             }
         );
@@ -1571,19 +2029,48 @@ function renderGroup() {
 
     if (groupStatus) {
 
+        const memberCount =
+            Number(
+                currentGroup.memberCount ||
+                (
+                    Array.isArray(
+                        currentGroup.memberIds
+                    )
+                        ? currentGroup.memberIds.length
+                        : Array.isArray(
+                            currentGroup.members
+                        )
+                            ? currentGroup.members.length
+                            : 0
+                )
+            );
+
+
         if (
-            currentGroup.chatLocked === true
+            groupControl.messagingLocked
         ) {
 
             groupStatus.textContent =
-                "Chat locked";
+                "Messaging locked";
+
+        } else if (
+            groupControl.announcementOnly
+        ) {
+
+            groupStatus.textContent =
+                "Announcements only";
+
+        } else if (
+            currentGroup.type === "private"
+        ) {
+
+            groupStatus.textContent =
+                `${memberCount} members • Private`;
 
         } else {
 
             groupStatus.textContent =
-                currentGroup.type === "private"
-                    ? "Private group"
-                    : "Public group";
+                `${memberCount} members • Public`;
         }
     }
 
@@ -1657,6 +2144,11 @@ function renderGroupInfo() {
             "infoGroupSubscription"
         );
 
+    const infoMessaging =
+        document.getElementById(
+            "infoGroupMessaging"
+        );
+
     const infoOwner =
         document.getElementById(
             "infoGroupOwner"
@@ -1703,7 +2195,7 @@ function renderGroupInfo() {
 
         infoMeta.textContent =
             currentGroup.type === "private"
-                ? "Private group"
+                ? "Private group • Verified users"
                 : "Public group";
     }
 
@@ -1732,10 +2224,14 @@ function renderGroupInfo() {
                 currentGroup.memberCount ||
                 (
                     Array.isArray(
-                        currentGroup.members
+                        currentGroup.memberIds
                     )
-                        ? currentGroup.members.length
-                        : 0
+                        ? currentGroup.memberIds.length
+                        : Array.isArray(
+                            currentGroup.members
+                        )
+                            ? currentGroup.members.length
+                            : 0
                 )
             );
 
@@ -1747,9 +2243,13 @@ function renderGroupInfo() {
 
     if (infoSubscription) {
 
-        if (
-            currentGroup.subscriptionEnabled === true
-        ) {
+        const type =
+            String(
+                currentGroup.type || "public"
+            ).toLowerCase();
+
+
+        if (type === "private") {
 
             const fee =
                 Number(
@@ -1757,13 +2257,50 @@ function renderGroupInfo() {
                 );
 
 
-            infoSubscription.textContent =
-                `Paid — KSh ${fee}`;
+            if (
+                currentGroup.subscriptionEnabled === true &&
+                fee > 0
+            ) {
+
+                infoSubscription.textContent =
+                    `Paid — KSh ${fee}`;
+
+            } else {
+
+                infoSubscription.textContent =
+                    "Private / Verified users";
+            }
 
         } else {
 
             infoSubscription.textContent =
                 "Free";
+        }
+    }
+
+
+    if (infoMessaging) {
+
+        if (
+            groupControl.messagingLocked
+        ) {
+
+            infoMessaging.textContent =
+                "Locked";
+
+        } else if (
+            groupControl.announcementOnly
+        ) {
+
+            infoMessaging.textContent =
+                isGroupOwner()
+                    ? "Announcements only — Owner can send"
+                    : "Announcements only";
+
+        } else {
+
+            infoMessaging.textContent =
+                "Enabled";
         }
     }
 
@@ -1794,7 +2331,16 @@ function loadCachedMessages() {
     ) {
 
         messages =
-            cached;
+            cached
+                .sort(
+                    (a, b) =>
+                        getTimestampMillis(
+                            a.createdAt
+                        ) -
+                        getTimestampMillis(
+                            b.createdAt
+                        )
+                );
 
         renderMessages();
     }
@@ -1894,6 +2440,140 @@ function setupMessageListener() {
                 }
             }
         );
+}
+
+
+/* =========================================================
+   TYPING LISTENER
+========================================================= */
+
+function setupTypingListener() {
+
+    if (
+        !currentUser ||
+        !groupId
+    ) {
+        return;
+    }
+
+
+    if (stopTypingUsers) {
+
+        stopTypingUsers();
+
+        stopTypingUsers = null;
+    }
+
+
+    const typingRef =
+        collection(
+            db,
+            GROUPS_COLLECTION,
+            groupId,
+            GROUP_TYPING_COLLECTION
+        );
+
+
+    stopTypingUsers =
+        onSnapshot(
+
+            typingRef,
+
+            snapshot => {
+
+                typingUsers =
+                    snapshot.docs
+                        .map(
+                            item => ({
+                                id:
+                                    item.id,
+                                ...item.data()
+                            })
+                        )
+                        .filter(
+                            user =>
+                                user.uid !==
+                                currentUser.uid
+                        );
+
+
+                renderTypingUsers();
+            },
+
+            error => {
+
+                console.warn(
+                    "Typing listener error:",
+                    error
+                );
+
+                typingUsers = [];
+
+                renderTypingUsers();
+            }
+        );
+}
+
+
+/* =========================================================
+   RENDER TYPING
+========================================================= */
+
+function renderTypingUsers() {
+
+    if (!typingArea) {
+        return;
+    }
+
+
+    const names =
+        typingUsers
+            .map(
+                user =>
+                    String(
+                        user.name ||
+                        "Someone"
+                    ).trim()
+            )
+            .filter(Boolean);
+
+
+    if (!names.length) {
+
+        typingArea.textContent = "";
+
+        typingArea.style.display =
+            "none";
+
+        return;
+    }
+
+
+    let text = "";
+
+
+    if (names.length === 1) {
+
+        text =
+            `${names[0]} is typing...`;
+
+    } else if (names.length === 2) {
+
+        text =
+            `${names[0]} and ${names[1]} are typing...`;
+
+    } else {
+
+        text =
+            "Several people are typing...";
+    }
+
+
+    typingArea.textContent =
+        text;
+
+    typingArea.style.display =
+        "";
 }
 
 
@@ -2060,9 +2740,9 @@ function renderMessages() {
     );
 }
 
+
 /* =========================================================
    RENDER MESSAGE
-   CONNECTA — COMPACT WHATSAPP-STYLE MESSAGE
 ========================================================= */
 
 function renderMessage(message) {
@@ -2099,10 +2779,6 @@ function renderMessage(message) {
         );
 
 
-    /* =====================================================
-       AVATAR
-    ===================================================== */
-
     const avatar = senderPhoto
 
         ? `
@@ -2130,10 +2806,6 @@ function renderMessage(message) {
         `;
 
 
-    /* =====================================================
-       VERIFIED BADGE
-    ===================================================== */
-
     const verified =
         message.senderVerified === true
 
@@ -2149,10 +2821,6 @@ function renderMessage(message) {
 
             : "";
 
-
-    /* =====================================================
-       TEXT MESSAGE
-    ===================================================== */
 
     if (
         messageType !== "image" &&
@@ -2183,7 +2851,6 @@ function renderMessage(message) {
                         : ""
                 }
 
-
                 <div class="message-content">
 
                     ${
@@ -2201,7 +2868,6 @@ function renderMessage(message) {
                             `
                             : ""
                     }
-
 
                     <div
                         class="
@@ -2227,7 +2893,6 @@ function renderMessage(message) {
 
                 </div>
 
-
                 ${
                     isMine
                         ? avatar
@@ -2235,14 +2900,9 @@ function renderMessage(message) {
                 }
 
             </div>
-
         `;
     }
 
-
-    /* =====================================================
-       PHOTO MESSAGE
-    ===================================================== */
 
     const imageURL =
         message.imageURL ||
@@ -2284,7 +2944,6 @@ function renderMessage(message) {
             >${escapeHTML(
                 timestamp
             )}</span>
-
         `;
 
 
@@ -2306,7 +2965,6 @@ function renderMessage(message) {
                     : ""
             }
 
-
             <div class="message-content">
 
                 ${
@@ -2325,7 +2983,6 @@ function renderMessage(message) {
                         : ""
                 }
 
-
                 <div
                     class="
                         message-bubble
@@ -2342,7 +2999,6 @@ function renderMessage(message) {
 
             </div>
 
-
             ${
                 isMine
                     ? avatar
@@ -2350,7 +3006,6 @@ function renderMessage(message) {
             }
 
         </div>
-
     `;
 }
 
@@ -2422,6 +3077,10 @@ async function sendTextMessage() {
 
     try {
 
+        /*
+         * Re-check both group and profile
+         * immediately before sending.
+         */
         const [
             groupSnapshot,
             profileSnapshot
@@ -2492,11 +3151,8 @@ async function sendTextMessage() {
 
 
         renderGroup();
-
         updateOwnerControls();
-
         updateComposerState();
-
         updateAccessUI();
 
 
@@ -2743,9 +3399,7 @@ async function sendPhotoMessage(file) {
 
 
         renderGroup();
-
         updateComposerState();
-
         updateAccessUI();
 
 
@@ -2984,6 +3638,10 @@ async function updateGroupPreview(
 
 function showBlockedMessage() {
 
+    const lock =
+        getComposerLockState();
+
+
     if (!accountControl.loaded) {
 
         showToast(
@@ -3033,16 +3691,35 @@ function showBlockedMessage() {
         );
 
     } else if (
-        groupControl.chatLocked
+        groupControl.verifiedRequired &&
+        !groupControl.verified
     ) {
 
         showToast(
-            "This group chat is locked by an admin."
+            "This private group is available only to verified CONNECTA users."
+        );
+
+    } else if (
+        groupControl.messagingLocked
+    ) {
+
+        showToast(
+            "Messaging is locked in this group."
+        );
+
+    } else if (
+        groupControl.announcementOnly &&
+        !isGroupOwner()
+    ) {
+
+        showToast(
+            "Only the group owner can send messages in announcement-only mode."
         );
 
     } else {
 
         showToast(
+            lock.text ||
             "You cannot send messages here."
         );
     }
@@ -3094,6 +3771,10 @@ async function setTyping() {
 
                 updatedAt:
                     serverTimestamp()
+            },
+
+            {
+                merge: true
             }
         );
 
@@ -3168,11 +3849,6 @@ function setupComposer() {
         "input",
         () => {
 
-            /*
-             * Auto-grow text area slightly.
-             * This keeps the composer compact.
-             */
-
             messageInput.style.height =
                 "auto";
 
@@ -3213,15 +3889,9 @@ function setupComposer() {
     );
 
 
-    const form =
-        document.getElementById(
-            "messageForm"
-        );
+    if (messageForm) {
 
-
-    if (form) {
-
-        form.addEventListener(
+        messageForm.addEventListener(
             "submit",
             event => {
 
@@ -3265,16 +3935,10 @@ function setupPhotoUpload() {
             }
 
 
-            photoInputMode = "message";
+            photoInputMode =
+                "message";
 
             photoInput.value = "";
-
-            /*
-             * No capture="environment" is used.
-             *
-             * This opens the normal browser/device
-             * image picker.
-             */
 
             photoInput.click();
         }
@@ -3373,6 +4037,9 @@ function openGroupInfo() {
     }
 
 
+    renderGroupInfo();
+
+
     groupInfoOverlay.classList.add(
         "open"
     );
@@ -3468,12 +4135,15 @@ function updateOwnerControls() {
 
     if (ownerMenu) {
 
-        ownerMenu.classList.remove(
-            "open"
-        );
+        if (!owner) {
 
-        ownerMenu.style.display =
-            "none";
+            ownerMenu.classList.remove(
+                "open"
+            );
+
+            ownerMenu.style.display =
+                "none";
+        }
     }
 
 
@@ -3730,12 +4400,6 @@ function setupOwnerPhotoPicker() {
 
                 photoInput.value = "";
 
-                /*
-                 * Normal gallery/file picker.
-                 * The HTML input intentionally does NOT
-                 * contain capture="environment".
-                 */
-
                 photoInput.click();
             }
         }
@@ -3915,11 +4579,6 @@ async function saveGroupOwnerChanges() {
                     storageRef
                 );
 
-
-            /*
-             * Delete previous group photo if
-             * it was stored at a different path.
-             */
 
             if (
                 photoStoragePath &&
@@ -4895,7 +5554,8 @@ function setupOwnerControls() {
             closeOwnerMenu();
 
 
-            photoInputMode = "group";
+            photoInputMode =
+                "group";
 
 
             if (photoInput) {
@@ -5009,6 +5669,54 @@ function setupOwnerControls() {
 
 
 /* =========================================================
+   OUTSIDE MENU CLICK
+========================================================= */
+
+function setupOutsideMenu() {
+
+    document.addEventListener(
+        "click",
+        event => {
+
+            if (!ownerMenu) {
+                return;
+            }
+
+
+            if (
+                !ownerMenu.classList.contains(
+                    "open"
+                )
+            ) {
+                return;
+            }
+
+
+            const clickedInsideMenu =
+                ownerMenu.contains(
+                    event.target
+                );
+
+
+            const clickedInfoButton =
+                infoBtn?.contains(
+                    event.target
+                );
+
+
+            if (
+                !clickedInsideMenu &&
+                !clickedInfoButton
+            ) {
+
+                closeOwnerMenu();
+            }
+        }
+    );
+}
+
+
+/* =========================================================
    BACK BUTTONS
 ========================================================= */
 
@@ -5036,113 +5744,169 @@ function setupBackButtons() {
 
 
 /* =========================================================
+   ESCAPE KEY
+========================================================= */
+
+function setupEscapeKey() {
+
+    document.addEventListener(
+        "keydown",
+        event => {
+
+            if (
+                event.key !== "Escape"
+            ) {
+                return;
+            }
+
+
+            closeOwnerMenu();
+            closeGroupInfo();
+            closeEditGroupModal();
+            closeDeleteGroupModal();
+            closeDeleteMessageModal();
+            exitDeleteMode();
+        }
+    );
+}
+
+
+/* =========================================================
    INITIALIZATION
 ========================================================= */
 
 async function initializeGroupChat() {
 
-    const session =
-        await getCurrentConnectaUser({
+    try {
 
-            redirect: true,
+        const session =
+            await getCurrentConnectaUser({
 
-            allowBlocked: true
-        });
+                redirect: true,
 
-
-    if (!session) {
-        return;
-    }
+                allowBlocked: true
+            });
 
 
-    currentUser =
-        session.authUser;
+        if (!session) {
+            return;
+        }
 
 
-    currentProfile =
-        session.profile || {
+        currentUser =
+            session.authUser;
 
-            uid:
-                currentUser.uid,
 
-            status:
-                "active"
+        currentProfile =
+            session.profile || {
+
+                uid:
+                    currentUser.uid,
+
+                status:
+                    "active"
+            };
+
+
+        accountControl =
+            getAccountControl(
+                currentProfile
+            );
+
+
+        groupControl = {
+
+            loaded: false,
+
+            chatLocked: true,
+
+            messagingLocked: true,
+
+            announcementOnly: false,
+
+            approved: false,
+
+            member: false,
+
+            verifiedRequired: false,
+
+            verified:
+                currentProfile?.isVerified ===
+                true,
+
+            allowed: false
         };
 
 
-    accountControl =
-        getAccountControl(
-            currentProfile
+        updateComposerState();
+        updateAccessUI();
+
+
+        groupId =
+            getGroupId();
+
+
+        if (!groupId) {
+
+            showAccessError(
+                "Group not found",
+                "No group ID was provided."
+            );
+
+            return;
+        }
+
+
+        /*
+         * Keep account controls live.
+         */
+        listenToOwnProfile();
+
+
+        /*
+         * Load group, messages and controls.
+         */
+        await loadGroup();
+
+
+        /*
+         * Interface events.
+         */
+        setupComposer();
+
+        setupPhotoUpload();
+
+        setupGroupInfo();
+
+        setupOwnerPhotoPicker();
+
+        setupOwnerControls();
+
+        setupBackButtons();
+
+        setupOutsideMenu();
+
+        setupEscapeKey();
+
+
+        updateOwnerControls();
+        updateComposerState();
+        updateAccessUI();
+
+    } catch (error) {
+
+        console.error(
+            "CONNECTA group chat initialization error:",
+            error
         );
 
-
-    groupControl = {
-
-        loaded: false,
-
-        chatLocked: true,
-
-        approved: false,
-
-        member: false,
-
-        allowed: false
-    };
-
-
-    updateComposerState();
-
-    updateAccessUI();
-
-
-    groupId =
-        getGroupId();
-
-
-    if (!groupId) {
 
         showAccessError(
-            "Group not found",
-            "No group ID was provided."
+            "Unable to open group chat",
+            error?.message ||
+            "Please refresh the page and try again."
         );
-
-        return;
     }
-
-
-    /*
-     * Keep the user's account controls live.
-     */
-    listenToOwnProfile();
-
-
-    /*
-     * Load group and messages.
-     */
-    await loadGroup();
-
-
-    /*
-     * Set up interface events.
-     */
-    setupComposer();
-
-    setupPhotoUpload();
-
-    setupGroupInfo();
-
-    setupOwnerPhotoPicker();
-
-    setupOwnerControls();
-
-    setupBackButtons();
-
-
-    updateOwnerControls();
-
-    updateComposerState();
-
-    updateAccessUI();
 }
 
 
@@ -5155,6 +5919,12 @@ function cleanup() {
     clearTimeout(
         typingTimer
     );
+
+
+    if (currentUser && groupId) {
+
+        stopTyping();
+    }
 
 
     if (stopGroup) {
@@ -5178,6 +5948,14 @@ function cleanup() {
         stopOwnProfile();
 
         stopOwnProfile = null;
+    }
+
+
+    if (stopTypingUsers) {
+
+        stopTypingUsers();
+
+        stopTypingUsers = null;
     }
 
 
