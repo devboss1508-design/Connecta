@@ -32,7 +32,6 @@
     href="css/dashboard.css"
   >
 
-
 <style>
 
 /* =========================================================
@@ -1034,6 +1033,7 @@
     <button
       class="connection-btn"
       id="connectionBtn"
+      type="button"
     >
       Get Connection
     </button>
@@ -1042,6 +1042,7 @@
     <button
       class="profile-btn"
       id="profileBtn"
+      type="button"
       aria-label="Open profile"
     >
       U
@@ -1107,25 +1108,19 @@
   </a>
 
 
-  <a
-    href="stories.html"
-  >
+  <a href="stories.html">
     ◉
     <span>Stories</span>
   </a>
 
 
-  <a
-    href="friends.html"
-  >
+  <a href="friends.html">
     👤
     <span>Friends</span>
   </a>
 
 
-  <a
-    href="online.html"
-  >
+  <a href="online.html">
     🟢
     <span>Online Users</span>
   </a>
@@ -1152,6 +1147,7 @@
   <button
     id="logoutBtn"
     class="logout-link"
+    type="button"
   >
     ↪
     <span>Logout</span>
@@ -1502,7 +1498,6 @@
     aria-labelledby="createGroupTitle"
   >
 
-
     <div class="group-modal-header">
 
       <h2 id="createGroupTitle">
@@ -1556,6 +1551,7 @@
     <div
       class="access-notice"
       id="groupAccessNotice"
+      aria-live="polite"
     ></div>
 
 
@@ -1567,7 +1563,6 @@
       id="createGroupForm"
       novalidate
     >
-
 
       <!-- GROUP NAME -->
 
@@ -1625,7 +1620,6 @@
 
 
         <div class="group-type-options">
-
 
           <!-- PUBLIC -->
 
@@ -1702,11 +1696,14 @@
 
       <!-- =================================================
            PRIVATE GROUP FEE
+           IMPORTANT:
+           ID MUST MATCH groups.js:
+           subscriptionBox
       ================================================== -->
 
       <div
         class="private-fee-box"
-        id="privateFeeBox"
+        id="subscriptionBox"
       >
 
         <div class="fee-title">
@@ -1714,7 +1711,7 @@
         </div>
 
         <p class="fee-description">
-          Verified users must pay this one-time joining
+          Verified users must pay this joining
           fee before they can enter the group.
         </p>
 
@@ -1744,6 +1741,20 @@
         >
 
       </div>
+
+
+      <!-- =================================================
+           HIDDEN COMPATIBILITY VALUE
+           groups.js supports this field, but users
+           should not manually control it.
+      ================================================== -->
+
+      <input
+        type="hidden"
+        id="subscriptionEnabled"
+        name="subscriptionEnabled"
+        value="false"
+      >
 
 
       <!-- =================================================
@@ -1783,7 +1794,7 @@
 
       <!-- =================================================
            ACTIONS
-      ================================================= -->
+      ================================================== -->
 
       <div class="group-form-actions">
 
@@ -1837,4 +1848,5 @@
 
 
 </body>
-      </html>
+
+  </html>
