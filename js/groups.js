@@ -872,18 +872,14 @@ function isMember(
    CAN JOIN GROUP
 ========================================================= */
 
-function canJoinGroup(
-  group
-) {
+
+function canJoinGroup(group) {
 
   if (!currentUser) {
 
     return {
-
       allowed: false,
-
-      reason:
-        "Please log in first."
+      reason: "Please log in first."
     };
   }
 
@@ -894,61 +890,88 @@ function canJoinGroup(
     );
 
 
-  if (
-    control.status === "checking"
-  ) {
+  if (control.status === "checking") {
 
     return {
-
       allowed: false,
-
-      reason:
-        control.message
+      reason: control.message
     };
   }
 
 
-  if (
-    control.blocked
-  ) {
+  if (control.blocked) {
 
     return {
-
       allowed: false,
-
-      reason:
-        control.message
+      reason: control.message
     };
   }
 
 
-  if (
-    control.groupParticipationRestricted
-  ) {
+  if (control.groupParticipationRestricted) {
 
     return {
-
       allowed: false,
-
-      reason:
-        control.message
+      reason: control.message
     };
   }
 
 
-  if (
-    group.status !== "approved"
-  ) {
+  if (group.status !== "approved") {
 
     return {
-
       allowed: false,
-
-      reason:
-        "This group has not been approved yet."
+      reason: "This group has not been approved yet."
     };
   }
 
+
+  /* =======================================================
+     PUBLIC GROUP
+  ======================================================= */
+
+  if (group.type === "public") {
+
+    return {
+      allowed: true,
+      requiresVerification: false,
+      requiresPayment: false,
+      fee: 0
+    };
+  }
+
+
+  /* =======================================================
+     PRIVATE GROUP
+  ======================================================= */
+
+  if (group.type === "private") {
+
+    const fee =
+      Number(
+        group.subscriptionFee || 0
+      );
+
+
+    return {
+      allowed: true,
+      requiresVerification:
+        currentProfile?.isVerified !== true,
+
+      requiresPayment:
+        fee > 0,
+
+      fee:
+        fee > 0 ? fee : 0
+    };
+  }
+
+
+  return {
+    allowed: false,
+    reason: "Invalid group type."
+  };
+}
 
   /* -------------------------------------------------------
      PUBLIC GROUP
@@ -2120,27 +2143,54 @@ async function handleGroupAction(
 
 
   const access =
-    canJoinGroup(group);
+  canJoinGroup(group);
 
+
+if (!access.allowed) {
+
+  showToast(
+    access.reason
+  );
+
+  return;
+}
+
+
+/* =======================================================
+   PRIVATE GROUP
+======================================================= */
+
+if (group.type === "private") {
+
+  /*
+   * First make sure the account is verified.
+   *
+   * If not verified, the user is taken through
+   * the KSh 999 CONNECTA verification payment.
+   */
 
   if (
-    !access.allowed
+    access.requiresVerification
   ) {
 
-    showToast(
-      access.reason
+    await startPrivateGroupVerification(
+      group
     );
 
     return;
   }
 
 
-  /* -------------------------------------------------------
-     PRIVATE PAID GROUP
-  ------------------------------------------------------- */
+  /*
+   * Account is already verified.
+   *
+   * Now check whether this particular
+   * private group has a joining fee.
+   */
 
   if (
-    access.requiresPayment
+    access.requiresPayment &&
+    access.fee > 0
   ) {
 
     await startPaidGroupJoin(
@@ -2151,14 +2201,26 @@ async function handleGroupAction(
   }
 
 
-  /* -------------------------------------------------------
-     PUBLIC FREE GROUP
-  ------------------------------------------------------- */
+  /*
+   * Verified private group with
+   * no joining fee.
+   */
 
   await joinFreeGroup(
     group
   );
+
+  return;
 }
+
+
+/* =======================================================
+   PUBLIC FREE GROUP
+======================================================= */
+
+await joinFreeGroup(
+  group
+);
 
 
 /* =========================================================
@@ -2381,7 +2443,949 @@ async function joinFreeGroup(
   }
 }
 
+/* =========================================================
+   PRIVATE GROUP VERIFICATION
+   ---------------------------------------------------------
+   PRIVATE GROUPS REQUIRE A VERIFIED ACCOUNT.
 
+   FLOW:
+
+   JOIN
+     ↓
+   NOT VERIFIED
+     ↓
+   VERIFICATION POPUP
+     ↓
+   M-PESA PHONE
+     ↓
+   STK PUSH — KSh 999
+     ↓
+   PAYMENT CONFIRMED
+     ↓
+   CHECK GROUP JOINING FEE
+========================================================= */
+
+async function startPrivateGroupVerification(
+  group
+) {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  const confirmed =
+    await showVerificationRequiredModal(
+      group
+    );
+
+
+  if (!confirmed) {
+    return;
+  }
+
+
+  const phone =
+    await showMpesaPhoneModal(
+      "Verify Your CONNECTA Account",
+      "Enter your M-PESA phone number to receive an STK Push.",
+      999,
+      "Pay KSh 999 & Verify"
+    );
+
+
+  if (!phone) {
+    return;
+  }
+
+
+  try {
+
+    showToast(
+      "Sending verification STK Push..."
+    );
+
+
+    const firebaseUser =
+      currentUser;
+
+
+    const token =
+      await firebaseUser.getIdToken(
+        true
+      );
+
+
+    const response =
+      await fetch(
+        "https://connecta-backend-com.onrender.com/api/verification/initiate",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            "Authorization":
+              `Bearer ${token}`
+          },
+
+          body:
+            JSON.stringify({
+              phone
+            })
+        }
+      );
+
+
+    const data =
+      await response.json()
+        .catch(
+          () => ({})
+        );
+
+
+    if (!response.ok) {
+
+      throw new Error(
+        data.message ||
+        data.error ||
+        "Could not start verification payment."
+      );
+    }
+
+
+    /*
+     * Backend should return a payment reference
+     * / checkout request ID.
+     */
+
+    const checkoutRequestId =
+      data.checkout_request_id ||
+      data.checkoutRequestId ||
+      data.reference ||
+      data.transaction_id ||
+      data.transactionId;
+
+
+    if (!checkoutRequestId) {
+
+      throw new Error(
+        "Verification payment was started, but no payment reference was returned."
+      );
+    }
+
+
+    showToast(
+      "STK Push sent. Enter your M-PESA PIN."
+    );
+
+
+    const paid =
+      await pollVerificationPayment(
+        checkoutRequestId,
+        token
+      );
+
+
+    if (!paid) {
+
+      return;
+    }
+
+
+    showToast(
+      "Account verified successfully."
+    );
+
+
+    /*
+     * Refresh the current user's profile.
+     */
+
+    await refreshCurrentGroupProfile();
+
+
+    /*
+     * If the group requires a joining fee,
+     * continue directly to the group payment.
+     */
+
+    const fee =
+      Number(
+        group.subscriptionFee || 0
+      );
+
+
+    if (
+      fee > 0
+    ) {
+
+      setTimeout(
+        () => {
+
+          startPaidGroupJoin(
+            group
+          );
+
+        },
+        500
+      );
+
+      return;
+    }
+
+
+    /*
+     * Verified private group with no fee.
+     */
+
+    await joinFreeGroup(
+      group
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Private group verification error:",
+      error
+    );
+
+
+    showToast(
+      error.message ||
+      "Verification payment could not be completed."
+    );
+  }
+}
+
+/* =========================================================
+   VERIFICATION REQUIRED MODAL
+========================================================= */
+
+function showVerificationRequiredModal(
+  group
+) {
+
+  return new Promise(
+    resolve => {
+
+      const existing =
+        document.getElementById(
+          "connectaGroupPaymentModal"
+        );
+
+
+      existing?.remove();
+
+
+      const modal =
+        document.createElement("div");
+
+
+      modal.id =
+        "connectaGroupPaymentModal";
+
+
+      modal.style.cssText = `
+        position:fixed;
+        inset:0;
+        z-index:9000;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:20px;
+        background:rgba(15,23,42,.58);
+        backdrop-filter:blur(4px);
+      `;
+
+
+      modal.innerHTML = `
+        <div
+          style="
+            width:100%;
+            max-width:390px;
+            background:#ffffff;
+            border-radius:24px;
+            padding:23px;
+            box-shadow:0 20px 60px rgba(0,0,0,.22);
+          "
+        >
+
+          <div
+            style="
+              width:55px;
+              height:55px;
+              margin:0 auto 13px;
+              display:grid;
+              place-items:center;
+              border-radius:50%;
+              background:#ecfdf5;
+              color:#16a34a;
+              font-size:25px;
+            "
+          >
+            ✓
+          </div>
+
+          <h3
+            style="
+              margin:0;
+              text-align:center;
+              color:#14532d;
+              font-size:19px;
+              font-weight:900;
+            "
+          >
+            Verification Required
+          </h3>
+
+          <p
+            style="
+              margin:9px 0 0;
+              text-align:center;
+              color:#6b7280;
+              font-size:12px;
+              line-height:1.55;
+            "
+          >
+            Your CONNECTA account must be verified
+            before you can join
+            <strong>
+              ${escapeHtml(
+                group?.name ||
+                "this private group"
+              )}
+            </strong>.
+          </p>
+
+          <div
+            style="
+              margin-top:15px;
+              padding:12px;
+              border-radius:14px;
+              background:#f0fdf4;
+              border:1px solid #bbf7d0;
+              color:#166534;
+              font-size:11px;
+              line-height:1.5;
+            "
+          >
+            Account verification requires a
+            one-time payment of
+            <strong>KSh 999</strong>.
+          </div>
+
+          <div
+            style="
+              display:flex;
+              gap:9px;
+              margin-top:18px;
+            "
+          >
+
+            <button
+              id="groupVerifyCancel"
+              type="button"
+              style="
+                flex:1;
+                min-height:46px;
+                border:1px solid #d1d5db;
+                border-radius:13px;
+                background:#ffffff;
+                color:#374151;
+                font-weight:900;
+                cursor:pointer;
+              "
+            >
+              Cancel
+            </button>
+
+            <button
+              id="groupVerifyNow"
+              type="button"
+              style="
+                flex:1;
+                min-height:46px;
+                border:0;
+                border-radius:13px;
+                background:#22c55e;
+                color:#ffffff;
+                font-weight:900;
+                cursor:pointer;
+              "
+            >
+              Verify Now
+            </button>
+
+          </div>
+
+        </div>
+      `;
+
+
+      document.body.appendChild(
+        modal
+      );
+
+
+      const finish =
+        value => {
+
+          modal.remove();
+
+          resolve(value);
+        };
+
+
+      modal
+        .querySelector(
+          "#groupVerifyCancel"
+        )
+        ?.addEventListener(
+          "click",
+          () => finish(false)
+        );
+
+
+      modal
+        .querySelector(
+          "#groupVerifyNow"
+        )
+        ?.addEventListener(
+          "click",
+          () => finish(true)
+        );
+
+
+      modal.addEventListener(
+        "click",
+        event => {
+
+          if (
+            event.target === modal
+          ) {
+
+            finish(false);
+          }
+        }
+      );
+    }
+  );
+}
+
+/* =========================================================
+   M-PESA PHONE MODAL
+========================================================= */
+
+function showMpesaPhoneModal(
+  title,
+  description,
+  amount,
+  submitText
+) {
+
+  return new Promise(
+    resolve => {
+
+      document
+        .getElementById(
+          "connectaGroupPaymentModal"
+        )
+        ?.remove();
+
+
+      const modal =
+        document.createElement("div");
+
+
+      modal.id =
+        "connectaGroupPaymentModal";
+
+
+      modal.style.cssText = `
+        position:fixed;
+        inset:0;
+        z-index:9000;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:20px;
+        background:rgba(15,23,42,.58);
+        backdrop-filter:blur(4px);
+      `;
+
+
+      modal.innerHTML = `
+        <div
+          style="
+            width:100%;
+            max-width:390px;
+            background:#ffffff;
+            border-radius:24px;
+            padding:23px;
+            box-shadow:0 20px 60px rgba(0,0,0,.22);
+          "
+        >
+
+          <h3
+            style="
+              margin:0;
+              color:#14532d;
+              font-size:19px;
+              font-weight:900;
+            "
+          >
+            ${escapeHtml(title)}
+          </h3>
+
+          <p
+            style="
+              margin:8px 0 16px;
+              color:#6b7280;
+              font-size:12px;
+              line-height:1.55;
+            "
+          >
+            ${escapeHtml(description)}
+          </p>
+
+          <div
+            style="
+              margin-bottom:13px;
+              padding:12px;
+              border-radius:13px;
+              background:#f0fdf4;
+              color:#166534;
+              font-size:12px;
+              font-weight:900;
+              text-align:center;
+            "
+          >
+            Amount:
+            KSh ${Number(amount).toLocaleString("en-KE")}
+          </div>
+
+          <label
+            style="
+              display:block;
+              margin-bottom:7px;
+              color:#374151;
+              font-size:12px;
+              font-weight:900;
+            "
+          >
+            M-PESA Phone Number
+          </label>
+
+          <input
+            id="groupPaymentPhone"
+            type="tel"
+            inputmode="numeric"
+            autocomplete="tel"
+            placeholder="07XXXXXXXX"
+            maxlength="13"
+            style="
+              width:100%;
+              min-height:48px;
+              padding:0 13px;
+              border:1px solid #d1d5db;
+              border-radius:13px;
+              outline:none;
+              font-size:14px;
+              box-sizing:border-box;
+            "
+          >
+
+          <p
+            style="
+              margin:7px 0 0;
+              color:#9ca3af;
+              font-size:10px;
+            "
+          >
+            You will receive an STK Push on this number.
+          </p>
+
+          <div
+            style="
+              display:flex;
+              gap:9px;
+              margin-top:18px;
+            "
+          >
+
+            <button
+              id="groupPaymentCancel"
+              type="button"
+              style="
+                flex:1;
+                min-height:46px;
+                border:1px solid #d1d5db;
+                border-radius:13px;
+                background:#ffffff;
+                color:#374151;
+                font-weight:900;
+              "
+            >
+              Cancel
+            </button>
+
+            <button
+              id="groupPaymentSubmit"
+              type="button"
+              style="
+                flex:1;
+                min-height:46px;
+                border:0;
+                border-radius:13px;
+                background:#22c55e;
+                color:#ffffff;
+                font-weight:900;
+              "
+            >
+              ${escapeHtml(submitText)}
+            </button>
+
+          </div>
+
+        </div>
+      `;
+
+
+      document.body.appendChild(
+        modal
+      );
+
+
+      const input =
+        modal.querySelector(
+          "#groupPaymentPhone"
+        );
+
+
+      const finish =
+        value => {
+
+          modal.remove();
+
+          resolve(value);
+        };
+
+
+      modal
+        .querySelector(
+          "#groupPaymentCancel"
+        )
+        ?.addEventListener(
+          "click",
+          () => finish(null)
+        );
+
+
+      modal
+        .querySelector(
+          "#groupPaymentSubmit"
+        )
+        ?.addEventListener(
+          "click",
+          () => {
+
+            const raw =
+              String(
+                input?.value || ""
+              ).trim();
+
+
+            const digits =
+              raw.replace(
+                /\D/g,
+                ""
+              );
+
+
+            let normalized =
+              digits;
+
+
+            if (
+              normalized.startsWith(
+                "0"
+              )
+            ) {
+
+              normalized =
+                "254" +
+                normalized.slice(1);
+
+            } else if (
+              normalized.startsWith(
+                "+"
+              )
+            ) {
+
+              normalized =
+                normalized.replace(
+                  /^\+/,
+                  ""
+                );
+            }
+
+
+            if (
+              !/^2547\d{8}$/.test(
+                normalized
+              )
+            ) {
+
+              input?.focus();
+
+              showToast(
+                "Enter a valid Kenyan M-PESA number."
+              );
+
+              return;
+            }
+
+
+            finish(
+              normalized
+            );
+          }
+        );
+
+
+      input?.focus();
+
+
+      modal.addEventListener(
+        "click",
+        event => {
+
+          if (
+            event.target === modal
+          ) {
+
+            finish(null);
+          }
+        }
+      );
+    }
+  );
+}
+
+/* =========================================================
+   REFRESH CURRENT GROUP PROFILE
+========================================================= */
+
+async function refreshCurrentGroupProfile() {
+
+  if (!currentUser) {
+    return;
+  }
+
+
+  try {
+
+    const snapshot =
+      await getDoc(
+        doc(
+          db,
+          "users",
+          currentUser.uid
+        )
+      );
+
+
+    if (
+      snapshot.exists()
+    ) {
+
+      currentProfile = {
+        uid:
+          currentUser.uid,
+
+        ...snapshot.data()
+      };
+
+
+      renderHeaderProfile(
+        currentProfile
+      );
+
+
+      applyGroupAccountControl();
+    }
+
+  } catch (error) {
+
+    console.warn(
+      "Could not refresh CONNECTA profile:",
+      error
+    );
+  }
+}
+
+
+/* =========================================================
+   VERIFICATION PAYMENT POLLING
+========================================================= */
+
+async function pollVerificationPayment(
+  checkoutRequestId,
+  token
+) {
+
+  const maxAttempts =
+    30;
+
+
+  const delay =
+    2000;
+
+
+  for (
+    let attempt = 0;
+    attempt < maxAttempts;
+    attempt++
+  ) {
+
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          delay
+        )
+    );
+
+
+    try {
+
+      const response =
+        await fetch(
+          "https://connecta-backend-com.onrender.com/api/verification/status",
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              "Authorization":
+                `Bearer ${token}`
+            },
+
+            body:
+              JSON.stringify({
+                checkout_request_id:
+                  checkoutRequestId
+              })
+          }
+        );
+
+
+      const data =
+        await response.json()
+          .catch(
+            () => ({})
+          );
+
+
+      if (!response.ok) {
+
+        throw new Error(
+          data.message ||
+          data.error ||
+          "Could not check payment status."
+        );
+      }
+
+
+      const status =
+        String(
+          data.status ||
+          data.payment_status ||
+          ""
+        )
+          .toLowerCase();
+
+
+      if (
+        [
+          "completed",
+          "success",
+          "successful",
+          "paid"
+        ].includes(
+          status
+        )
+      ) {
+
+        return true;
+      }
+
+
+      if (
+        [
+          "failed",
+          "cancelled",
+          "canceled",
+          "rejected",
+          "timeout",
+          "expired"
+        ].includes(
+          status
+        )
+      ) {
+
+        showToast(
+          "Verification payment was not completed."
+        );
+
+        return false;
+      }
+
+
+      if (
+        attempt ===
+        maxAttempts - 1
+      ) {
+
+        showToast(
+          "Payment is taking longer than expected. Please check your verification status."
+        );
+
+        return false;
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Verification status error:",
+        error
+      );
+
+
+      if (
+        attempt ===
+        maxAttempts - 1
+      ) {
+
+        showToast(
+          error.message ||
+          "Could not confirm verification payment."
+        );
+
+        return false;
+      }
+    }
+  }
+
+
+  return false;
+}
+   
 /* =========================================================
    PRIVATE GROUP PAYMENT
 ========================================================= */
