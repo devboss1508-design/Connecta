@@ -2,29 +2,22 @@
    CONNECTA DASHBOARD ENGINE
    File: frontend/js/dashboard.js
 
-   Compatible with:
-   - dashboard.html
-   - dashboard.css
-   - firebase.js
-   - globalAuth.js
-   - chat.js
-   - group-chat.js
-
    FEATURES
-   - Cache-first dashboard
-   - Instant previous data
-   - Skeleton instead of "Loading..."
+   - Instant cache-first dashboard
+   - No blocking "Loading..." screen
+   - Skeleton/shimmer only on first visit
    - Live users
-   - Online/offline status
-   - Private chats
-   - Groups
-   - Group membership: members OR memberIds
+   - Live private chats
+   - Live groups
+   - Group membership via memberIds OR members
    - Group unread counts
-   - Unified recent chats
+   - Unified Recent Chats
+   - Private-chat unread counts
    - Verified badges
    - Follow system
-   - Profile cache
-   - Dashboard cache
+   - Online/offline status
+   - Dashboard profile cache
+   - Group/chat cache
    - Presence heartbeat
    - Account restriction protection
 ========================================================= */
@@ -55,10 +48,11 @@ import {
 
 
 /* =========================================================
-   DOM
+   DOM HELPER
 ========================================================= */
 
-const $ = id => document.getElementById(id);
+const $ = id =>
+    document.getElementById(id);
 
 
 /* =========================================================
@@ -73,20 +67,15 @@ let onlineUsers = [];
 let recentChats = [];
 let recentGroups = [];
 
+let groupListeners = [];
 let stopUsers = null;
 let stopChats = null;
 
-let groupListeners = {
-    memberIds: [],
-    members: [],
-    owned: []
-};
-
-let groupUnsubscribers = [];
-
 let presenceInterval = null;
+
 let groupProcessTimer = null;
 let groupProcessVersion = 0;
+
 
 /* =========================================================
    CACHE
@@ -100,170 +89,240 @@ const PROFILE_CACHE_KEY =
 
 
 /* =========================================================
-   INSTANT STYLES
+   INSTANT DASHBOARD STYLES
 ========================================================= */
 
 function installInstantDashboardStyles() {
 
     if (
-        $("connectaDashboardInstantStyles")
+        document.getElementById(
+            "connectaDashboardInstantStyles"
+        )
     ) {
+
         return;
     }
 
+
     const style =
-        document.createElement("style");
+        document.createElement(
+            "style"
+        );
+
 
     style.id =
         "connectaDashboardInstantStyles";
 
+
     style.textContent = `
 
-        @keyframes connectaShimmer {
+        @keyframes connectaDashboardShimmer {
 
             0% {
-                background-position:-600px 0;
+                background-position:
+                    -500px 0;
             }
 
             100% {
-                background-position:600px 0;
+                background-position:
+                    500px 0;
             }
 
         }
 
-        .connecta-skeleton {
+
+        .connecta-dashboard-skeleton {
 
             background:
                 linear-gradient(
                     90deg,
-                    #edf2ee 25%,
-                    #f8faf8 50%,
-                    #edf2ee 75%
+                    rgba(226,232,228,.75) 25%,
+                    rgba(245,248,246,.95) 50%,
+                    rgba(226,232,228,.75) 75%
                 );
 
-            background-size:1200px 100%;
+            background-size:
+                1000px 100%;
 
             animation:
-                connectaShimmer
+                connectaDashboardShimmer
                 1.25s infinite linear;
 
-            border-radius:16px;
+            border-radius:
+                14px;
 
         }
 
-        .connecta-skeleton-users {
 
-            display:flex;
-            gap:10px;
-            width:100%;
-            overflow:hidden;
+        .connecta-dashboard-skeleton-row {
 
-        }
+            display:
+                flex;
 
-        .connecta-skeleton-user {
+            gap:
+                10px;
 
-            min-width:122px;
-            height:150px;
-            flex:0 0 122px;
+            overflow:
+                hidden;
 
-        }
-
-        .connecta-skeleton-chat {
-
-            width:100%;
-            height:68px;
-            margin-bottom:8px;
+            width:
+                100%;
 
         }
 
-        .verified-badge {
 
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
+        .connecta-dashboard-skeleton-user {
 
-            width:16px;
-            height:16px;
+            flex:
+                0 0 82px;
 
-            margin-left:3px;
+            height:
+                105px;
 
-            border-radius:50%;
-
-            background:#22c55e;
-            color:#fff;
-
-            font-size:10px;
-            font-weight:900;
-
-            vertical-align:middle;
+            border-radius:
+                16px;
 
         }
 
-        .chat-status-ticks {
 
-            font-size:10px;
-            margin-left:3px;
-            color:#94a3b8;
+        .connecta-dashboard-skeleton-chat {
 
-        }
+            height:
+                72px;
 
-        .chat-status-ticks.read {
+            width:
+                100%;
 
-            color:#22c55e;
+            margin-bottom:
+                9px;
 
-        }
-
-        .connecta-empty {
-
-            width:100%;
-            min-height:100px;
-
-            display:grid;
-            place-items:center;
-
-            padding:20px;
-
-            color:#718078;
-
-            font-size:13px;
-            text-align:center;
+            border-radius:
+                16px;
 
         }
 
-        .connecta-error {
 
-            width:100%;
-            padding:18px;
+        .connecta-dashboard-skeleton-pulse {
 
-            color:#b42318;
+            width:
+                9px;
 
-            font-size:13px;
-            text-align:center;
+            height:
+                9px;
+
+            border-radius:
+                50%;
+
+            display:
+                inline-block;
+
+            margin-right:
+                5px;
+
+            background:
+                #22c55e;
+
+            animation:
+                connectaDashboardPulse
+                1s infinite ease-in-out;
 
         }
 
-        .user-card {
 
-            cursor:pointer;
+        @keyframes connectaDashboardPulse {
+
+            0%,
+            100% {
+                opacity: .35;
+                transform: scale(.85);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1);
+            }
 
         }
 
-        .chat-item {
 
-            cursor:pointer;
+        .connecta-dashboard-error {
+
+            padding:
+                18px;
+
+            text-align:
+                center;
+
+            color:
+                #718078;
+
+            font-size:
+                13px;
 
         }
 
-        .group-avatar {
 
-            background:#dcfce7;
-            color:#166534;
+        .connecta-dashboard-empty {
+
+            padding:
+                22px 14px;
+
+            text-align:
+                center;
+
+            color:
+                #718078;
+
+            font-size:
+                13px;
+
+        }
+
+
+        .connecta-dashboard-unread {
+
+            min-width:
+                19px;
+
+            height:
+                19px;
+
+            padding:
+                0 5px;
+
+            display:
+                inline-flex;
+
+            align-items:
+                center;
+
+            justify-content:
+                center;
+
+            border-radius:
+                999px;
+
+            background:
+                #22c55e;
+
+            color:
+                #fff;
+
+            font-size:
+                10px;
+
+            font-weight:
+                800;
 
         }
 
     `;
 
-    document.head.appendChild(style);
+
+    document.head.appendChild(
+        style
+    );
+
 }
 
 
@@ -276,82 +335,93 @@ function showDashboardSkeleton() {
     const onlineBox =
         $("onlineUsers");
 
+
     const chatBox =
         $("chatList");
 
 
-    if (onlineBox) {
+    if (
+        onlineBox &&
+        !onlineBox.children.length
+    ) {
 
         onlineBox.innerHTML = `
 
             <div
-                class="connecta-skeleton-users"
+                class="connecta-dashboard-skeleton-row"
                 aria-hidden="true"
             >
 
                 <div
                     class="
-                        connecta-skeleton
-                        connecta-skeleton-user
+                        connecta-dashboard-skeleton
+                        connecta-dashboard-skeleton-user
                     "
                 ></div>
 
                 <div
                     class="
-                        connecta-skeleton
-                        connecta-skeleton-user
+                        connecta-dashboard-skeleton
+                        connecta-dashboard-skeleton-user
                     "
                 ></div>
 
                 <div
                     class="
-                        connecta-skeleton
-                        connecta-skeleton-user
+                        connecta-dashboard-skeleton
+                        connecta-dashboard-skeleton-user
                     "
                 ></div>
 
                 <div
                     class="
-                        connecta-skeleton
-                        connecta-skeleton-user
+                        connecta-dashboard-skeleton
+                        connecta-dashboard-skeleton-user
                     "
                 ></div>
 
             </div>
 
         `;
+
 
         onlineBox.setAttribute(
             "aria-busy",
             "true"
         );
+
     }
 
 
-    if (chatBox) {
+    if (
+        chatBox &&
+        !chatBox.children.length
+    ) {
 
         chatBox.innerHTML = `
 
-            <div aria-hidden="true">
+            <div
+                aria-hidden="true"
+            >
 
                 <div
                     class="
-                        connecta-skeleton
-                        connecta-skeleton-chat
+                        connecta-dashboard-skeleton
+                        connecta-dashboard-skeleton-chat
                     "
                 ></div>
 
                 <div
                     class="
-                        connecta-skeleton
-                        connecta-skeleton-chat
+                        connecta-dashboard-skeleton
+                        connecta-dashboard-skeleton-chat
                     "
                 ></div>
 
                 <div
                     class="
-                        connecta-skeleton
-                        connecta-skeleton-chat
+                        connecta-dashboard-skeleton
+                        connecta-dashboard-skeleton-chat
                     "
                 ></div>
 
@@ -359,11 +429,54 @@ function showDashboardSkeleton() {
 
         `;
 
+
         chatBox.setAttribute(
             "aria-busy",
             "true"
         );
+
     }
+
+}
+
+
+/* =========================================================
+   HIDE SKELETON
+========================================================= */
+
+function hideOnlineSkeleton() {
+
+    const box =
+        $("onlineUsers");
+
+
+    if (box) {
+
+        box.setAttribute(
+            "aria-busy",
+            "false"
+        );
+
+    }
+
+}
+
+
+function hideChatSkeleton() {
+
+    const box =
+        $("chatList");
+
+
+    if (box) {
+
+        box.setAttribute(
+            "aria-busy",
+            "false"
+        );
+
+    }
+
 }
 
 
@@ -371,7 +484,9 @@ function showDashboardSkeleton() {
    PUBLIC PROFILE DATA
 ========================================================= */
 
-function publicProfileData(user = {}) {
+function publicProfileData(
+    user = {}
+) {
 
     return {
 
@@ -405,107 +520,34 @@ function publicProfileData(user = {}) {
             user.isVerified === true,
 
         followersCount:
-            Number(user.followersCount || 0),
+            Number(
+                user.followersCount || 0
+            ),
 
         followingCount:
-            Number(user.followingCount || 0),
+            Number(
+                user.followingCount || 0
+            ),
 
         lastSeen:
             user.lastSeen || null
+
     };
+
 }
 
 
 /* =========================================================
-   CACHE KEY
+   DASHBOARD CACHE KEY
 ========================================================= */
 
-function getDashboardCacheKey(uid) {
+function getDashboardCacheKey(
+    uid
+) {
 
     return (
-        DASHBOARD_CACHE_PREFIX +
-        uid
+        `${DASHBOARD_CACHE_PREFIX}${uid}`
     );
-
-}
-
-
-/* =========================================================
-   PROFILE CACHE
-========================================================= */
-
-function getProfileCache() {
-
-    try {
-
-        return JSON.parse(
-            localStorage.getItem(
-                PROFILE_CACHE_KEY
-            ) || "{}"
-        );
-
-    } catch {
-
-        return {};
-
-    }
-
-}
-
-
-function saveProfileToCache(profile) {
-
-    if (!profile?.uid) {
-        return;
-    }
-
-    try {
-
-        const cache =
-            getProfileCache();
-
-        cache[profile.uid] = {
-
-            ...publicProfileData(
-                profile
-            ),
-
-            cachedAt:
-                Date.now()
-
-        };
-
-        localStorage.setItem(
-            PROFILE_CACHE_KEY,
-            JSON.stringify(cache)
-        );
-
-    } catch {
-
-        // Cache is optional.
-    }
-
-}
-
-
-function getCachedProfile(uid) {
-
-    if (!uid) {
-        return null;
-    }
-
-    try {
-
-        const cache =
-            getProfileCache();
-
-        return cache[uid] || null;
-
-    } catch {
-
-        return null;
-
-    }
 
 }
 
@@ -520,10 +562,12 @@ function saveDashboardCache() {
         return;
     }
 
+
     try {
 
         const safeProfile =
             currentProfile
+
                 ? {
 
                     ...publicProfileData(
@@ -539,7 +583,8 @@ function saveDashboardCache() {
 
                     balance:
                         Number(
-                            currentProfile.balance || 0
+                            currentProfile.balance ||
+                            0
                         ),
 
                     status:
@@ -547,20 +592,24 @@ function saveDashboardCache() {
                         "active"
 
                 }
+
                 : null;
 
 
         const safeGroups =
-            recentGroups.map(group => {
+            recentGroups.map(
+                group => {
 
-                const {
-                    readData,
-                    ...safeGroup
-                } = group;
+                    const {
+                        readData,
+                        ...safeGroup
+                    } = group;
 
-                return safeGroup;
 
-            });
+                    return safeGroup;
+
+                }
+            );
 
 
         const payload = {
@@ -597,6 +646,7 @@ function saveDashboardCache() {
 
         );
 
+
     } catch (error) {
 
         console.warn(
@@ -619,6 +669,7 @@ function loadDashboardCache() {
         return false;
     }
 
+
     try {
 
         const raw =
@@ -630,22 +681,32 @@ function loadDashboardCache() {
 
 
         if (!raw) {
+
             return false;
+
         }
 
 
         const cache =
-            JSON.parse(raw);
+            JSON.parse(
+                raw
+            );
 
 
         if (!cache) {
+
             return false;
+
         }
 
 
-        /* PROFILE */
+        /*
+         * Profile
+         */
 
-        if (cache.profile) {
+        if (
+            cache.profile
+        ) {
 
             currentProfile = {
 
@@ -655,28 +716,35 @@ function loadDashboardCache() {
 
             };
 
+
             renderProfile();
 
         }
 
 
-        /* USERS */
+        /*
+         * Users
+         */
 
         if (
             Array.isArray(
                 cache.users
-            )
+            ) &&
+            cache.users.length
         ) {
 
             onlineUsers =
                 cache.users;
+
 
             renderOnline();
 
         }
 
 
-        /* PRIVATE CHATS */
+        /*
+         * Private chats
+         */
 
         if (
             Array.isArray(
@@ -690,7 +758,9 @@ function loadDashboardCache() {
         }
 
 
-        /* GROUPS */
+        /*
+         * Groups
+         */
 
         if (
             Array.isArray(
@@ -704,6 +774,10 @@ function loadDashboardCache() {
         }
 
 
+        /*
+         * Unified list
+         */
+
         if (
             recentChats.length ||
             recentGroups.length
@@ -716,12 +790,14 @@ function loadDashboardCache() {
 
         return true;
 
+
     } catch (error) {
 
         console.warn(
             "Dashboard cache load failed:",
             error
         );
+
 
         return false;
 
@@ -731,10 +807,159 @@ function loadDashboardCache() {
 
 
 /* =========================================================
-   NAME
+   PROFILE CACHE
 ========================================================= */
 
-function getFullName(user = {}) {
+function getProfileCache() {
+
+    try {
+
+        return JSON.parse(
+            localStorage.getItem(
+                PROFILE_CACHE_KEY
+            ) || "{}"
+        );
+
+    } catch {
+
+        return {};
+
+    }
+
+}
+
+
+function saveProfileToCache(
+    profile
+) {
+
+    if (
+        !profile?.uid
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const cache =
+            getProfileCache();
+
+
+        cache[
+            profile.uid
+        ] = {
+
+            ...publicProfileData(
+                profile
+            ),
+
+            cachedAt:
+                Date.now()
+
+        };
+
+
+        localStorage.setItem(
+            PROFILE_CACHE_KEY,
+            JSON.stringify(
+                cache
+            )
+        );
+
+
+    } catch {
+
+        /* Ignore */
+
+    }
+
+}
+
+
+function getCachedProfile(
+    uid
+) {
+
+    if (!uid) {
+        return null;
+    }
+
+
+    try {
+
+        const cache =
+            getProfileCache();
+
+
+        return cache[
+            uid
+        ] || null;
+
+    } catch {
+
+        return null;
+
+    }
+
+}
+
+
+/* =========================================================
+   INITIALS
+========================================================= */
+
+function initials(
+    name = "U"
+) {
+
+    const parts =
+        String(name)
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean);
+
+
+    if (!parts.length) {
+
+        return "U";
+
+    }
+
+
+    if (
+        parts.length === 1
+    ) {
+
+        return parts[0]
+            .slice(0, 2)
+            .toUpperCase();
+
+    }
+
+
+    return (
+
+        parts[0][0] +
+
+        parts[
+            parts.length - 1
+        ][0]
+
+    ).toUpperCase();
+
+}
+
+
+/* =========================================================
+   FULL NAME
+========================================================= */
+
+function getFullName(
+    user = {}
+) {
 
     const displayName =
         String(
@@ -769,7 +994,9 @@ function getFullName(user = {}) {
 
 
     if (fullName) {
+
         return fullName;
+
     }
 
 
@@ -795,49 +1022,17 @@ function getFullName(user = {}) {
 
 
 /* =========================================================
-   INITIALS
-========================================================= */
-
-function initials(name = "U") {
-
-    const parts =
-        String(name)
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean);
-
-
-    if (!parts.length) {
-        return "U";
-    }
-
-
-    if (parts.length === 1) {
-
-        return parts[0]
-            .slice(0, 2)
-            .toUpperCase();
-
-    }
-
-
-    return (
-
-        parts[0][0] +
-        parts[parts.length - 1][0]
-
-    ).toUpperCase();
-
-}
-
-
-/* =========================================================
    ESCAPE HTML
 ========================================================= */
 
-function escapeHtml(value) {
+function escapeHtml(
+    value
+) {
 
-    return String(value ?? "")
+    return String(
+        value ?? ""
+    )
+
         .replace(
             /[&<>"']/g,
             character => ({
@@ -857,7 +1052,10 @@ function escapeHtml(value) {
                 "'":
                     "&#039;"
 
-            })[character]
+            }[
+                character
+            ])
+
         );
 
 }
@@ -867,7 +1065,9 @@ function escapeHtml(value) {
    VERIFIED BADGE
 ========================================================= */
 
-function verifiedBadge(user) {
+function verifiedBadge(
+    user
+) {
 
     if (
         user?.isVerified !== true
@@ -894,10 +1094,12 @@ function verifiedBadge(user) {
 
 
 /* =========================================================
-   TIMESTAMP
+   TIMESTAMP TO DATE
 ========================================================= */
 
-function timestampToDate(value) {
+function timestampToDate(
+    value
+) {
 
     if (!value) {
         return null;
@@ -914,27 +1116,28 @@ function timestampToDate(value) {
 
 
     if (
-        typeof value?.toDate ===
-        "function"
-    ) {
-
-        return value.toDate();
-
-    }
-
-
-    if (
         typeof value === "number"
     ) {
 
         const date =
             new Date(value);
 
+
         return Number.isNaN(
             date.getTime()
         )
             ? null
             : date;
+
+    }
+
+
+    if (
+        typeof value?.toDate ===
+        "function"
+    ) {
+
+        return value.toDate();
 
     }
 
@@ -970,6 +1173,7 @@ function timestampToDate(value) {
         const date =
             new Date(value);
 
+
         return Number.isNaN(
             date.getTime()
         )
@@ -985,13 +1189,17 @@ function timestampToDate(value) {
 
 
 /* =========================================================
-   FORMAT TIME
+   FORMAT TIMESTAMP
 ========================================================= */
 
-function formatTimestamp(value) {
+function formatTimestamp(
+    value
+) {
 
     const date =
-        timestampToDate(value);
+        timestampToDate(
+            value
+        );
 
 
     if (!date) {
@@ -1003,10 +1211,12 @@ function formatTimestamp(value) {
         new Date();
 
 
-    if (
+    const sameDay =
         date.toDateString() ===
-        now.toDateString()
-    ) {
+        now.toDateString();
+
+
+    if (sameDay) {
 
         return date.toLocaleTimeString(
             [],
@@ -1021,6 +1231,7 @@ function formatTimestamp(value) {
 
     const yesterday =
         new Date();
+
 
     yesterday.setDate(
         yesterday.getDate() - 1
@@ -1052,14 +1263,23 @@ function formatTimestamp(value) {
    ACCOUNT CONTROL
 ========================================================= */
 
-function getAccountControl(profile) {
+function getAccountControl(
+    profile
+) {
 
     if (!profile) {
 
         return {
 
-            blocked: true,
-            status: "unknown",
+            blocked:
+                true,
+
+            status:
+                "unknown",
+
+            messagingRestricted:
+                true,
+
             message:
                 "Your account could not be verified."
 
@@ -1077,12 +1297,20 @@ function getAccountControl(profile) {
             .toLowerCase();
 
 
-    if (status === "banned") {
+    if (
+        status === "banned"
+    ) {
 
         return {
 
-            blocked: true,
-            status: "banned",
+            blocked:
+                true,
+
+            status:
+                "banned",
+
+            messagingRestricted:
+                true,
 
             message:
                 "Your CONNECTA account has been banned."
@@ -1092,12 +1320,20 @@ function getAccountControl(profile) {
     }
 
 
-    if (status === "suspended") {
+    if (
+        status === "suspended"
+    ) {
 
         return {
 
-            blocked: true,
-            status: "suspended",
+            blocked:
+                true,
+
+            status:
+                "suspended",
+
+            messagingRestricted:
+                true,
 
             message:
                 "Your CONNECTA account is currently suspended."
@@ -1109,9 +1345,21 @@ function getAccountControl(profile) {
 
     return {
 
-        blocked: false,
-        status: "active",
-        message: ""
+        blocked:
+            false,
+
+        status:
+            "active",
+
+        messagingRestricted:
+            profile.messagingRestricted === true,
+
+        message:
+            profile.messagingRestricted === true
+
+                ? "Messaging has been restricted by CONNECTA."
+
+                : ""
 
     };
 
@@ -1122,7 +1370,9 @@ function getAccountControl(profile) {
    BLOCKED SCREEN
 ========================================================= */
 
-function showAccountBlockedScreen(control) {
+function showAccountBlockedScreen(
+    control
+) {
 
     stopDashboardListeners();
 
@@ -1160,14 +1410,16 @@ function showAccountBlockedScreen(control) {
                         height:64px;
                         border-radius:50%;
                         margin:0 auto 18px;
-                        display:grid;
-                        place-items:center;
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;
                         background:#fff1f2;
                         font-size:30px;
                     "
                 >
                     🔒
                 </div>
+
 
                 <h2
                     style="
@@ -1176,11 +1428,15 @@ function showAccountBlockedScreen(control) {
                     "
                 >
                     ${
-                        control.status === "banned"
+                        control.status ===
+                        "banned"
+
                             ? "Account Banned"
+
                             : "Account Suspended"
                     }
                 </h2>
+
 
                 <p
                     style="
@@ -1195,6 +1451,7 @@ function showAccountBlockedScreen(control) {
                     )}
                 </p>
 
+
                 <button
                     id="blockedLogout"
                     style="
@@ -1206,6 +1463,7 @@ function showAccountBlockedScreen(control) {
                         background:#16a34a;
                         color:#fff;
                         font-weight:800;
+                        cursor:pointer;
                     "
                 >
                     Logout
@@ -1227,59 +1485,6 @@ function showAccountBlockedScreen(control) {
 
 
 /* =========================================================
-   AVATAR RENDER
-========================================================= */
-
-function renderAvatarElement(
-    element,
-    user,
-    className = ""
-) {
-
-    if (!element) {
-        return;
-    }
-
-
-    const name =
-        getFullName(user);
-
-
-    const photo =
-        user?.photoURL ||
-        user?.photoUrl ||
-        "";
-
-
-    element.classList.add(
-        ...className
-            .split(" ")
-            .filter(Boolean)
-    );
-
-
-    if (photo) {
-
-        element.innerHTML = `
-
-            <img
-                src="${escapeHtml(photo)}"
-                alt="${escapeHtml(name)}"
-            >
-
-        `;
-
-    } else {
-
-        element.textContent =
-            initials(name);
-
-    }
-
-}
-
-
-/* =========================================================
    RENDER PROFILE
 ========================================================= */
 
@@ -1288,6 +1493,34 @@ function renderProfile() {
     if (!currentProfile) {
         return;
     }
+
+
+    const welcomeName =
+        $("welcomeName");
+
+
+    const profileBtn =
+        $("profileBtn");
+
+
+    const menuName =
+        $("menuUserName");
+
+
+    const menuUsername =
+        $("menuUsername");
+
+
+    const menuAvatar =
+        $("menuAvatar");
+
+
+    const profileAvatar =
+        $("profileAvatar");
+
+
+    const balance =
+        $("balanceAmount");
 
 
     const fullName =
@@ -1302,28 +1535,6 @@ function renderProfile() {
         "";
 
 
-    const welcomeName =
-        $("welcomeName");
-
-    const balanceAmount =
-        $("balanceAmount");
-
-    const menuName =
-        $("menuName");
-
-    const menuUsername =
-        $("menuUsername");
-
-    const menuAvatar =
-        $("menuAvatar");
-
-    const welcomeAvatar =
-        $("welcomeAvatar");
-
-    const profileBtn =
-        $("profileBtn");
-
-
     if (welcomeName) {
 
         welcomeName.textContent =
@@ -1332,16 +1543,19 @@ function renderProfile() {
     }
 
 
-    if (balanceAmount) {
+    if (balance) {
 
-        balanceAmount.textContent =
+        balance.textContent =
             Number(
-                currentProfile.balance || 0
+                currentProfile.balance ||
+                0
             ).toLocaleString(
                 "en-KE",
                 {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 2
+                    minimumFractionDigits:
+                        0,
+                    maximumFractionDigits:
+                        2
                 }
             );
 
@@ -1378,35 +1592,65 @@ function renderProfile() {
 
 
     renderAvatarElement(
-        welcomeAvatar,
+        profileAvatar,
         currentProfile
     );
 
 
     if (profileBtn) {
 
-        if (photo) {
-
-            profileBtn.innerHTML = `
-
-                <img
-                    src="${escapeHtml(photo)}"
-                    alt="${escapeHtml(fullName)}"
-                >
-
-            `;
-
-        } else {
-
-            profileBtn.textContent =
-                initials(fullName);
-
-        }
-
         profileBtn.setAttribute(
             "aria-label",
             `${fullName} profile`
         );
+
+    }
+
+}
+
+
+/* =========================================================
+   AVATAR
+========================================================= */
+
+function renderAvatarElement(
+    element,
+    user
+) {
+
+    if (!element) {
+        return;
+    }
+
+
+    const name =
+        getFullName(
+            user
+        );
+
+
+    const photo =
+        user?.photoURL ||
+        user?.photoUrl ||
+        "";
+
+
+    if (photo) {
+
+        element.innerHTML = `
+
+            <img
+                src="${escapeHtml(photo)}"
+                alt="${escapeHtml(name)}"
+                loading="lazy"
+            >
+
+        `;
+
+    } else {
+
+        element.textContent =
+            initials(name);
 
     }
 
@@ -1428,258 +1672,120 @@ function renderOnline() {
     }
 
 
-    box.setAttribute(
-        "aria-busy",
-        "false"
-    );
+    hideOnlineSkeleton();
 
-
-    /* =====================================================
-       CURRENT USER UID
-       Use Firebase Auth first, then profile as fallback.
-    ===================================================== */
-
-    const currentUid =
-        currentUser?.uid ||
-        currentProfile?.uid ||
-        "";
-
-
-    /* =====================================================
-       ONLINE COUNT
-    ===================================================== */
-
-    const onlineCount =
-        $("onlineCount");
-
-
-    const activeCount =
-        onlineUsers.filter(
-            user =>
-                user.isOnline === true
-        ).length;
-
-
-    if (onlineCount) {
-
-        onlineCount.textContent =
-            `(${activeCount})`;
-
-    }
-
-
-    /* =====================================================
-       EMPTY STATE
-    ===================================================== */
 
     if (!onlineUsers.length) {
 
         box.innerHTML = `
 
-            <div class="connecta-empty">
+            <div
+                class="connecta-dashboard-empty"
+            >
                 No users found.
             </div>
 
         `;
+
 
         return;
 
     }
 
 
-    /* =====================================================
-       SORT USERS
-       Current user always appears first.
-       Online users come before offline users.
-    ===================================================== */
+    const users =
+        [...onlineUsers]
+            .sort(
+                (a, b) => {
 
-    const sortedUsers =
-        [...onlineUsers].sort(
-            (a, b) => {
+                    if (
+                        a.uid ===
+                        currentUser?.uid
+                    ) {
 
-                const aIsSelf =
-                    String(a.uid || "") ===
-                    String(currentUid || "");
+                        return -1;
 
-                const bIsSelf =
-                    String(b.uid || "") ===
-                    String(currentUid || "");
+                    }
 
 
-                /* Current user first */
+                    if (
+                        b.uid ===
+                        currentUser?.uid
+                    ) {
 
-                if (
-                    aIsSelf &&
-                    !bIsSelf
-                ) {
+                        return 1;
 
-                    return -1;
-
-                }
+                    }
 
 
-                if (
-                    bIsSelf &&
-                    !aIsSelf
-                ) {
+                    if (
+                        a.isOnline !==
+                        b.isOnline
+                    ) {
 
-                    return 1;
+                        return a.isOnline
+                            ? -1
+                            : 1;
 
-                }
-
-
-                /* Online before offline */
-
-                if (
-                    a.isOnline !==
-                    b.isOnline
-                ) {
-
-                    return a.isOnline
-                        ? -1
-                        : 1;
-
-                }
+                    }
 
 
-                /* Alphabetical */
-
-                return getFullName(a)
-                    .localeCompare(
-                        getFullName(b)
+                    return getFullName(
+                        a
+                    ).localeCompare(
+                        getFullName(
+                            b
+                        )
                     );
 
-            }
-        );
+                }
+            );
 
-
-    /* =====================================================
-       RENDER
-    ===================================================== */
 
     box.innerHTML =
-        sortedUsers.map(
-            user => {
+        users
+            .map(
+                user => {
 
-                const name =
-                    getFullName(user);
-
-
-                /*
-                 * IMPORTANT:
-                 * Determine ownership using both
-                 * Firebase Auth UID and current profile UID.
-                 */
-
-                const userUid =
-                    String(
-                        user.uid || ""
-                    );
+                    const name =
+                        getFullName(
+                            user
+                        );
 
 
-                const self =
-                    userUid !== "" &&
-                    (
-                        userUid ===
-                        String(
-                            currentUser?.uid || ""
-                        )
-                        ||
-                        userUid ===
-                        String(
-                            currentProfile?.uid || ""
-                        )
-                    );
+                    const isSelf =
+                        user.uid ===
+                        currentUser?.uid;
 
 
-                /*
-                 * Following only applies to OTHER users.
-                 */
-
-                const following =
-                    !self &&
-                    Array.isArray(
-                        currentProfile?.following
-                    ) &&
-                    currentProfile.following.includes(
-                        user.uid
-                    );
+                    const following =
+                        Array.isArray(
+                            currentProfile?.following
+                        ) &&
+                        currentProfile.following
+                            .includes(
+                                user.uid
+                            );
 
 
-                const photo =
-                    user.photoURL ||
-                    user.photoUrl ||
-                    "";
+                    const photo =
+                        user.photoURL ||
+                        user.photoUrl ||
+                        "";
 
 
-                return `
-
-                    <div
-                        class="user-card"
-                        data-user-card="${escapeHtml(
-                            user.uid
-                        )}"
-                    >
+                    return `
 
                         <div
-                            class="user-card-profile"
+                            class="online-user-card"
+                            data-uid="${escapeHtml(
+                                user.uid
+                            )}"
                         >
-
-                            <!-- PROFILE PHOTO -->
 
                             <div
                                 class="
-                                    avatar
-                                    large
-                                    ${
-                                        user.isOnline
-                                            ? "avatar-green"
-                                            : ""
-                                    }
-                                "
-                            >
-
-                                ${
-                                    photo
-
-                                        ? `
-                                            <img
-                                                src="${escapeHtml(
-                                                    photo
-                                                )}"
-                                                alt="${escapeHtml(
-                                                    name
-                                                )}"
-                                                loading="lazy"
-                                            >
-                                          `
-
-                                        : escapeHtml(
-                                            initials(name)
-                                        )
-                                }
-
-                            </div>
-
-
-                            <!-- NAME -->
-
-                            <strong>
-
-                                ${escapeHtml(
-                                    name
-                                )}
-
-                                ${verifiedBadge(user)}
-
-                            </strong>
-
-
-                            <!-- ONLINE STATUS -->
-
-                            <small
-                                class="
-                                    online-text
+                                    online-user-avatar-wrap
                                     ${
                                         user.isOnline
                                             ? "online"
@@ -1688,16 +1794,62 @@ function renderOnline() {
                                 "
                             >
 
-                                <span
-                                    class="
-                                        status-dot
-                                        ${
-                                            user.isOnline
-                                                ? "online"
-                                                : "offline"
-                                        }
-                                    "
-                                ></span>
+                                <div
+                                    class="online-user-avatar"
+                                >
+
+                                    ${
+                                        photo
+
+                                            ? `
+                                                <img
+                                                    src="${escapeHtml(
+                                                        photo
+                                                    )}"
+                                                    alt="${escapeHtml(
+                                                        name
+                                                    )}"
+                                                    loading="lazy"
+                                                >
+                                              `
+
+                                            : escapeHtml(
+                                                initials(
+                                                    name
+                                                )
+                                            )
+                                    }
+
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                class="online-user-name"
+                            >
+
+                                ${escapeHtml(
+                                    name
+                                )}
+
+                                ${verifiedBadge(
+                                    user
+                                )}
+
+                            </div>
+
+
+                            <div
+                                class="
+                                    online-user-status
+                                    ${
+                                        user.isOnline
+                                            ? "online"
+                                            : "offline"
+                                    }
+                                "
+                            >
 
                                 ${
                                     user.isOnline
@@ -1705,33 +1857,15 @@ function renderOnline() {
                                         : "Offline"
                                 }
 
-                            </small>
+                            </div>
 
-
-                            <!-- ACTION -->
 
                             ${
-                                self
+                                !isSelf
 
                                     ? `
 
                                         <button
-                                            type="button"
-                                            class="
-                                                follow-btn
-                                                following
-                                            "
-                                            disabled
-                                        >
-                                            You
-                                        </button>
-
-                                      `
-
-                                    : `
-
-                                        <button
-                                            type="button"
                                             class="
                                                 follow-btn
                                                 ${
@@ -1752,111 +1886,96 @@ function renderOnline() {
                                         </button>
 
                                       `
+
+                                    : ""
                             }
 
                         </div>
 
-                    </div>
-
-                `;
-
-            }
-        ).join("");
-
-
-    /* =====================================================
-       CARD CLICK
-       Tap card -> public profile
-       Follow button -> follow only
-    ===================================================== */
-
-    box.onclick =
-        async event => {
-
-            const followButton =
-                event.target.closest(
-                    "[data-follow-uid]"
-                );
-
-
-            if (followButton) {
-
-                event.preventDefault();
-                event.stopPropagation();
-
-
-                const targetUid =
-                    followButton.dataset.followUid;
-
-
-                if (!targetUid) {
-                    return;
-                }
-
-
-                followButton.disabled =
-                    true;
-
-
-                try {
-
-                    await toggleFollow(
-                        targetUid
-                    );
-
-                } finally {
-
-                    followButton.disabled =
-                        false;
+                    `;
 
                 }
+            )
+            .join("");
 
 
-                return;
+    box
+        .querySelectorAll(
+            "[data-uid]"
+        )
+        .forEach(
+            card => {
 
-            }
+                card.addEventListener(
+                    "click",
+                    event => {
+
+                        if (
+                            event.target.closest(
+                                ".follow-btn"
+                            )
+                        ) {
+
+                            return;
+
+                        }
 
 
-            const card =
-                event.target.closest(
-                    "[data-user-card]"
+                        const uid =
+                            card.dataset.uid;
+
+
+                        if (!uid) {
+                            return;
+                        }
+
+
+                        location.href =
+                            `profile.html?uid=${encodeURIComponent(
+                                uid
+                            )}`;
+
+                    }
                 );
 
-
-            if (!card) {
-                return;
             }
+        );
 
 
-            const uid =
-                card.dataset.userCard;
+    box
+        .querySelectorAll(
+            "[data-follow-uid]"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    event => {
+
+                        event.stopPropagation();
 
 
-            if (!uid) {
-                return;
+                        toggleFollow(
+                            button.dataset.followUid
+                        );
+
+                    }
+                );
+
             }
-
-
-            console.log(
-                "[CONNECTA] Opening profile:",
-                uid
-            );
-
-
-            window.location.href =
-                `profile.html?uid=${encodeURIComponent(
-                    uid
-                )}`;
-
-        };
+        );
 
 }
 
+
 /* =========================================================
-   FOLLOW
+   TOGGLE FOLLOW
 ========================================================= */
 
-async function toggleFollow(targetUid) {
+async function toggleFollow(
+    targetUid
+) {
 
     if (
         !currentUser ||
@@ -1891,16 +2010,20 @@ async function toggleFollow(targetUid) {
             db,
             async transaction => {
 
-                const currentSnap =
-                    await transaction.get(
+                const [
+                    currentSnap,
+                    targetSnap
+                ] = await Promise.all([
+
+                    transaction.get(
                         currentRef
-                    );
+                    ),
 
-
-                const targetSnap =
-                    await transaction.get(
+                    transaction.get(
                         targetRef
-                    );
+                    )
+
+                ]);
 
 
                 if (
@@ -1927,15 +2050,19 @@ async function toggleFollow(targetUid) {
                     Array.isArray(
                         currentData.following
                     )
-                        ? [...currentData.following]
+                        ? [
+                            ...currentData.following
+                        ]
                         : [];
 
 
-                const followers =
+                const targetFollowers =
                     Array.isArray(
                         targetData.followers
                     )
-                        ? [...targetData.followers]
+                        ? [
+                            ...targetData.followers
+                        ]
                         : [];
 
 
@@ -1945,19 +2072,22 @@ async function toggleFollow(targetUid) {
                     );
 
 
-                if (alreadyFollowing) {
+                if (
+                    alreadyFollowing
+                ) {
 
                     const nextFollowing =
                         following.filter(
-                            id =>
-                                id !== targetUid
+                            uid =>
+                                uid !==
+                                targetUid
                         );
 
 
                     const nextFollowers =
-                        followers.filter(
-                            id =>
-                                id !==
+                        targetFollowers.filter(
+                            uid =>
+                                uid !==
                                 currentUser.uid
                         );
 
@@ -1973,7 +2103,8 @@ async function toggleFollow(targetUid) {
                                 Math.max(
                                     0,
                                     Number(
-                                        currentData.followingCount || 0
+                                        currentData.followingCount ||
+                                        0
                                     ) - 1
                                 )
 
@@ -1992,12 +2123,14 @@ async function toggleFollow(targetUid) {
                                 Math.max(
                                     0,
                                     Number(
-                                        targetData.followersCount || 0
+                                        targetData.followersCount ||
+                                        0
                                     ) - 1
                                 )
 
                         }
                     );
+
 
                 } else {
 
@@ -2007,12 +2140,12 @@ async function toggleFollow(targetUid) {
 
 
                     if (
-                        !followers.includes(
+                        !targetFollowers.includes(
                             currentUser.uid
                         )
                     ) {
 
-                        followers.push(
+                        targetFollowers.push(
                             currentUser.uid
                         );
 
@@ -2027,7 +2160,8 @@ async function toggleFollow(targetUid) {
 
                             followingCount:
                                 Number(
-                                    currentData.followingCount || 0
+                                    currentData.followingCount ||
+                                    0
                                 ) + 1
 
                         }
@@ -2038,11 +2172,13 @@ async function toggleFollow(targetUid) {
                         targetRef,
                         {
 
-                            followers,
+                            followers:
+                                targetFollowers,
 
                             followersCount:
                                 Number(
-                                    targetData.followersCount || 0
+                                    targetData.followersCount ||
+                                    0
                                 ) + 1
 
                         }
@@ -2064,7 +2200,9 @@ async function toggleFollow(targetUid) {
             );
 
 
-        if (profileSnap.exists()) {
+        if (
+            profileSnap.exists()
+        ) {
 
             currentProfile = {
 
@@ -2098,6 +2236,7 @@ async function toggleFollow(targetUid) {
             error
         );
 
+
         showToast(
             error?.message ||
             "Could not update follow status."
@@ -2109,10 +2248,12 @@ async function toggleFollow(targetUid) {
 
 
 /* =========================================================
-   USER PROFILE
+   GET USER PROFILE
 ========================================================= */
 
-async function getUserProfile(uid) {
+async function getUserProfile(
+    uid
+) {
 
     if (!uid) {
         return null;
@@ -2120,10 +2261,17 @@ async function getUserProfile(uid) {
 
 
     const cached =
-        getCachedProfile(uid);
+        getCachedProfile(
+            uid
+        );
 
 
     if (cached) {
+
+        /*
+         * Return cached data immediately.
+         * Live user listener will update it later.
+         */
 
         return {
 
@@ -2148,8 +2296,12 @@ async function getUserProfile(uid) {
             );
 
 
-        if (!snapshot.exists()) {
+        if (
+            !snapshot.exists()
+        ) {
+
             return null;
+
         }
 
 
@@ -2182,7 +2334,9 @@ async function getUserProfile(uid) {
    REFRESH USER PROFILE
 ========================================================= */
 
-async function refreshUserProfile(uid) {
+async function refreshUserProfile(
+    uid
+) {
 
     if (!uid) {
         return null;
@@ -2201,8 +2355,12 @@ async function refreshUserProfile(uid) {
             );
 
 
-        if (!snapshot.exists()) {
+        if (
+            !snapshot.exists()
+        ) {
+
             return null;
+
         }
 
 
@@ -2220,12 +2378,17 @@ async function refreshUserProfile(uid) {
         );
 
 
+        /*
+         * Update private-chat preview.
+         */
+
         recentChats =
             recentChats.map(
                 chat => {
 
                     if (
-                        chat.otherUid !== uid
+                        chat.otherUid !==
+                        uid
                     ) {
 
                         return chat;
@@ -2248,7 +2411,8 @@ async function refreshUserProfile(uid) {
                             "",
 
                         otherUserVerified:
-                            profile.isVerified === true
+                            profile.isVerified ===
+                            true
 
                     };
 
@@ -2256,12 +2420,17 @@ async function refreshUserProfile(uid) {
             );
 
 
+        /*
+         * Update group preview sender.
+         */
+
         recentGroups =
             recentGroups.map(
                 group => {
 
                     if (
-                        group.lastMessageSenderId !== uid
+                        group.lastMessageSenderId !==
+                        uid
                     ) {
 
                         return group;
@@ -2279,7 +2448,8 @@ async function refreshUserProfile(uid) {
                             ),
 
                         lastMessageSenderVerified:
-                            profile.isVerified === true
+                            profile.isVerified ===
+                            true
 
                     };
 
@@ -2302,23 +2472,12 @@ async function refreshUserProfile(uid) {
 
 
 /* =========================================================
-   PRIVATE CHAT LIVE LISTENER
-   =========================================================
-   - Listens ONLY to chats involving the current user
-   - Updates immediately when a message is sent
-   - No page refresh required
-   - No composite index required
-   - Sorts chats locally by updatedAt
+   PRIVATE CHAT LISTENER
 ========================================================= */
 
-function listenToChats(uid) {
-
-    if (!uid) {
-        return;
-    }
-
-
-    /* STOP PREVIOUS LISTENER */
+function listenToChats(
+    uid
+) {
 
     if (stopChats) {
 
@@ -2336,42 +2495,15 @@ function listenToChats(uid) {
         );
 
 
-    /*
-     * IMPORTANT
-     *
-     * We intentionally do NOT use:
-     *
-     * orderBy("updatedAt", "desc")
-     *
-     * here.
-     *
-     * That combination with array-contains can require
-     * a composite Firestore index.
-     *
-     * Instead, Firestore listens to all chats belonging
-     * to this user and we sort them locally.
-     */
-
     const chatsQuery =
         query(
-
             chatsRef,
-
-            where(
-                "participants",
-                "array-contains",
-                uid
+            orderBy(
+                "updatedAt",
+                "desc"
             ),
-
-            limit(100)
-
+            limit(50)
         );
-
-
-    console.log(
-        "[CONNECTA] Starting LIVE private chat listener:",
-        uid
-    );
 
 
     stopChats =
@@ -2381,10 +2513,25 @@ function listenToChats(uid) {
 
             async snapshot => {
 
-                console.log(
-                    "[CONNECTA] LIVE chat snapshot:",
-                    snapshot.docs.length
-                );
+                const chatDocuments =
+                    snapshot.docs.filter(
+                        chatDoc => {
+
+                            const data =
+                                chatDoc.data();
+
+
+                            return (
+                                Array.isArray(
+                                    data.participants
+                                ) &&
+                                data.participants.includes(
+                                    uid
+                                )
+                            );
+
+                        }
+                    );
 
 
                 const result = [];
@@ -2392,45 +2539,25 @@ function listenToChats(uid) {
 
                 for (
                     const chatDoc
-                    of snapshot.docs
+                    of chatDocuments
                 ) {
 
                     const data =
                         chatDoc.data();
 
 
-                    /*
-                     * FIND OTHER USER
-                     */
-
-                    const participants =
-                        Array.isArray(
-                            data.participants
-                        )
-                            ? data.participants
-                            : [];
-
-
                     const otherUid =
-                        participants.find(
+                        data.participants.find(
                             participant =>
-                                participant !== uid
+                                participant !==
+                                uid
                         );
 
 
                     if (!otherUid) {
-
                         continue;
-
                     }
 
-
-                    /*
-                     * FIND USER PROFILE
-                     *
-                     * First use users already loaded
-                     * by the dashboard.
-                     */
 
                     let profile =
                         onlineUsers.find(
@@ -2439,10 +2566,6 @@ function listenToChats(uid) {
                                 otherUid
                         );
 
-
-                    /*
-                     * Then try local profile cache.
-                     */
 
                     if (!profile) {
 
@@ -2455,10 +2578,8 @@ function listenToChats(uid) {
 
 
                     /*
-                     * DO NOT WAIT FOR PROFILE
-                     *
-                     * The chat must appear immediately
-                     * even if the profile hasn't loaded.
+                     * We don't block rendering on a
+                     * profile request.
                      */
 
                     const otherName =
@@ -2482,13 +2603,11 @@ function listenToChats(uid) {
 
 
                     const otherVerified =
-                        profile?.isVerified === true ||
-                        data.otherUserVerified === true;
+                        profile?.isVerified ===
+                            true ||
+                        data.otherUserVerified ===
+                            true;
 
-
-                    /*
-                     * UNREAD COUNT
-                     */
 
                     const unread =
                         Number(
@@ -2498,28 +2617,16 @@ function listenToChats(uid) {
                         );
 
 
-                    /*
-                     * LAST SENDER
-                     */
-
                     const lastSenderId =
                         data.lastSenderId ||
                         data.lastMessageSenderId ||
                         "";
 
 
-                    /*
-                     * LAST MESSAGE
-                     */
-
                     const lastMessage =
                         data.lastMessage ||
                         "";
 
-
-                    /*
-                     * MESSAGE TYPE
-                     */
 
                     const lastMessageType =
                         data.lastMessageType ||
@@ -2541,10 +2648,6 @@ function listenToChats(uid) {
                     }
 
 
-                    /*
-                     * EMPTY / NEW CHAT
-                     */
-
                     if (
                         !preview &&
                         lastSenderId === uid
@@ -2556,10 +2659,6 @@ function listenToChats(uid) {
                     }
 
 
-                    /*
-                     * BUILD CHAT OBJECT
-                     */
-
                     result.push({
 
                         type:
@@ -2568,9 +2667,7 @@ function listenToChats(uid) {
                         chatId:
                             chatDoc.id,
 
-                        otherUid:
-
-                            otherUid,
+                        otherUid,
 
                         otherUserName:
                             otherName,
@@ -2584,28 +2681,15 @@ function listenToChats(uid) {
                         lastMessage:
                             preview,
 
-                        lastMessageType:
-                            lastMessageType,
+                        lastMessageType,
 
-                        lastSenderId:
-                            lastSenderId,
+                        lastSenderId,
 
-                        unread:
-                            unread,
-
-                        /*
-                         * IMPORTANT:
-                         *
-                         * chat.js updates updatedAt
-                         * whenever a new message is sent.
-                         *
-                         * This value is used to move the
-                         * conversation to the top.
-                         */
+                        unread,
 
                         lastMessageAt:
-                            data.updatedAt ||
                             data.lastMessageAt ||
+                            data.updatedAt ||
                             null,
 
                         updatedAt:
@@ -2613,70 +2697,27 @@ function listenToChats(uid) {
                             null,
 
                         delivered:
-                            data.delivered === true,
+                            data.delivered ===
+                                true,
 
                         read:
-                            data.read === true
+                            data.read ===
+                                true
 
                     });
 
                 }
 
 
-                /*
-                 * SORT LOCALLY
-                 *
-                 * Newest conversation first.
-                 */
-
-                result.sort(
-                    (a, b) => {
-
-                        const dateA =
-                            timestampToDate(
-                                a.lastMessageAt ||
-                                a.updatedAt
-                            );
-
-
-                        const dateB =
-                            timestampToDate(
-                                b.lastMessageAt ||
-                                b.updatedAt
-                            );
-
-
-                        return (
-
-                            (dateB?.getTime() || 0) -
-                            (dateA?.getTime() || 0)
-
-                        );
-
-                    }
-                );
-
-
-                /*
-                 * REPLACE LIVE CHAT DATA
-                 */
-
                 recentChats =
                     result;
 
-
-                /*
-                 * RENDER IMMEDIATELY
-                 */
 
                 mergeRecentChats();
 
 
                 /*
-                 * REFRESH OTHER USER PROFILES
-                 *
-                 * This happens in the background.
-                 * It does NOT delay the chat preview.
+                 * Refresh profiles in the background.
                  */
 
                 result.forEach(
@@ -2694,13 +2735,14 @@ function listenToChats(uid) {
             error => {
 
                 console.error(
-                    "[CONNECTA] LIVE chat listener error:",
+                    "Private chat listener:",
                     error
                 );
 
 
                 /*
-                 * Keep cached chats visible.
+                 * Don't destroy group chats if
+                 * private chat listening fails.
                  */
 
                 mergeRecentChats();
@@ -2743,14 +2785,18 @@ async function getGroupUnreadCount(
 
 
         /*
-         * Never opened.
+         * No read state means this user has
+         * never opened the group.
+         *
+         * Count recent messages from other
+         * users.
          */
 
         if (
             !readData?.lastReadAt
         ) {
 
-            const q =
+            const firstQuery =
                 query(
                     messagesRef,
                     orderBy(
@@ -2762,7 +2808,9 @@ async function getGroupUnreadCount(
 
 
             const snapshot =
-                await getDocs(q);
+                await getDocs(
+                    firstQuery
+                );
 
 
             return snapshot.docs.filter(
@@ -2781,11 +2829,13 @@ async function getGroupUnreadCount(
 
 
         if (!readDate) {
+
             return 0;
+
         }
 
 
-        const q =
+        const unreadQuery =
             query(
                 messagesRef,
                 where(
@@ -2802,7 +2852,9 @@ async function getGroupUnreadCount(
 
 
         const snapshot =
-            await getDocs(q);
+            await getDocs(
+                unreadQuery
+            );
 
 
         return snapshot.docs.filter(
@@ -2811,13 +2863,14 @@ async function getGroupUnreadCount(
                 currentUser.uid
         ).length;
 
+
     } catch (error) {
 
         console.warn(
-            "Group unread count failed:",
-            groupId,
+            `Could not calculate unread group count for ${groupId}:`,
             error
         );
+
 
         return 0;
 
@@ -2832,76 +2885,54 @@ async function getGroupUnreadCount(
 
 async function processGroups() {
 
+    const version =
+        ++groupProcessVersion;
+
+
     if (!currentUser) {
         return;
     }
 
 
-    const version =
-        ++groupProcessVersion;
+    const allGroups = new Map();
 
 
-    const groupMap =
-        new Map();
+    [
+        ...groupListeners.memberIds,
+        ...groupListeners.members,
+        ...groupListeners.owned
+    ]
+        .forEach(
+            groupDoc => {
+
+                if (
+                    !groupDoc?.id
+                ) {
+
+                    return;
+
+                }
 
 
-    for (
-        const groupDoc
-        of groupListeners.memberIds
-    ) {
-
-        groupMap.set(
-            groupDoc.id,
-            {
-                groupId:
+                allGroups.set(
                     groupDoc.id,
+                    {
 
-                ...groupDoc.data()
+                        groupId:
+                            groupDoc.id,
+
+                        ...groupDoc.data()
+
+                    }
+                );
+
             }
         );
-
-    }
-
-
-    for (
-        const groupDoc
-        of groupListeners.members
-    ) {
-
-        groupMap.set(
-            groupDoc.id,
-            {
-                groupId:
-                    groupDoc.id,
-
-                ...groupDoc.data()
-            }
-        );
-
-    }
-
-
-    for (
-        const groupDoc
-        of groupListeners.owned
-    ) {
-
-        groupMap.set(
-            groupDoc.id,
-            {
-                groupId:
-                    groupDoc.id,
-
-                ...groupDoc.data()
-            }
-        );
-
-    }
 
 
     const groups =
         Array.from(
-            groupMap.values()
+            allGroups.values()
         );
 
 
@@ -2913,8 +2944,12 @@ async function processGroups() {
         of groups
     ) {
 
-        const isMember =
+        /*
+         * Only groups where the current user is
+         * actually a member/owner.
+         */
 
+        const member =
             (
                 Array.isArray(
                     group.memberIds
@@ -2922,9 +2957,7 @@ async function processGroups() {
                 group.memberIds.includes(
                     currentUser.uid
                 )
-            )
-
-            ||
+            ) ||
 
             (
                 Array.isArray(
@@ -2933,20 +2966,21 @@ async function processGroups() {
                 group.members.includes(
                     currentUser.uid
                 )
-            )
-
-            ||
+            ) ||
 
             group.ownerId ===
                 currentUser.uid;
 
 
-        if (!isMember) {
+        if (!member) {
+
             continue;
+
         }
 
 
-        let readData = null;
+        let readData =
+            null;
 
 
         try {
@@ -2963,7 +2997,9 @@ async function processGroups() {
                 );
 
 
-            if (readSnapshot.exists()) {
+            if (
+                readSnapshot.exists()
+            ) {
 
                 readData =
                     readSnapshot.data();
@@ -2972,7 +3008,8 @@ async function processGroups() {
 
         } catch {
 
-            readData = null;
+            readData =
+                null;
 
         }
 
@@ -2984,7 +3021,12 @@ async function processGroups() {
             );
 
 
-        let senderProfile = null;
+        /*
+         * Resolve sender profile if available.
+         */
+
+        let senderProfile =
+            null;
 
 
         if (
@@ -2997,6 +3039,8 @@ async function processGroups() {
                         user.uid ===
                         group.lastMessageSenderId
                 ) ||
+
+
                 getCachedProfile(
                     group.lastMessageSenderId
                 );
@@ -3004,7 +3048,7 @@ async function processGroups() {
         }
 
 
-        const senderName =
+        const lastSenderName =
             group.lastMessageSenderName ||
 
             (
@@ -3016,10 +3060,12 @@ async function processGroups() {
             );
 
 
-        const senderVerified =
-            group.lastMessageSenderVerified === true ||
+        const lastSenderVerified =
+            group.lastMessageSenderVerified ===
+                true ||
 
-            senderProfile?.isVerified === true;
+            senderProfile?.isVerified ===
+                true;
 
 
         enriched.push({
@@ -3044,17 +3090,17 @@ async function processGroups() {
 
             lastMessageType:
                 group.lastMessageType ||
-                "text",
+                "",
 
             lastMessageSenderId:
                 group.lastMessageSenderId ||
                 "",
 
             lastMessageSenderName:
-                senderName,
+                lastSenderName,
 
             lastMessageSenderVerified:
-                senderVerified,
+                lastSenderVerified,
 
             lastMessageAt:
                 group.lastMessageAt ||
@@ -3074,12 +3120,18 @@ async function processGroups() {
                 "",
 
             chatLocked:
-                group.chatLocked === true
+                group.chatLocked ===
+                true
 
         });
 
     }
 
+
+    /*
+     * Prevent stale async processing from
+     * overwriting newer data.
+     */
 
     if (
         version !==
@@ -3093,9 +3145,6 @@ async function processGroups() {
 
     recentGroups =
         enriched;
-
-
-    updateGroupBadge();
 
 
     mergeRecentChats();
@@ -3119,17 +3168,19 @@ function queueGroupProcessing() {
             () => {
 
                 processGroups()
-                    .catch(error => {
+                    .catch(
+                        error => {
 
-                        console.error(
-                            "Group processing error:",
-                            error
-                        );
+                            console.error(
+                                "Group processing error:",
+                                error
+                            );
 
-                    });
+                        }
+                    );
 
             },
-            60
+            40
         );
 
 }
@@ -3139,9 +3190,11 @@ function queueGroupProcessing() {
    GROUP LISTENER
 ========================================================= */
 
-function listenToGroups(uid) {
+function listenToGroups(
+    uid
+) {
 
-    groupUnsubscribers.forEach(
+    groupListeners.forEach(
         unsubscribe => {
 
             if (
@@ -3157,31 +3210,34 @@ function listenToGroups(uid) {
     );
 
 
-    groupUnsubscribers = [];
-
-
     groupListeners = {
 
-        memberIds: [],
-        members: [],
-        owned: []
+        memberIds:
+            [],
+
+        members:
+            [],
+
+        owned:
+            []
 
     };
 
 
-    recentGroups = [];
+    recentGroups =
+        [];
 
 
-    const groupsRef =
-        collection(
-            db,
-            "groups"
-        );
-
+    /*
+     * MEMBER IDS
+     */
 
     const memberIdsQuery =
         query(
-            groupsRef,
+            collection(
+                db,
+                "groups"
+            ),
             where(
                 "memberIds",
                 "array-contains",
@@ -3191,9 +3247,16 @@ function listenToGroups(uid) {
         );
 
 
+    /*
+     * MEMBERS
+     */
+
     const membersQuery =
         query(
-            groupsRef,
+            collection(
+                db,
+                "groups"
+            ),
             where(
                 "members",
                 "array-contains",
@@ -3203,9 +3266,16 @@ function listenToGroups(uid) {
         );
 
 
+    /*
+     * OWNER
+     */
+
     const ownerQuery =
         query(
-            groupsRef,
+            collection(
+                db,
+                "groups"
+            ),
             where(
                 "ownerId",
                 "==",
@@ -3216,7 +3286,10 @@ function listenToGroups(uid) {
 
 
     /*
-     * Initial data.
+     * Initial reads.
+     *
+     * Promise.allSettled means one query failing
+     * does not break the others.
      */
 
     Promise.allSettled([
@@ -3233,60 +3306,73 @@ function listenToGroups(uid) {
             ownerQuery
         )
 
-    ]).then(results => {
+    ])
+        .then(
+            results => {
 
-        const [
-            memberIdsResult,
-            membersResult,
-            ownerResult
-        ] = results;
-
-
-        if (
-            memberIdsResult.status ===
-            "fulfilled"
-        ) {
-
-            groupListeners.memberIds =
-                memberIdsResult.value.docs;
-
-        }
+                const [
+                    memberIdsResult,
+                    membersResult,
+                    ownerResult
+                ] = results;
 
 
-        if (
-            membersResult.status ===
-            "fulfilled"
-        ) {
+                if (
+                    memberIdsResult.status ===
+                    "fulfilled"
+                ) {
 
-            groupListeners.members =
-                membersResult.value.docs;
+                    groupListeners.memberIds =
+                        memberIdsResult.value.docs;
 
-        }
-
-
-        if (
-            ownerResult.status ===
-            "fulfilled"
-        ) {
-
-            groupListeners.owned =
-                ownerResult.value.docs;
-
-        }
+                }
 
 
-        queueGroupProcessing();
+                if (
+                    membersResult.status ===
+                    "fulfilled"
+                ) {
 
-    });
+                    groupListeners.members =
+                        membersResult.value.docs;
+
+                }
+
+
+                if (
+                    ownerResult.status ===
+                    "fulfilled"
+                ) {
+
+                    groupListeners.owned =
+                        ownerResult.value.docs;
+
+                }
+
+
+                queueGroupProcessing();
+
+            }
+        )
+        .catch(
+            error => {
+
+                console.error(
+                    "Initial group loading error:",
+                    error
+                );
+
+            }
+        );
 
 
     /*
-     * memberIds
+     * Live memberIds listener
      */
 
-    groupUnsubscribers.push(
-
+    const stopMemberIds =
         onSnapshot(
+
             memberIdsQuery,
 
             snapshot => {
@@ -3301,23 +3387,22 @@ function listenToGroups(uid) {
             error => {
 
                 console.warn(
-                    "memberIds listener:",
+                    "memberIds group listener:",
                     error
                 );
 
             }
-        )
 
-    );
+        );
 
 
     /*
-     * members
+     * Live members listener
      */
 
-    groupUnsubscribers.push(
-
+    const stopMembers =
         onSnapshot(
+
             membersQuery,
 
             snapshot => {
@@ -3332,23 +3417,22 @@ function listenToGroups(uid) {
             error => {
 
                 console.warn(
-                    "members listener:",
+                    "members group listener:",
                     error
                 );
 
             }
-        )
 
-    );
+        );
 
 
     /*
-     * owner
+     * Live owner listener
      */
 
-    groupUnsubscribers.push(
-
+    const stopOwned =
         onSnapshot(
+
             ownerQuery,
 
             snapshot => {
@@ -3363,126 +3447,80 @@ function listenToGroups(uid) {
             error => {
 
                 console.warn(
-                    "owner listener:",
+                    "owner group listener:",
                     error
                 );
 
             }
-        )
 
-    );
-
-}
-
-
-/* =========================================================
-   GROUP BADGE
-========================================================= */
-
-function updateGroupBadge() {
-
-    const badge =
-        $("groupBadge");
-
-
-    if (!badge) {
-        return;
-    }
-
-
-    const unread =
-        recentGroups.reduce(
-            (total, group) =>
-                total +
-                Number(
-                    group.unread || 0
-                ),
-            0
         );
 
 
-    if (unread > 0) {
+    /*
+     * Keep unsubscribe callbacks.
+     */
 
-        badge.hidden = false;
+    groupListeners.unsubscribers = [
 
-        badge.textContent =
-            unread > 99
-                ? "99+"
-                : String(unread);
+        stopMemberIds,
+        stopMembers,
+        stopOwned
 
-    } else {
-
-        badge.hidden = true;
-
-    }
+    ];
 
 }
 
 
 /* =========================================================
-   MERGE RECENT CHATS
+   MERGE PRIVATE CHATS + GROUPS
 ========================================================= */
 
 function mergeRecentChats() {
 
-    const map =
-        new Map();
+    const combined = [
 
+        ...recentChats,
 
-    for (
-        const chat
-        of recentChats
-    ) {
+        ...recentGroups
 
-        map.set(
-            `private:${chat.chatId}`,
-            chat
-        );
-
-    }
-
-
-    for (
-        const group
-        of recentGroups
-    ) {
-
-        map.set(
-            `group:${group.groupId}`,
-            group
-        );
-
-    }
-
-
-    const combined =
-        Array.from(
-            map.values()
-        );
+    ];
 
 
     combined.sort(
-        (a, b) => {
+        (
+            first,
+            second
+        ) => {
 
-            const dateA =
+            const firstDate =
                 timestampToDate(
-                    a.lastMessageAt ||
-                    a.updatedAt
+                    first.lastMessageAt ||
+                    first.updatedAt
                 );
 
 
-            const dateB =
+            const secondDate =
                 timestampToDate(
-                    b.lastMessageAt ||
-                    b.updatedAt
+                    second.lastMessageAt ||
+                    second.updatedAt
                 );
+
+
+            const firstTime =
+                firstDate
+                    ? firstDate.getTime()
+                    : 0;
+
+
+            const secondTime =
+                secondDate
+                    ? secondDate.getTime()
+                    : 0;
 
 
             return (
-
-                (dateB?.getTime() || 0) -
-                (dateA?.getTime() || 0)
-
+                secondTime -
+                firstTime
             );
 
         }
@@ -3500,70 +3538,12 @@ function mergeRecentChats() {
 
 
 /* =========================================================
-   CHAT STATUS
+   RENDER RECENT CHATS
 ========================================================= */
 
-function getMessageStatus(chat) {
-
-    if (
-        chat.lastSenderId !==
-        currentUser?.uid
-    ) {
-
-        return "";
-
-    }
-
-
-    if (
-        chat.read === true
-    ) {
-
-        return `
-            <span
-                class="chat-status-ticks read"
-                title="Read"
-            >
-                ✓✓
-            </span>
-        `;
-
-    }
-
-
-    if (
-        chat.delivered === true
-    ) {
-
-        return `
-            <span
-                class="chat-status-ticks"
-                title="Delivered"
-            >
-                ✓✓
-            </span>
-        `;
-
-    }
-
-
-    return `
-        <span
-            class="chat-status-ticks"
-            title="Sent"
-        >
-            ✓
-        </span>
-    `;
-
-}
-
-
-/* =========================================================
-   RENDER CHATS
-========================================================= */
-
-function renderChats(chats) {
+function renderChats(
+    chats
+) {
 
     const box =
         $("chatList");
@@ -3574,21 +3554,21 @@ function renderChats(chats) {
     }
 
 
-    box.setAttribute(
-        "aria-busy",
-        "false"
-    );
+    hideChatSkeleton();
 
 
     if (!chats.length) {
 
         box.innerHTML = `
 
-            <div class="empty-state">
+            <div
+                class="connecta-dashboard-empty"
+            >
                 No conversations yet.
             </div>
 
         `;
+
 
         return;
 
@@ -3596,320 +3576,369 @@ function renderChats(chats) {
 
 
     box.innerHTML =
-        chats.map(
-            chat => {
+        chats
+            .map(
+                chat => {
 
-                const isGroup =
-                    chat.type === "group";
-
-
-                const name =
-                    isGroup
-
-                        ? (
-                            chat.groupName ||
-                            "Group"
-                        )
-
-                        : (
-                            chat.otherUserName ||
-                            "CONNECTA User"
-                        );
+                    const isGroup =
+                        chat.type ===
+                        "group";
 
 
-                const photo =
-                    isGroup
-
-                        ? (
-                            chat.photoURL ||
-                            ""
-                        )
-
-                        : (
-                            chat.otherUserPhoto ||
-                            ""
-                        );
-
-
-                const avatar =
-                    photo
-
-                        ? `
-
-                            <img
-                                src="${escapeHtml(
-                                    photo
-                                )}"
-                                alt="${escapeHtml(
-                                    name
-                                )}"
-                                loading="lazy"
-                            >
-
-                          `
-
-                        : escapeHtml(
-                            initials(name)
-                        );
-
-
-                const unread =
-                    Number(
-                        chat.unread || 0
-                    );
-
-
-                const time =
-                    formatTimestamp(
-                        chat.lastMessageAt ||
-                        chat.updatedAt
-                    );
-
-
-                let preview =
-                    chat.lastMessage ||
-                    "";
-
-
-                if (
-                    chat.lastMessageType ===
-                    "image"
-                ) {
-
-                    preview =
-                        "📷 Photo";
-
-                }
-
-
-                if (
-                    !preview
-                ) {
-
-                    preview =
+                    const name =
                         isGroup
-                            ? "No messages yet"
-                            : "Start a conversation";
 
-                }
+                            ? (
+                                chat.groupName ||
+                                "Group"
+                            )
+
+                            : (
+                                chat.otherUserName ||
+                                "CONNECTA User"
+                            );
 
 
-                /*
-                 * GROUP MESSAGE PREVIEW
-                 */
+                    const photo =
+                        isGroup
 
-                let previewMarkup =
-                    escapeHtml(
+                            ? (
+                                chat.photoURL ||
+                                ""
+                            )
+
+                            : (
+                                chat.otherUserPhoto ||
+                                ""
+                            );
+
+
+                    const avatar =
+                        photo
+
+                            ? `
+
+                                <img
+                                    src="${escapeHtml(
+                                        photo
+                                    )}"
+                                    alt="${escapeHtml(
+                                        name
+                                    )}"
+                                    loading="lazy"
+                                >
+
+                              `
+
+                            : escapeHtml(
+                                initials(
+                                    name
+                                )
+                            );
+
+
+                    const unread =
+                        Number(
+                            chat.unread || 0
+                        );
+
+
+                    const time =
+                        formatTimestamp(
+                            chat.lastMessageAt ||
+                            chat.updatedAt
+                        );
+
+
+                    let preview =
+                        chat.lastMessage ||
+                        "";
+
+
+                    if (
+                        chat.lastMessageType ===
+                        "image"
+                    ) {
+
+                        preview =
+                            "📷 Photo";
+
+                    }
+
+
+                    if (
+                        isGroup &&
+                        !preview
+                    ) {
+
+                        preview =
+                            "No messages yet";
+
+                    }
+
+
+                    if (
+                        !isGroup &&
+                        !preview
+                    ) {
+
+                        preview =
+                            "Start a conversation";
+
+                    }
+
+
+                    /*
+                     * GROUP PREVIEW
+                     *
+                     * Example:
+                     *
+                     * John Chumo ✓: Hello
+                     */
+
+                    let previewMarkup =
+                        escapeHtml(
+                            preview
+                        );
+
+
+                    if (
+                        isGroup &&
+                        chat.lastMessageSenderName &&
                         preview
-                    );
+                    ) {
+
+                        const senderName =
+                            escapeHtml(
+                                chat.lastMessageSenderName
+                            );
 
 
-                if (
-                    isGroup &&
-                    chat.lastMessageSenderName
-                ) {
+                        const senderBadge =
+                            chat.lastMessageSenderVerified
 
-                    const senderBadge =
-                        chat.lastMessageSenderVerified
+                                ? `
+                                    <span
+                                        class="verified-badge"
+                                        title="Verified account"
+                                    >
+                                        ✓
+                                    </span>
+                                  `
+
+                                : "";
+
+
+                        previewMarkup = `
+
+                            <span>
+                                ${senderName}
+                            </span>
+
+                            ${senderBadge}
+
+                            <span>
+                                :
+                                ${escapeHtml(
+                                    preview
+                                )}
+                            </span>
+
+                        `;
+
+                    }
+
+
+                    /*
+                     * PRIVATE VERIFIED BADGE
+                     */
+
+                    const nameBadge =
+                        !isGroup
 
                             ? verifiedBadge({
-                                isVerified: true
+
+                                isVerified:
+                                    chat.otherUserVerified
+
                             })
 
                             : "";
 
 
-                    previewMarkup = `
+                    return `
 
-                        <span>
-                            ${escapeHtml(
-                                chat.lastMessageSenderName
-                            )}
-                        </span>
+                        <div
+                            class="
+                                chat-list-item
+                                ${
+                                    unread > 0
+                                        ? "unread"
+                                        : ""
+                                }
+                            "
+                            data-chat-type="${isGroup
+                                ? "group"
+                                : "private"}"
+                            data-chat-id="${escapeHtml(
+                                isGroup
+                                    ? chat.groupId
+                                    : chat.chatId
+                            )}"
+                            data-user-id="${escapeHtml(
+                                isGroup
+                                    ? ""
+                                    : chat.otherUid
+                            )}"
+                        >
 
-                        ${senderBadge}
+                            <div
+                                class="chat-list-avatar"
+                            >
 
-                        <span>
-                            :
-                            ${escapeHtml(
-                                preview
-                            )}
-                        </span>
+                                ${avatar}
+
+                            </div>
+
+
+                            <div
+                                class="chat-list-content"
+                            >
+
+                                <div
+                                    class="chat-list-top"
+                                >
+
+                                    <div
+                                        class="chat-list-name"
+                                    >
+
+                                        ${escapeHtml(
+                                            name
+                                        )}
+
+                                        ${nameBadge}
+
+                                    </div>
+
+
+                                    <div
+                                        class="chat-list-time"
+                                    >
+                                        ${escapeHtml(
+                                            time
+                                        )}
+                                    </div>
+
+                                </div>
+
+
+                                <div
+                                    class="chat-list-bottom"
+                                >
+
+                                    <div
+                                        class="chat-list-preview"
+                                    >
+                                        ${previewMarkup}
+                                    </div>
+
+
+                                    ${
+                                        unread > 0
+
+                                            ? `
+
+                                                <span
+                                                    class="
+                                                        connecta-dashboard-unread
+                                                    "
+                                                >
+                                                    ${
+                                                        unread > 99
+                                                            ? "99+"
+                                                            : unread
+                                                    }
+                                                </span>
+
+                                              `
+
+                                            : ""
+                                    }
+
+                                </div>
+
+                            </div>
+
+                        </div>
 
                     `;
 
                 }
-
-
-                const nameBadge =
-                    !isGroup
-                        ? verifiedBadge({
-                            isVerified:
-                                chat.otherUserVerified
-                        })
-                        : "";
-
-
-                return `
-
-                    <div
-                        class="chat-item"
-                        data-chat-type="${isGroup
-                            ? "group"
-                            : "private"}"
-                        data-chat-id="${escapeHtml(
-                            isGroup
-                                ? chat.groupId
-                                : chat.chatId
-                        )}"
-                        data-user-id="${escapeHtml(
-                            isGroup
-                                ? ""
-                                : chat.otherUid
-                        )}"
-                    >
-
-                        <div
-                            class="
-                                avatar
-                                ${
-                                    isGroup
-                                        ? "group-avatar"
-                                        : "avatar-green"
-                                }
-                            "
-                        >
-
-                            ${avatar}
-
-                        </div>
-
-
-                        <div
-                            class="chat-copy"
-                        >
-
-                            <strong>
-
-                                ${escapeHtml(
-                                    name
-                                )}
-
-                                ${nameBadge}
-
-                            </strong>
-
-
-                            <p>
-
-                                ${previewMarkup}
-
-                                ${
-                                    !isGroup
-                                        ? getMessageStatus(chat)
-                                        : ""
-                                }
-
-                            </p>
-
-                        </div>
-
-
-                        <div
-                            class="chat-meta"
-                        >
-
-                            <time>
-                                ${escapeHtml(
-                                    time
-                                )}
-                            </time>
-
-
-                            ${
-                                unread > 0
-
-                                    ? `
-
-                                        <span
-                                            class="unread"
-                                        >
-                                            ${
-                                                unread > 99
-                                                    ? "99+"
-                                                    : unread
-                                            }
-                                        </span>
-
-                                      `
-
-                                    : ""
-                            }
-
-                        </div>
-
-                    </div>
-
-                `;
-
-            }
-        ).join("");
+            )
+            .join("");
 
 
     box
         .querySelectorAll(
-            ".chat-item"
+            ".chat-list-item"
         )
-        .forEach(item => {
+        .forEach(
+            item => {
 
-            item.addEventListener(
-                "click",
-                () => {
+                item.addEventListener(
+                    "click",
+                    () => {
 
-                    const type =
-                        item.dataset.chatType;
-
-
-                    const chatId =
-                        item.dataset.chatId;
+                        const type =
+                            item.dataset.chatType;
 
 
-                    const userId =
-                        item.dataset.userId;
+                        const id =
+                            item.dataset.chatId;
 
 
-                    if (
-                        type === "group"
-                    ) {
+                        const userId =
+                            item.dataset.userId;
 
-                        if (!chatId) {
+
+                        if (
+                            type ===
+                            "group"
+                        ) {
+
+                            if (!id) {
+                                return;
+                            }
+
+
+                            location.href =
+                                `group-chat.html?groupId=${encodeURIComponent(
+                                    id
+                                )}`;
+
+
                             return;
+
                         }
 
 
-                        location.href =
-                            `group-chat.html?groupId=${encodeURIComponent(
-                                chatId
-                            )}`;
+                        if (
+                            userId
+                        ) {
 
-                        return;
+                            location.href =
+                                `chat.html?uid=${encodeURIComponent(
+                                    userId
+                                )}`;
 
-                    }
-
-
-                    if (userId) {
-
-                        location.href =
-                            `chat.html?uid=${encodeURIComponent(
-                                userId
-                            )}`;
+                        }
 
                     }
+                );
 
-                }
-            );
-
-        });
+            }
+        );
 
 }
 
@@ -3918,10 +3947,14 @@ function renderChats(chats) {
    CHAT SEARCH
 ========================================================= */
 
-function searchChats(term) {
+function searchChats(
+    term
+) {
 
     const value =
-        String(term || "")
+        String(
+            term || ""
+        )
             .trim()
             .toLowerCase();
 
@@ -3985,7 +4018,9 @@ function searchChats(term) {
    PRESENCE
 ========================================================= */
 
-async function setPresence(online) {
+async function setPresence(
+    online
+) {
 
     if (!currentUser) {
         return;
@@ -4041,7 +4076,9 @@ function startPresence() {
     }
 
 
-    setPresence(true);
+    setPresence(
+        true
+    );
 
 
     clearInterval(
@@ -4049,18 +4086,17 @@ function startPresence() {
     );
 
 
+    /*
+     * Heartbeat every 60 seconds.
+     */
+
     presenceInterval =
         setInterval(
             () => {
 
-                if (
-                    document.visibilityState ===
-                    "visible"
-                ) {
-
-                    setPresence(true);
-
-                }
+                setPresence(
+                    true
+                );
 
             },
             60000
@@ -4076,7 +4112,7 @@ function startPresence() {
 
 
 /* =========================================================
-   VISIBILITY
+   VISIBILITY PRESENCE
 ========================================================= */
 
 function handleVisibilityPresence() {
@@ -4086,11 +4122,15 @@ function handleVisibilityPresence() {
         "visible"
     ) {
 
-        setPresence(true);
+        setPresence(
+            true
+        );
 
     } else {
 
-        setPresence(false);
+        setPresence(
+            false
+        );
 
     }
 
@@ -4098,7 +4138,7 @@ function handleVisibilityPresence() {
 
 
 /* =========================================================
-   STOP EVERYTHING
+   STOP LISTENERS
 ========================================================= */
 
 function stopDashboardListeners() {
@@ -4107,7 +4147,8 @@ function stopDashboardListeners() {
 
         stopUsers();
 
-        stopUsers = null;
+        stopUsers =
+            null;
 
     }
 
@@ -4116,28 +4157,47 @@ function stopDashboardListeners() {
 
         stopChats();
 
-        stopChats = null;
+        stopChats =
+            null;
 
     }
 
 
-    groupUnsubscribers.forEach(
-        unsubscribe => {
+    if (
+        groupListeners?.unsubscribers
+    ) {
 
-            if (
-                typeof unsubscribe ===
-                "function"
-            ) {
+        groupListeners.unsubscribers
+            .forEach(
+                unsubscribe => {
 
-                unsubscribe();
+                    if (
+                        typeof unsubscribe ===
+                        "function"
+                    ) {
 
-            }
+                        unsubscribe();
 
-        }
-    );
+                    }
+
+                }
+            );
+
+    }
 
 
-    groupUnsubscribers = [];
+    groupListeners = {
+
+        memberIds:
+            [],
+
+        members:
+            [],
+
+        owned:
+            []
+
+    };
 
 
     clearTimeout(
@@ -4150,7 +4210,8 @@ function stopDashboardListeners() {
     );
 
 
-    presenceInterval = null;
+    presenceInterval =
+        null;
 
 
     document.removeEventListener(
@@ -4162,80 +4223,35 @@ function stopDashboardListeners() {
 
 
 /* =========================================================
-   TOAST
-========================================================= */
-
-function showToast(message) {
-
-    const toast =
-        $("toast");
-
-
-    if (!toast) {
-        return;
-    }
-
-
-    toast.textContent =
-        message;
-
-
-    toast.classList.add(
-        "show"
-    );
-
-
-    clearTimeout(
-        showToast.timer
-    );
-
-
-    showToast.timer =
-        setTimeout(
-            () => {
-
-                toast.classList.remove(
-                    "show"
-                );
-
-            },
-            2600
-        );
-
-}
-
-
-/* =========================================================
    DASHBOARD UI
 ========================================================= */
 
 function setupUI() {
 
-    /* MENU */
+    /*
+     * SIDE MENU
+     */
 
-    const menuBtn =
-        $("menuBtn");
+    const menuButton =
+        $("menuButton");
 
-    const sideMenu =
-        $("sideMenu");
 
-    const menuOverlay =
-        $("menuOverlay");
+    const sidebar =
+        $("sidebar");
+
+
+    const sidebarOverlay =
+        $("sidebarOverlay");
 
 
     function openMenu() {
 
-        sideMenu?.classList.add(
+        sidebar?.classList.add(
             "open"
         );
 
-        menuOverlay?.classList.add(
+        sidebarOverlay?.classList.add(
             "open"
-        );
-
-        sideMenu?.setAttribute(
-            "aria-hidden",
-            "false"
         );
 
     }
@@ -4243,47 +4259,52 @@ function setupUI() {
 
     function closeMenu() {
 
-        sideMenu?.classList.remove(
+        sidebar?.classList.remove(
             "open"
         );
 
-        menuOverlay?.classList.remove(
+        sidebarOverlay?.classList.remove(
             "open"
-        );
-
-        sideMenu?.setAttribute(
-            "aria-hidden",
-            "true"
         );
 
     }
 
 
-    menuBtn?.addEventListener(
+    menuButton?.addEventListener(
         "click",
         openMenu
     );
 
 
-    menuOverlay?.addEventListener(
+    sidebarOverlay?.addEventListener(
         "click",
         closeMenu
     );
 
 
-    sideMenu
-        ?.querySelectorAll("a")
-        .forEach(link => {
+    /*
+     * SIDE NAV
+     */
 
-            link.addEventListener(
-                "click",
-                closeMenu
-            );
+    document
+        .querySelectorAll(
+            ".nav-item"
+        )
+        .forEach(
+            item => {
 
-        });
+                item.addEventListener(
+                    "click",
+                    closeMenu
+                );
+
+            }
+        );
 
 
-    /* PROFILE */
+    /*
+     * PROFILE
+     */
 
     $("profileBtn")?.addEventListener(
         "click",
@@ -4304,7 +4325,9 @@ function setupUI() {
     );
 
 
-    /* CONNECTION */
+    /*
+     * GET CONNECTION
+     */
 
     $("connectionBtn")?.addEventListener(
         "click",
@@ -4318,74 +4341,16 @@ function setupUI() {
     );
 
 
-    /* ONLINE SEARCH BUTTON */
-
-    $("onlineSearchBtn")?.addEventListener(
-        "click",
-        () => {
-
-            const wrap =
-                $("onlineSearchWrap");
-
-
-            wrap?.classList.toggle(
-                "open"
-            );
-
-
-            if (
-                wrap?.classList.contains(
-                    "open"
-                )
-            ) {
-
-                $("onlineSearch")?.focus();
-
-            }
-
-        }
-    );
-
-
-    /* CHAT SEARCH BUTTON */
-
-    $("chatSearchBtn")?.addEventListener(
-        "click",
-        () => {
-
-            const wrap =
-                $("chatSearchWrap");
-
-
-            wrap?.classList.toggle(
-                "open"
-            );
-
-
-            if (
-                wrap?.classList.contains(
-                    "open"
-                )
-            ) {
-
-                $("chatSearch")?.focus();
-
-            }
-
-        }
-    );
-
-
-    /* ONLINE SEARCH */
+    /*
+     * ONLINE SEARCH
+     */
 
     $("onlineSearch")?.addEventListener(
         "input",
         event => {
 
             const term =
-                String(
-                    event.target.value || ""
-                )
+                event.target.value
                     .trim()
                     .toLowerCase();
 
@@ -4394,14 +4359,11 @@ function setupUI() {
                 onlineUsers.filter(
                     user => {
 
-                        if (!term) {
-                            return true;
-                        }
-
-
                         const text = [
 
-                            getFullName(user),
+                            getFullName(
+                                user
+                            ),
 
                             user.username,
 
@@ -4439,7 +4401,9 @@ function setupUI() {
     );
 
 
-    /* CHAT SEARCH */
+    /*
+     * CHAT SEARCH
+     */
 
     $("chatSearch")?.addEventListener(
         "input",
@@ -4453,56 +4417,55 @@ function setupUI() {
     );
 
 
-    /* COMING SOON */
-
-    document
-        .querySelectorAll(
-            "[data-coming]"
-        )
-        .forEach(element => {
-
-            element.addEventListener(
-                "click",
-                event => {
-
-                    if (
-                        element.getAttribute(
-                            "href"
-                        ) === "#"
-                    ) {
-
-                        event.preventDefault();
-
-                    }
-
-
-                    closeMenu();
-
-
-                    showToast(
-                        `${element.dataset.coming} feature coming soon.`
-                    );
-
-                }
-            );
-
-        });
-
-
-    /* LOGOUT */
+    /*
+     * LOGOUT
+     */
 
     $("logoutBtn")?.addEventListener(
         "click",
         async () => {
 
-            await setPresence(false);
+            await setPresence(
+                false
+            );
+
 
             stopDashboardListeners();
 
-            await logout(true);
+
+            await logout(
+                true
+            );
 
         }
     );
+
+
+    /*
+     * QUICK BUTTONS
+     */
+
+    document
+        .querySelectorAll(
+            "[data-coming-soon]"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        showToast(
+                            button.dataset.comingSoon ||
+                            "This feature is coming soon."
+                        );
+
+                    }
+                );
+
+            }
+        );
 
 }
 
@@ -4517,7 +4480,8 @@ function listenToUsers() {
 
         stopUsers();
 
-        stopUsers = null;
+        stopUsers =
+            null;
 
     }
 
@@ -4539,7 +4503,7 @@ function listenToUsers() {
 
             snapshot => {
 
-                onlineUsers =
+                const users =
                     snapshot.docs.map(
                         userDoc => {
 
@@ -4558,10 +4522,17 @@ function listenToUsers() {
                     );
 
 
-                /* OWN PROFILE */
+                onlineUsers =
+                    users;
+
+
+                /*
+                 * Update own profile with live
+                 * balance/status/following.
+                 */
 
                 const own =
-                    onlineUsers.find(
+                    users.find(
                         user =>
                             user.uid ===
                             currentUser?.uid
@@ -4579,6 +4550,11 @@ function listenToUsers() {
                     };
 
 
+                    /*
+                     * Preserve private own fields
+                     * already loaded by globalAuth.
+                     */
+
                     saveProfileToCache(
                         currentProfile
                     );
@@ -4592,14 +4568,17 @@ function listenToUsers() {
                 renderOnline();
 
 
-                /* UPDATE PRIVATE CHAT NAMES */
+                /*
+                 * Refresh chat and group names
+                 * from live user data.
+                 */
 
                 recentChats =
                     recentChats.map(
                         chat => {
 
                             const profile =
-                                onlineUsers.find(
+                                users.find(
                                     user =>
                                         user.uid ===
                                         chat.otherUid
@@ -4607,7 +4586,9 @@ function listenToUsers() {
 
 
                             if (!profile) {
+
                                 return chat;
+
                             }
 
 
@@ -4635,14 +4616,12 @@ function listenToUsers() {
                     );
 
 
-                /* UPDATE GROUP SENDERS */
-
                 recentGroups =
                     recentGroups.map(
                         group => {
 
                             const profile =
-                                onlineUsers.find(
+                                users.find(
                                     user =>
                                         user.uid ===
                                         group.lastMessageSenderId
@@ -4650,7 +4629,9 @@ function listenToUsers() {
 
 
                             if (!profile) {
+
                                 return group;
+
                             }
 
 
@@ -4685,6 +4666,9 @@ function listenToUsers() {
                 );
 
 
+                hideOnlineSkeleton();
+
+
                 const box =
                     $("onlineUsers");
 
@@ -4693,7 +4677,11 @@ function listenToUsers() {
 
                     box.innerHTML = `
 
-                        <div class="connecta-error">
+                        <div
+                            class="
+                                connecta-dashboard-error
+                            "
+                        >
                             Users could not be loaded.
                         </div>
 
@@ -4714,144 +4702,146 @@ function listenToUsers() {
 
 async function initializeDashboard() {
 
-    try {
+    /*
+     * The skeleton is already visible before
+     * authentication finishes.
+     */
 
-        const session =
-            await getCurrentConnectaUser({
+    const session =
+        await getCurrentConnectaUser({
 
-                redirect: true,
+            redirect:
+                true,
 
-                allowBlocked: true
+            allowBlocked:
+                true
 
-            });
-
-
-        if (!session) {
-            return;
-        }
-
-
-        currentUser =
-            session.authUser;
+        });
 
 
-        currentProfile =
-            session.profile || {
+    if (!session) {
 
-                uid:
-                    currentUser.uid,
-
-                displayName:
-                    currentUser.displayName ||
-                    "",
-
-                photoURL:
-                    currentUser.photoURL ||
-                    "",
-
-                status:
-                    "active",
-
-                balance:
-                    0,
-
-                following:
-                    []
-
-            };
-
-
-        /*
-         * CACHE FIRST
-         *
-         * This happens before live Firestore
-         * listeners start.
-         */
-
-        loadDashboardCache();
-
-
-        renderProfile();
-
-
-        /*
-         * ACCOUNT STATUS
-         */
-
-        const control =
-            getAccountControl(
-                currentProfile
-            );
-
-
-        if (control.blocked) {
-
-            showAccountBlockedScreen(
-                control
-            );
-
-            return;
-
-        }
-
-
-        /*
-         * PRESENCE
-         */
-
-        startPresence();
-
-
-        /*
-         * LIVE USERS
-         */
-
-        listenToUsers();
-
-
-        /*
-         * LIVE PRIVATE CHATS
-         */
-
-        listenToChats(
-            currentUser.uid
-        );
-
-
-        /*
-         * LIVE GROUPS
-         */
-
-        listenToGroups(
-            currentUser.uid
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Dashboard initialization failed:",
-            error
-        );
-
-
-        showToast(
-            "Unable to load CONNECTA dashboard."
-        );
+        return;
 
     }
+
+
+    currentUser =
+        session.authUser;
+
+
+    currentProfile =
+        session.profile || {
+
+            uid:
+                currentUser.uid,
+
+            displayName:
+                currentUser.displayName ||
+                "",
+
+            photoURL:
+                currentUser.photoURL ||
+                "",
+
+            status:
+                "active",
+
+            balance:
+                0,
+
+            following:
+                []
+
+        };
+
+
+    /*
+     * =====================================================
+     * CACHE FIRST
+     * =====================================================
+     *
+     * Render cached data immediately.
+     *
+     * Firestore updates it afterwards.
+     */
+
+    loadDashboardCache();
+
+
+    renderProfile();
+
+
+    /*
+     * =====================================================
+     * ACCOUNT CONTROL
+     * =====================================================
+     */
+
+    const control =
+        getAccountControl(
+            currentProfile
+        );
+
+
+    if (
+        control.blocked
+    ) {
+
+        showAccountBlockedScreen(
+            control
+        );
+
+
+        return;
+
+    }
+
+
+    /*
+     * =====================================================
+     * PRESENCE
+     * =====================================================
+     */
+
+    startPresence();
+
+
+    /*
+     * =====================================================
+     * LIVE USERS
+     * =====================================================
+     */
+
+    listenToUsers();
+
+
+    /*
+     * =====================================================
+     * LIVE PRIVATE CHATS
+     * =====================================================
+     */
+
+    listenToChats(
+        currentUser.uid
+    );
+
+
+    /*
+     * =====================================================
+     * LIVE GROUPS
+     * =====================================================
+     */
+
+    listenToGroups(
+        currentUser.uid
+    );
 
 }
 
 
 /* =========================================================
-   PAGE LIFECYCLE
-   =========================================================
-   Important:
-   When navigating Dashboard → Chat → Back,
-   the browser may restore Dashboard from BFCache.
-
-   pagehide stops the listeners before leaving.
-   pageshow starts them again when Dashboard returns.
+   PAGE HIDE
 ========================================================= */
 
 window.addEventListener(
@@ -4868,9 +4858,13 @@ window.addEventListener(
         );
 
 
-        if (currentUser) {
+        if (
+            currentUser
+        ) {
 
-            setPresence(false);
+            setPresence(
+                false
+            );
 
         }
 
@@ -4882,96 +4876,7 @@ window.addEventListener(
 
 
 /* =========================================================
-   RESUME DASHBOARD AFTER BACK/FORWARD
-========================================================= */
-
-window.addEventListener(
-    "pageshow",
-    event => {
-
-        console.log(
-            "[CONNECTA] Dashboard pageshow:",
-            event.persisted
-        );
-
-
-        /*
-         * If the browser restored this page from
-         * BFCache, restart everything.
-         */
-
-        if (
-            event.persisted
-        ) {
-
-            resumeDashboardLive();
-
-        }
-
-    }
-);
-
-
-/* =========================================================
-   RESUME LIVE DASHBOARD
-========================================================= */
-
-function resumeDashboardLive() {
-
-    if (!currentUser?.uid) {
-
-        /*
-         * If the page was restored before authentication
-         * was available, initialize normally.
-         */
-
-        initializeDashboard();
-
-        return;
-
-    }
-
-
-    console.log(
-        "[CONNECTA] Restarting dashboard live listeners..."
-    );
-
-
-    /*
-     * Restart presence.
-     */
-
-    startPresence();
-
-
-    /*
-     * Restart live users.
-     */
-
-    listenToUsers();
-
-
-    /*
-     * Restart private chat listener.
-     */
-
-    listenToChats(
-        currentUser.uid
-    );
-
-
-    /*
-     * Restart group listeners.
-     */
-
-    listenToGroups(
-        currentUser.uid
-    );
-
-}
-
-/* =========================================================
-   START
+   START DASHBOARD
 ========================================================= */
 
 installInstantDashboardStyles();
