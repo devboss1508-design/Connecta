@@ -23,7 +23,7 @@
 
     /* =====================================================
        CONNECTA PROFILE
-       OWN PROFILE + PUBLIC USER PROFILE
+       INSTANT / CACHE-FIRST / REALTIME
     ===================================================== */
 
     .profile-page {
@@ -94,6 +94,152 @@
     .profile-header-title {
       font-size: 19px;
       font-weight: 900;
+    }
+
+
+    /* =====================================================
+       INSTANT PROFILE BOOTSTRAP
+       
+       This is displayed before profile.js finishes
+       initializing.
+       
+       IMPORTANT:
+       There is intentionally NO "Loading profile..."
+       message here.
+    ===================================================== */
+
+    .profile-instant-shell {
+      padding: 25px 10px 10px;
+
+      text-align: center;
+
+      animation:
+        connectaInstantAppear
+        .15s
+        ease-out;
+    }
+
+
+    .profile-instant-avatar {
+      width: 145px;
+      height: 145px;
+
+      padding: 5px;
+
+      margin: 0 auto;
+
+      border-radius: 50%;
+
+      background:
+        linear-gradient(
+          135deg,
+          #22C55E,
+          #16A34A
+        );
+
+      box-shadow:
+        0 5px 18px rgba(21,128,61,.18);
+
+      display: grid;
+      place-items: center;
+    }
+
+
+    .profile-instant-avatar-inner {
+      width: 135px;
+      height: 135px;
+
+      border-radius: 50%;
+
+      overflow: hidden;
+
+      background: #baf0ca;
+
+      color: #08752f;
+
+      display: grid;
+      place-items: center;
+
+      font-size: 42px;
+      font-weight: 900;
+    }
+
+
+    .profile-instant-avatar-inner img {
+      width: 100%;
+      height: 100%;
+
+      object-fit: cover;
+
+      display: block;
+    }
+
+
+    .profile-instant-name {
+      margin-top: 16px;
+
+      min-height: 30px;
+
+      color: #17201b;
+
+      font-size: 25px;
+      font-weight: 900;
+
+      overflow-wrap: anywhere;
+    }
+
+
+    .profile-instant-username {
+      margin-top: 5px;
+
+      color: #66706a;
+
+      font-size: 13px;
+    }
+
+
+    .profile-instant-status {
+      display: inline-flex;
+
+      align-items: center;
+      justify-content: center;
+
+      gap: 6px;
+
+      margin-top: 8px;
+
+      color: #16A34A;
+
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+
+    .profile-instant-status-dot {
+      width: 8px;
+      height: 8px;
+
+      border-radius: 50%;
+
+      background: #22C55E;
+
+      box-shadow:
+        0 0 0 3px rgba(34,197,94,.12);
+    }
+
+
+    @keyframes connectaInstantAppear {
+
+      from {
+        opacity: .4;
+        transform: translateY(3px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
     }
 
 
@@ -170,12 +316,22 @@
       object-fit: cover;
 
       display: block;
+
+      opacity: 0;
+
+      transition:
+        opacity .18s ease;
+    }
+
+
+    .profile-avatar img.connecta-profile-image-ready {
+      opacity: 1;
     }
 
 
     /* =====================================================
        PHOTO UPLOAD
-       Only shown for OWN profile.
+       ONLY OWN PROFILE
     ===================================================== */
 
     .profile-photo-upload {
@@ -385,7 +541,7 @@
 
 
     /* =====================================================
-       FOLLOW / CHAT / VERIFY / EDIT ACTIONS
+       ACTION BUTTONS
     ===================================================== */
 
     .profile-main-action {
@@ -550,7 +706,6 @@
 
     /* =====================================================
        INFORMATION CARDS
-       OWN PROFILE ONLY
     ===================================================== */
 
     .profile-card {
@@ -589,7 +744,8 @@
     .profile-stat-grid {
       display: grid;
 
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns:
+        1fr 1fr;
 
       margin-top: 14px;
     }
@@ -629,7 +785,7 @@
 
 
     /* =====================================================
-       INFO ROWS
+       INFORMATION ROWS
     ===================================================== */
 
     .profile-info-row {
@@ -716,55 +872,6 @@
 
 
     /* =====================================================
-       FAST PROFILE LOADING
-    ===================================================== */
-
-    .profile-loading {
-      min-height: 250px;
-
-      display: grid;
-
-      place-items: center;
-
-      color: #7b847f;
-
-      font-size: 14px;
-    }
-
-
-    /*
-    Small loading indicator.
-    profile.js can replace this immediately
-    when cached profile data exists.
-    */
-
-    .profile-loading::before {
-      content: "";
-
-      width: 24px;
-      height: 24px;
-
-      border: 3px solid #dcefe1;
-
-      border-top-color: #22C55E;
-
-      border-radius: 50%;
-
-      animation:
-        connectaProfileSpin .7s linear infinite;
-    }
-
-
-    @keyframes connectaProfileSpin {
-
-      to {
-        transform: rotate(360deg);
-      }
-
-    }
-
-
-    /* =====================================================
        ERROR
     ===================================================== */
 
@@ -789,7 +896,6 @@
 
     /* =====================================================
        VERIFICATION MODAL
-       OWN PROFILE ONLY
     ===================================================== */
 
     .verification-modal {
@@ -1041,6 +1147,11 @@
       }
 
 
+      .profile-instant-shell {
+        padding-top: 23px;
+      }
+
+
       .profile-photo-area {
         width: 145px;
         height: 145px;
@@ -1069,7 +1180,26 @@
       }
 
 
+      .profile-instant-avatar {
+        width: 140px;
+        height: 140px;
+      }
+
+
+      .profile-instant-avatar-inner {
+        width: 130px;
+        height: 130px;
+
+        font-size: 38px;
+      }
+
+
       .profile-name {
+        font-size: 25px;
+      }
+
+
+      .profile-instant-name {
         font-size: 25px;
       }
 
@@ -1106,6 +1236,7 @@
 
   <main class="profile-page">
 
+
     <!-- =================================================
          HEADER
     ================================================= -->
@@ -1134,14 +1265,12 @@
 
     <!-- =================================================
          PROFILE CONTENT
-         
-         profile.js controls whether this becomes:
-         
-         1. OWN PROFILE
-            Full private account information.
-         
-         2. OTHER USER PROFILE
-            Public information only.
+
+         IMPORTANT:
+         There is NO "Loading profile..." text.
+
+         profile.js will immediately replace this
+         with the cached/full profile.
     ================================================= -->
 
     <section
@@ -1149,8 +1278,53 @@
       class="profile-container"
     >
 
-      <div class="profile-loading">
-        Loading profile...
+      <div
+        id="instantProfileShell"
+        class="profile-instant-shell"
+      >
+
+        <div
+          id="instantProfileAvatar"
+          class="profile-instant-avatar"
+        >
+
+          <div
+            id="instantProfileAvatarInner"
+            class="profile-instant-avatar-inner"
+          >
+            U
+          </div>
+
+        </div>
+
+
+        <div
+          id="instantProfileName"
+          class="profile-instant-name"
+        >
+        </div>
+
+
+        <div
+          id="instantProfileUsername"
+          class="profile-instant-username"
+        >
+        </div>
+
+
+        <div
+          id="instantProfileStatus"
+          class="profile-instant-status"
+        >
+
+          <span
+            class="profile-instant-status-dot"
+          ></span>
+
+          Online
+
+        </div>
+
       </div>
 
     </section>
@@ -1160,10 +1334,6 @@
 
   <!-- =====================================================
        VERIFY ACCOUNT MODAL
-
-       This is only usable from the OWN profile.
-       profile.js will not expose it when viewing another
-       user's profile.
   ===================================================== -->
 
   <div
@@ -1274,6 +1444,271 @@
     type="module"
     src="js/profile.js"
   ></script>
+
+
+  <!-- =====================================================
+       INSTANT CACHE BOOTSTRAP
+
+       This runs BEFORE profile.js because it is a normal
+       script.
+
+       It checks localStorage for the profile cache and
+       immediately puts the user's name/photo on screen.
+
+       Firebase then takes over through profile.js.
+  ===================================================== -->
+
+  <script>
+
+    (function () {
+
+      try {
+
+        const params =
+          new URLSearchParams(
+            window.location.search
+          );
+
+
+        const requestedUid =
+          params.get("uid");
+
+
+        const ownCacheRaw =
+          localStorage.getItem(
+            "connectaOwnProfileCache_v2"
+          );
+
+
+        let profile = null;
+
+
+        /*
+         * If there is a requested UID, first try the
+         * public profile cache.
+         */
+
+        if (requestedUid) {
+
+          const publicCacheRaw =
+            localStorage.getItem(
+              "connectaPublicProfileCache_v2_" +
+              requestedUid
+            );
+
+
+          if (publicCacheRaw) {
+
+            profile =
+              JSON.parse(
+                publicCacheRaw
+              );
+
+          }
+
+        }
+
+
+        /*
+         * If no requested UID exists, this is normally
+         * the logged-in user's own profile.
+         */
+
+        if (
+          !profile &&
+          ownCacheRaw
+        ) {
+
+          const ownCache =
+            JSON.parse(
+              ownCacheRaw
+            );
+
+
+          if (
+            ownCache &&
+            ownCache.uid
+          ) {
+
+            profile =
+              ownCache;
+          }
+
+        }
+
+
+        /*
+         * Nothing cached yet.
+         *
+         * We still leave a clean instant profile shell
+         * rather than showing "Loading profile..."
+         */
+
+        if (!profile) {
+          return;
+        }
+
+
+        const name =
+          profile.displayName ||
+          (
+            `${profile.firstName || ""} ` +
+            `${profile.lastName || ""}`
+          ).trim() ||
+          profile.username ||
+          "CONNECTA User";
+
+
+        const username =
+          profile.username
+            ? "@" +
+              String(
+                profile.username
+              ).replace(
+                /^@/,
+                ""
+              )
+            : "";
+
+
+        const photo =
+          profile.photoURL ||
+          profile.photoUrl ||
+          "";
+
+
+        const avatar =
+          document.getElementById(
+            "instantProfileAvatarInner"
+          );
+
+
+        const nameElement =
+          document.getElementById(
+            "instantProfileName"
+          );
+
+
+        const usernameElement =
+          document.getElementById(
+            "instantProfileUsername"
+          );
+
+
+        const statusElement =
+          document.getElementById(
+            "instantProfileStatus"
+          );
+
+
+        if (avatar) {
+
+          if (photo) {
+
+            avatar.innerHTML = `
+
+              <img
+                src="${String(photo)
+                  .replace(/"/g, "&quot;")}"
+                alt=""
+              >
+
+            `;
+
+          } else {
+
+            const parts =
+              String(name)
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean);
+
+
+            const initials =
+              parts.length === 1
+
+                ? parts[0]
+                    .slice(0, 2)
+                    .toUpperCase()
+
+                : (
+                    (parts[0]?.[0] || "") +
+                    (parts[parts.length - 1]?.[0] || "")
+                  ).toUpperCase();
+
+
+            avatar.textContent =
+              initials ||
+              "U";
+          }
+
+        }
+
+
+        if (nameElement) {
+
+          nameElement.textContent =
+            name;
+
+        }
+
+
+        if (usernameElement) {
+
+          usernameElement.textContent =
+            username;
+
+        }
+
+
+        if (statusElement) {
+
+          const online =
+            requestedUid
+              ? profile.isOnline === true
+              : true;
+
+
+          statusElement.innerHTML = online
+
+            ? `
+                <span
+                  class="profile-instant-status-dot"
+                ></span>
+                Online
+              `
+
+            : `
+                <span
+                  class="profile-instant-status-dot"
+                  style="
+                    background:#9CA3AF;
+                    box-shadow:none;
+                  "
+                ></span>
+                Offline
+              `;
+
+        }
+
+
+      } catch (error) {
+
+        /*
+         * Cache problems must NEVER stop
+         * profile.js from running.
+         */
+
+        console.warn(
+          "Instant profile cache bootstrap:",
+          error
+        );
+
+      }
+
+    })();
+
+  </script>
 
 </body>
 
