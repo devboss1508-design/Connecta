@@ -1412,14 +1412,18 @@ function renderProfile() {
 
 }
 
-
 /* =========================================================
    RENDER ONLINE USERS
+   ORDER:
+   1. Current logged-in user
+   2. Other ONLINE users
+   3. OFFLINE users
 ========================================================= */
 
 function renderOnline() {
 
-    const box = $("onlineUsers");
+    const box =
+        $("onlineUsers");
 
     if (!box) {
         return;
@@ -1430,23 +1434,19 @@ function renderOnline() {
         "false"
     );
 
-
-    /* =====================================================
-       CURRENT USER
-       Firebase Auth UID is the ONLY source of truth.
-    ===================================================== */
-
+    /*
+     * The Firebase Auth UID is the primary source of truth.
+     */
     const currentUid =
         String(
             currentUser?.uid || ""
         );
 
-
-    /* =====================================================
-       ONLINE COUNT
-       Count OTHER online users + current user if online.
-    ===================================================== */
-
+    /*
+     * Update ONLINE count.
+     *
+     * This counts only users whose isOnline is true.
+     */
     const onlineCount =
         $("onlineCount");
 
@@ -1463,62 +1463,72 @@ function renderOnline() {
 
     }
 
-
-    /* =====================================================
-       EMPTY
-    ===================================================== */
-
+    /*
+     * Nothing to show.
+     */
     if (!onlineUsers.length) {
 
         box.innerHTML = `
-
             <div class="connecta-empty">
                 No users found.
             </div>
-
         `;
 
         return;
     }
 
+    /*
+     * =====================================================
+     * NORMALIZE USERS
+     * =====================================================
+     *
+     * Make absolutely sure every user has a UID.
+     */
+    const normalizedUsers =
+        onlineUsers
+            .map(user => ({
 
-    /* =====================================================
-       SORT ORDER
+                ...user,
 
-       1. CURRENT USER
-       2. OTHER ONLINE USERS
-       3. OTHER OFFLINE USERS
-    ===================================================== */
+                uid:
+                    String(
+                        user.uid || ""
+                    )
 
+            }))
+            .filter(
+                user =>
+                    user.uid
+            );
+
+    /*
+     * =====================================================
+     * SORT
+     * =====================================================
+     *
+     * 1. CURRENT USER FIRST
+     * 2. OTHER ONLINE USERS
+     * 3. OFFLINE USERS
+     *
+     * This means the current user ALWAYS stays first,
+     * regardless of name or online status.
+     */
     const sortedUsers =
-        [...onlineUsers].sort(
+        [...normalizedUsers].sort(
             (a, b) => {
 
-                const aUid =
-                    String(
-                        a.uid || ""
-                    );
+                const aIsCurrent =
+                    a.uid === currentUid;
 
-                const bUid =
-                    String(
-                        b.uid || ""
-                    );
+                const bIsCurrent =
+                    b.uid === currentUid;
 
-
-                const aIsSelf =
-                    aUid === currentUid;
-
-                const bIsSelf =
-                    bUid === currentUid;
-
-
-                /* -----------------------------------------
-                   1. CURRENT USER ALWAYS FIRST
-                ----------------------------------------- */
-
+                /*
+                 * CURRENT USER FIRST
+                 */
                 if (
-                    aIsSelf &&
-                    !bIsSelf
+                    aIsCurrent &&
+                    !bIsCurrent
                 ) {
 
                     return -1;
@@ -1526,51 +1536,32 @@ function renderOnline() {
                 }
 
                 if (
-                    bIsSelf &&
-                    !aIsSelf
+                    !aIsCurrent &&
+                    bIsCurrent
                 ) {
 
                     return 1;
 
                 }
 
-
-                /* -----------------------------------------
-                   2. OTHER ONLINE USERS
-                   BEFORE OFFLINE USERS
-                ----------------------------------------- */
-
-                const aOnline =
-                    a.isOnline === true;
-
-                const bOnline =
-                    b.isOnline === true;
-
-
+                /*
+                 * OTHER ONLINE USERS BEFORE OFFLINE USERS
+                 */
                 if (
-                    aOnline &&
-                    !bOnline
+                    a.isOnline !==
+                    b.isOnline
                 ) {
 
-                    return -1;
+                    return a.isOnline
+                        ? -1
+                        : 1;
 
                 }
 
-                if (
-                    bOnline &&
-                    !aOnline
-                ) {
-
-                    return 1;
-
-                }
-
-
-                /* -----------------------------------------
-                   3. SAME STATUS
-                   SORT ALPHABETICALLY
-                ----------------------------------------- */
-
+                /*
+                 * Same category:
+                 * alphabetical order.
+                 */
                 return getFullName(a)
                     .localeCompare(
                         getFullName(b)
@@ -1579,147 +1570,58 @@ function renderOnline() {
             }
         );
 
-
-    /* =====================================================
-       RENDER USERS
-    ===================================================== */
-
+    /*
+     * =====================================================
+     * RENDER CARDS
+     * =====================================================
+     */
     box.innerHTML =
-        sortedUsers.map(
-            user => {
+        sortedUsers
+            .map(user => {
 
                 const userUid =
                     String(
                         user.uid || ""
                     );
 
-
                 /*
-                 * IMPORTANT:
-                 *
-                 * We identify "You" ONLY by Firebase Auth UID.
+                 * CURRENT USER
                  */
-
-                const self =
-                    userUid !== "" &&
+                const isCurrentUser =
                     userUid === currentUid;
-
 
                 const name =
                     getFullName(user);
-
 
                 const photo =
                     user.photoURL ||
                     user.photoUrl ||
                     "";
 
-
-                /* -----------------------------------------
-                   FOLLOW STATUS
-                   Only OTHER users can be followed.
-                ----------------------------------------- */
-
-                const following =
-                    !self &&
+                /*
+                 * Following only applies to OTHER users.
+                 */
+                const isFollowing =
+                    !isCurrentUser &&
                     Array.isArray(
                         currentProfile?.following
                     ) &&
-                    currentProfile.following.includes(
-                        user.uid
-                    );
-
-
-                /* -----------------------------------------
-                   AVATAR
-                ----------------------------------------- */
-
-                const avatarMarkup =
-                    photo
-
-                        ? `
-                            <img
-                                src="${escapeHtml(
-                                    photo
-                                )}"
-                                alt="${escapeHtml(
-                                    name
-                                )}"
-                                loading="lazy"
-                            >
-                          `
-
-                        : escapeHtml(
-                            initials(name)
+                    currentProfile.following
+                        .map(String)
+                        .includes(
+                            userUid
                         );
-
-
-                /* -----------------------------------------
-                   ACTION BUTTON
-                ----------------------------------------- */
-
-                const actionButton =
-                    self
-
-                        ? `
-
-                            <button
-                                type="button"
-                                class="
-                                    follow-btn
-                                    following
-                                "
-                                data-profile-uid="${escapeHtml(
-                                    user.uid
-                                )}"
-                            >
-                                You
-                            </button>
-
-                          `
-
-                        : `
-
-                            <button
-                                type="button"
-                                class="
-                                    follow-btn
-                                    ${
-                                        following
-                                            ? "following"
-                                            : ""
-                                    }
-                                "
-                                data-follow-uid="${escapeHtml(
-                                    user.uid
-                                )}"
-                            >
-                                ${
-                                    following
-                                        ? "Following"
-                                        : "Follow"
-                                }
-                            </button>
-
-                          `;
-
-
-                /* -----------------------------------------
-                   USER CARD
-                ----------------------------------------- */
 
                 return `
 
                     <div
                         class="user-card"
                         data-user-card="${escapeHtml(
-                            user.uid
+                            userUid
                         )}"
                     >
 
-                        <div
-                            class="user-card-profile"
-                        >
+                        <div class="user-card-profile">
 
                             <!-- PROFILE PHOTO -->
 
@@ -1735,10 +1637,27 @@ function renderOnline() {
                                 "
                             >
 
-                                ${avatarMarkup}
+                                ${
+                                    photo
+
+                                        ? `
+                                            <img
+                                                src="${escapeHtml(
+                                                    photo
+                                                )}"
+                                                alt="${escapeHtml(
+                                                    name
+                                                )}"
+                                                loading="lazy"
+                                            >
+                                          `
+
+                                        : escapeHtml(
+                                            initials(name)
+                                        )
+                                }
 
                             </div>
-
 
                             <!-- NAME -->
 
@@ -1752,8 +1671,7 @@ function renderOnline() {
 
                             </strong>
 
-
-                            <!-- ONLINE STATUS -->
+                            <!-- STATUS -->
 
                             <small
                                 class="
@@ -1785,10 +1703,51 @@ function renderOnline() {
 
                             </small>
 
-
                             <!-- ACTION -->
 
-                            ${actionButton}
+                            ${
+                                isCurrentUser
+
+                                    ? `
+
+                                        <button
+                                            type="button"
+                                            class="
+                                                follow-btn
+                                                following
+                                            "
+                                            data-own-profile="true"
+                                        >
+                                            You
+                                        </button>
+
+                                      `
+
+                                    : `
+
+                                        <button
+                                            type="button"
+                                            class="
+                                                follow-btn
+                                                ${
+                                                    isFollowing
+                                                        ? "following"
+                                                        : ""
+                                                }
+                                            "
+                                            data-follow-uid="${escapeHtml(
+                                                userUid
+                                            )}"
+                                        >
+                                            ${
+                                                isFollowing
+                                                    ? "Following"
+                                                    : "Follow"
+                                            }
+                                        </button>
+
+                                      `
+                            }
 
                         </div>
 
@@ -1796,10 +1755,145 @@ function renderOnline() {
 
                 `;
 
-            }
-        ).join("");
+            })
+            .join("");
 
-}
+    /*
+     * =====================================================
+     * FOLLOW BUTTONS
+     * =====================================================
+     *
+     * Give every Follow button its own click handler.
+     *
+     * This is more reliable than depending only on
+     * event delegation from the parent container.
+     */
+    box
+        .querySelectorAll(
+            "[data-follow-uid]"
+        )
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                async event => {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    const targetUid =
+                        String(
+                            button.dataset.followUid ||
+                            ""
+                        );
+
+                    if (!targetUid) {
+                        return;
+                    }
+
+                    /*
+                     * Prevent double taps.
+                     */
+                    if (
+                        button.disabled
+                    ) {
+                        return;
+                    }
+
+                    button.disabled = true;
+
+                    const oldText =
+                        button.textContent;
+
+                    button.textContent =
+                        "Updating...";
+
+                    try {
+
+                        await toggleFollow(
+                            targetUid
+                        );
+
+                    } catch (error) {
+
+                        console.error(
+                            "[CONNECTA] Follow button error:",
+                            error
+                        );
+
+                        button.textContent =
+                            oldText;
+
+                    } finally {
+
+                        button.disabled =
+                            false;
+
+                    }
+
+                }
+            );
+
+        });
+
+    /*
+     * =====================================================
+     * USER CARD CLICK
+     * =====================================================
+     *
+     * Clicking anywhere on the card except the Follow
+     * button opens that user's profile.
+     */
+    box
+        .querySelectorAll(
+            "[data-user-card]"
+        )
+        .forEach(card => {
+
+            card.addEventListener(
+                "click",
+                event => {
+
+                    /*
+                     * Do not open the profile when the
+                     * Follow button was clicked.
+                     */
+                    if (
+                        event.target.closest(
+                            "[data-follow-uid]"
+                        )
+                    ) {
+
+                        return;
+
+                    }
+
+                    const uid =
+                        String(
+                            card.dataset.userCard ||
+                            ""
+                        );
+
+                    if (!uid) {
+                        return;
+                    }
+
+                    console.log(
+                        "[CONNECTA] Opening user profile:",
+                        uid
+                    );
+
+                    window.location.href =
+                        `profile.html?uid=${encodeURIComponent(
+                            uid
+                        )}`;
+
+                }
+            );
+
+        });
+
+   }
 
 
 /* =========================================================
@@ -4588,22 +4682,39 @@ function listenToUsers() {
             snapshot => {
 
                 onlineUsers =
-                    snapshot.docs.map(
-                        userDoc => {
+    snapshot.docs.map(
+        userDoc => {
 
-                            return {
+            return {
 
-                                uid:
-                                    userDoc.id,
+                /*
+                 * IMPORTANT:
+                 * Always use the Firestore document ID
+                 * as the authoritative Firebase UID.
+                 *
+                 * This prevents the current user's card
+                 * from being mistaken for another user.
+                 */
 
-                                ...publicProfileData(
-                                    userDoc.data()
-                                )
+                uid:
+                    userDoc.id,
 
-                            };
+                ...publicProfileData(
+                    userDoc.data()
+                ),
 
-                        }
-                    );
+                /*
+                 * Put the document UID LAST so that
+                 * publicProfileData() cannot overwrite it.
+                 */
+
+                uid:
+                    userDoc.id
+
+            };
+
+        }
+    );
 
 
                 /* OWN PROFILE */
