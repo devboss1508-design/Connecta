@@ -1419,14 +1419,11 @@ function renderProfile() {
 
 function renderOnline() {
 
-    const box =
-        $("onlineUsers");
-
+    const box = $("onlineUsers");
 
     if (!box) {
         return;
     }
-
 
     box.setAttribute(
         "aria-busy",
@@ -1435,30 +1432,29 @@ function renderOnline() {
 
 
     /* =====================================================
-       CURRENT USER UID
-       Use Firebase Auth first, then profile as fallback.
+       CURRENT USER
+       Firebase Auth UID is the ONLY source of truth.
     ===================================================== */
 
     const currentUid =
-        currentUser?.uid ||
-        currentProfile?.uid ||
-        "";
+        String(
+            currentUser?.uid || ""
+        );
 
 
     /* =====================================================
        ONLINE COUNT
+       Count OTHER online users + current user if online.
     ===================================================== */
 
     const onlineCount =
         $("onlineCount");
-
 
     const activeCount =
         onlineUsers.filter(
             user =>
                 user.isOnline === true
         ).length;
-
 
     if (onlineCount) {
 
@@ -1469,7 +1465,7 @@ function renderOnline() {
 
 
     /* =====================================================
-       EMPTY STATE
+       EMPTY
     ===================================================== */
 
     if (!onlineUsers.length) {
@@ -1483,30 +1479,42 @@ function renderOnline() {
         `;
 
         return;
-
     }
 
 
     /* =====================================================
-       SORT USERS
-       Current user always appears first.
-       Online users come before offline users.
+       SORT ORDER
+
+       1. CURRENT USER
+       2. OTHER ONLINE USERS
+       3. OTHER OFFLINE USERS
     ===================================================== */
 
     const sortedUsers =
         [...onlineUsers].sort(
             (a, b) => {
 
+                const aUid =
+                    String(
+                        a.uid || ""
+                    );
+
+                const bUid =
+                    String(
+                        b.uid || ""
+                    );
+
+
                 const aIsSelf =
-                    String(a.uid || "") ===
-                    String(currentUid || "");
+                    aUid === currentUid;
 
                 const bIsSelf =
-                    String(b.uid || "") ===
-                    String(currentUid || "");
+                    bUid === currentUid;
 
 
-                /* Current user first */
+                /* -----------------------------------------
+                   1. CURRENT USER ALWAYS FIRST
+                ----------------------------------------- */
 
                 if (
                     aIsSelf &&
@@ -1516,7 +1524,6 @@ function renderOnline() {
                     return -1;
 
                 }
-
 
                 if (
                     bIsSelf &&
@@ -1528,21 +1535,41 @@ function renderOnline() {
                 }
 
 
-                /* Online before offline */
+                /* -----------------------------------------
+                   2. OTHER ONLINE USERS
+                   BEFORE OFFLINE USERS
+                ----------------------------------------- */
+
+                const aOnline =
+                    a.isOnline === true;
+
+                const bOnline =
+                    b.isOnline === true;
+
 
                 if (
-                    a.isOnline !==
-                    b.isOnline
+                    aOnline &&
+                    !bOnline
                 ) {
 
-                    return a.isOnline
-                        ? -1
-                        : 1;
+                    return -1;
+
+                }
+
+                if (
+                    bOnline &&
+                    !aOnline
+                ) {
+
+                    return 1;
 
                 }
 
 
-                /* Alphabetical */
+                /* -----------------------------------------
+                   3. SAME STATUS
+                   SORT ALPHABETICALLY
+                ----------------------------------------- */
 
                 return getFullName(a)
                     .localeCompare(
@@ -1554,22 +1581,12 @@ function renderOnline() {
 
 
     /* =====================================================
-       RENDER
+       RENDER USERS
     ===================================================== */
 
     box.innerHTML =
         sortedUsers.map(
             user => {
-
-                const name =
-                    getFullName(user);
-
-
-                /*
-                 * IMPORTANT:
-                 * Determine ownership using both
-                 * Firebase Auth UID and current profile UID.
-                 */
 
                 const userUid =
                     String(
@@ -1577,24 +1594,31 @@ function renderOnline() {
                     );
 
 
+                /*
+                 * IMPORTANT:
+                 *
+                 * We identify "You" ONLY by Firebase Auth UID.
+                 */
+
                 const self =
                     userUid !== "" &&
-                    (
-                        userUid ===
-                        String(
-                            currentUser?.uid || ""
-                        )
-                        ||
-                        userUid ===
-                        String(
-                            currentProfile?.uid || ""
-                        )
-                    );
+                    userUid === currentUid;
 
 
-                /*
-                 * Following only applies to OTHER users.
-                 */
+                const name =
+                    getFullName(user);
+
+
+                const photo =
+                    user.photoURL ||
+                    user.photoUrl ||
+                    "";
+
+
+                /* -----------------------------------------
+                   FOLLOW STATUS
+                   Only OTHER users can be followed.
+                ----------------------------------------- */
 
                 const following =
                     !self &&
@@ -1606,11 +1630,83 @@ function renderOnline() {
                     );
 
 
-                const photo =
-                    user.photoURL ||
-                    user.photoUrl ||
-                    "";
+                /* -----------------------------------------
+                   AVATAR
+                ----------------------------------------- */
 
+                const avatarMarkup =
+                    photo
+
+                        ? `
+                            <img
+                                src="${escapeHtml(
+                                    photo
+                                )}"
+                                alt="${escapeHtml(
+                                    name
+                                )}"
+                                loading="lazy"
+                            >
+                          `
+
+                        : escapeHtml(
+                            initials(name)
+                        );
+
+
+                /* -----------------------------------------
+                   ACTION BUTTON
+                ----------------------------------------- */
+
+                const actionButton =
+                    self
+
+                        ? `
+
+                            <button
+                                type="button"
+                                class="
+                                    follow-btn
+                                    following
+                                "
+                                data-profile-uid="${escapeHtml(
+                                    user.uid
+                                )}"
+                            >
+                                You
+                            </button>
+
+                          `
+
+                        : `
+
+                            <button
+                                type="button"
+                                class="
+                                    follow-btn
+                                    ${
+                                        following
+                                            ? "following"
+                                            : ""
+                                    }
+                                "
+                                data-follow-uid="${escapeHtml(
+                                    user.uid
+                                )}"
+                            >
+                                ${
+                                    following
+                                        ? "Following"
+                                        : "Follow"
+                                }
+                            </button>
+
+                          `;
+
+
+                /* -----------------------------------------
+                   USER CARD
+                ----------------------------------------- */
 
                 return `
 
@@ -1639,25 +1735,7 @@ function renderOnline() {
                                 "
                             >
 
-                                ${
-                                    photo
-
-                                        ? `
-                                            <img
-                                                src="${escapeHtml(
-                                                    photo
-                                                )}"
-                                                alt="${escapeHtml(
-                                                    name
-                                                )}"
-                                                loading="lazy"
-                                            >
-                                          `
-
-                                        : escapeHtml(
-                                            initials(name)
-                                        )
-                                }
+                                ${avatarMarkup}
 
                             </div>
 
@@ -1710,49 +1788,7 @@ function renderOnline() {
 
                             <!-- ACTION -->
 
-                            ${
-                                self
-
-                                    ? `
-
-                                        <button
-                                            type="button"
-                                            class="
-                                                follow-btn
-                                                following
-                                            "
-                                            disabled
-                                        >
-                                            You
-                                        </button>
-
-                                      `
-
-                                    : `
-
-                                        <button
-                                            type="button"
-                                            class="
-                                                follow-btn
-                                                ${
-                                                    following
-                                                        ? "following"
-                                                        : ""
-                                                }
-                                            "
-                                            data-follow-uid="${escapeHtml(
-                                                user.uid
-                                            )}"
-                                        >
-                                            ${
-                                                following
-                                                    ? "Following"
-                                                    : "Follow"
-                                            }
-                                        </button>
-
-                                      `
-                            }
+                            ${actionButton}
 
                         </div>
 
@@ -1763,94 +1799,8 @@ function renderOnline() {
             }
         ).join("");
 
-
-    /* =====================================================
-       CARD CLICK
-       Tap card -> public profile
-       Follow button -> follow only
-    ===================================================== */
-
-    box.onclick =
-        async event => {
-
-            const followButton =
-                event.target.closest(
-                    "[data-follow-uid]"
-                );
-
-
-            if (followButton) {
-
-                event.preventDefault();
-                event.stopPropagation();
-
-
-                const targetUid =
-                    followButton.dataset.followUid;
-
-
-                if (!targetUid) {
-                    return;
-                }
-
-
-                followButton.disabled =
-                    true;
-
-
-                try {
-
-                    await toggleFollow(
-                        targetUid
-                    );
-
-                } finally {
-
-                    followButton.disabled =
-                        false;
-
-                }
-
-
-                return;
-
-            }
-
-
-            const card =
-                event.target.closest(
-                    "[data-user-card]"
-                );
-
-
-            if (!card) {
-                return;
-            }
-
-
-            const uid =
-                card.dataset.userCard;
-
-
-            if (!uid) {
-                return;
-            }
-
-
-            console.log(
-                "[CONNECTA] Opening profile:",
-                uid
-            );
-
-
-            window.location.href =
-                `profile.html?uid=${encodeURIComponent(
-                    uid
-                )}`;
-
-        };
-
 }
+
 
 /* =========================================================
    FOLLOW
@@ -4210,6 +4160,104 @@ function showToast(message) {
 ========================================================= */
 
 function setupUI() {
+
+       /* =====================================================
+       ONLINE USER CARD INTERACTIONS
+       - Follow button -> Follow / Unfollow
+       - User card -> Open profile
+    ===================================================== */
+
+    const onlineUsersBox =
+        $("onlineUsers");
+
+    onlineUsersBox?.addEventListener(
+        "click",
+        async event => {
+
+            /* ---------------------------------------------
+               FOLLOW BUTTON
+            --------------------------------------------- */
+
+            const followButton =
+                event.target.closest(
+                    "[data-follow-uid]"
+                );
+
+
+            if (followButton) {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+
+                const targetUid =
+                    followButton.dataset.followUid;
+
+
+                if (!targetUid) {
+                    return;
+                }
+
+
+                followButton.disabled =
+                    true;
+
+
+                try {
+
+                    await toggleFollow(
+                        targetUid
+                    );
+
+                } finally {
+
+                    followButton.disabled =
+                        false;
+
+                }
+
+
+                return;
+            }
+
+
+            /* ---------------------------------------------
+               USER CARD
+            --------------------------------------------- */
+
+            const card =
+                event.target.closest(
+                    "[data-user-card]"
+                );
+
+
+            if (!card) {
+                return;
+            }
+
+
+            const uid =
+                card.dataset.userCard;
+
+
+            if (!uid) {
+                return;
+            }
+
+
+            console.log(
+                "[CONNECTA] Opening profile:",
+                uid
+            );
+
+
+            window.location.href =
+                `profile.html?uid=${encodeURIComponent(
+                    uid
+                )}`;
+
+        }
+    );
 
     /* MENU */
 
