@@ -36,6 +36,12 @@
    - My groups update live
    - Own profile/admin restrictions update live
    - Unread counts refresh automatically
+
+   INDEX-SAFE VERSION
+   ---------------------------------------------------------
+   - Does NOT use orderBy() together with where()
+   - Firestore results are sorted client-side
+   - Avoids unnecessary composite-index requirements
 ========================================================= */
 
 import {
@@ -55,7 +61,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   serverTimestamp,
   runTransaction
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
@@ -947,7 +952,7 @@ function canJoinGroup(
 
   /* -------------------------------------------------------
      PUBLIC GROUP
-     ------------------------------------------------------- */
+  ------------------------------------------------------- */
 
   if (
     group.type === "public"
@@ -965,7 +970,7 @@ function canJoinGroup(
 
   /* -------------------------------------------------------
      PRIVATE GROUP
-     ------------------------------------------------------- */
+  ------------------------------------------------------- */
 
   if (
     group.type === "private"
@@ -1109,6 +1114,41 @@ function getTimestampMillis(
 
 
   return null;
+}
+
+
+/* =========================================================
+   SORT GROUPS BY DATE
+   ---------------------------------------------------------
+   Firestore no longer performs orderBy().
+   We sort safely on the client instead.
+========================================================= */
+
+function sortGroupsByDate(
+  groups,
+  field = "createdAt"
+) {
+
+  return [
+    ...groups
+  ].sort(
+    (a, b) => {
+
+      const aTime =
+        getTimestampMillis(
+          a?.[field]
+        ) || 0;
+
+
+      const bTime =
+        getTimestampMillis(
+          b?.[field]
+        ) || 0;
+
+
+      return bTime - aTime;
+    }
+  );
 }
 
 
@@ -1691,35 +1731,38 @@ function renderPublicGroups(
 
 
   const groups =
-    allGroups.filter(
-      group => {
+    sortGroupsByDate(
+      allGroups.filter(
+        group => {
 
-        if (
-          group.status !==
-          "approved"
-        ) {
+          if (
+            group.status !==
+            "approved"
+          ) {
 
-          return false;
+            return false;
+          }
+
+
+          if (!term) {
+            return true;
+          }
+
+
+          const searchText =
+            `${group.name || ""}
+             ${group.description || ""}
+             ${group.ownerName || ""}
+             ${group.type || ""}`
+              .toLowerCase();
+
+
+          return searchText.includes(
+            term
+          );
         }
-
-
-        if (!term) {
-          return true;
-        }
-
-
-        const searchText =
-          `${group.name || ""}
-           ${group.description || ""}
-           ${group.ownerName || ""}
-           ${group.type || ""}`
-            .toLowerCase();
-
-
-        return searchText.includes(
-          term
-        );
-      }
+      ),
+      "createdAt"
     );
 
 
@@ -1807,24 +1850,27 @@ function renderMyGroups(
 
 
   const groups =
-    myGroups.filter(
-      group => {
+    sortGroupsByDate(
+      myGroups.filter(
+        group => {
 
-        if (!term) {
-          return true;
+          if (!term) {
+            return true;
+          }
+
+
+          const searchText =
+            `${group.name || ""}
+             ${group.description || ""}`
+              .toLowerCase();
+
+
+          return searchText.includes(
+            term
+          );
         }
-
-
-        const searchText =
-          `${group.name || ""}
-           ${group.description || ""}`
-            .toLowerCase();
-
-
-        return searchText.includes(
-          term
-        );
-      }
+      ),
+      "updatedAt"
     );
 
 
@@ -1972,11 +2018,6 @@ function attachGroupActions(
               );
 
             } finally {
-
-              /*
-               * Realtime snapshot will
-               * re-render when necessary.
-               */
 
               button.disabled =
                 false;
@@ -2200,10 +2241,6 @@ async function joinFreeGroup(
           userSnap.data();
 
 
-        /* -------------------------------------------------
-           ACCOUNT CONTROL
-        ------------------------------------------------- */
-
         const status =
           String(
             userData.status ||
@@ -2243,10 +2280,6 @@ async function joinFreeGroup(
           );
         }
 
-
-        /* -------------------------------------------------
-           GROUP CONTROL
-        ------------------------------------------------- */
 
         if (
           groupData.status !==
@@ -2300,6 +2333,9 @@ async function joinFreeGroup(
           {
 
             members,
+
+            memberIds:
+              members,
 
             memberCount:
               members.length,
@@ -2425,16 +2461,13 @@ async function startPaidGroupJoin(
    *
    * Do NOT add the user to group.members here.
    *
-   * The future backend/payment flow must:
+   * Future backend/payment flow must:
    *
    * 1. Create payment request
    * 2. Verify payment
    * 3. Confirm transaction
    * 4. Add user to group
    * 5. Update memberCount
-   *
-   * This prevents users from bypassing
-   * private-group joining fees.
    */
 
   showToast(
@@ -2742,13 +2775,12 @@ function scheduleUnreadRefresh() {
    REALTIME APPROVED GROUPS
    ---------------------------------------------------------
    IMPORTANT:
-   This now loads BOTH:
-   - public approved groups
-   - private approved groups
+   NO orderBy() HERE.
 
-   Private groups are visible in discovery,
-   but joining is restricted to verified users
-   and requires the joining fee.
+   Firestore only filters by status.
+   JavaScript sorts by createdAt.
+
+   This avoids composite-index errors.
 ========================================================= */
 
 function listenToApprovedGroups() {
@@ -2774,10 +2806,6 @@ function listenToApprovedGroups() {
         "status",
         "==",
         "approved"
-      ),
-      orderBy(
-        "createdAt",
-        "desc"
       )
     );
 
@@ -2805,6 +2833,17 @@ function listenToApprovedGroups() {
           );
 
 
+        /*
+         * Sort newest first on the client.
+         */
+
+        allGroups =
+          sortGroupsByDate(
+            allGroups,
+            "createdAt"
+          );
+
+
         renderPublicGroups(
           $("groupSearch")?.value ||
           ""
@@ -2812,7 +2851,7 @@ function listenToApprovedGroups() {
 
 
         /*
-         * Badge shows the number of
+         * Badge shows number of
          * approved available groups.
          */
 
@@ -2873,6 +2912,13 @@ function listenToApprovedGroups() {
 
 /* =========================================================
    REALTIME MY GROUPS
+   ---------------------------------------------------------
+   NO orderBy() HERE EITHER.
+
+   Firestore filters membership.
+   JavaScript sorts by updatedAt.
+
+   This avoids another composite-index requirement.
 ========================================================= */
 
 function listenToMyGroups() {
@@ -2898,10 +2944,6 @@ function listenToMyGroups() {
         "members",
         "array-contains",
         currentUser.uid
-      ),
-      orderBy(
-        "updatedAt",
-        "desc"
       )
     );
 
@@ -2926,6 +2968,17 @@ function listenToMyGroups() {
               ...snap.data()
 
             })
+          );
+
+
+        /*
+         * Sort newest activity first.
+         */
+
+        myGroups =
+          sortGroupsByDate(
+            myGroups,
+            "updatedAt"
           );
 
 
@@ -2965,7 +3018,7 @@ function listenToMyGroups() {
 
               <p>
                 Please check your Firestore
-                rules or indexes.
+                rules or connection.
               </p>
 
             </div>
@@ -3109,10 +3162,6 @@ function updateGroupTypeRules() {
     type === "public"
   ) {
 
-    /*
-     * Public groups must always be free.
-     */
-
     if (subscription) {
 
       subscription.value =
@@ -3143,13 +3192,6 @@ function updateGroupTypeRules() {
     return;
   }
 
-
-  /*
-   * Private group.
-   *
-   * Private groups must have
-   * a joining fee.
-   */
 
   if (subscription) {
 
@@ -3271,11 +3313,6 @@ async function createGroup(
     "public";
 
 
-  /*
-   * PUBLIC = FREE
-   * PRIVATE = PAID
-   */
-
   let subscriptionEnabled =
     false;
 
@@ -3365,10 +3402,6 @@ async function createGroup(
 
   try {
 
-    /*
-     * Fresh profile check before creating.
-     */
-
     const userSnap =
       await getDoc(
         doc(
@@ -3443,10 +3476,6 @@ async function createGroup(
     }
 
 
-    /*
-     * PRIVATE GROUP VALIDATION
-     */
-
     if (
       type === "private" &&
       (
@@ -3460,10 +3489,6 @@ async function createGroup(
       );
     }
 
-
-    /*
-     * PUBLIC GROUPS CAN NEVER BE PAID.
-     */
 
     if (
       type === "public"
@@ -3521,12 +3546,6 @@ async function createGroup(
       subscriptionFee:
         fee,
 
-      /*
-       * IMPORTANT:
-       * New groups are not public
-       * until admin approves them.
-       */
-
       status:
         "pending_review",
 
@@ -3562,13 +3581,6 @@ async function createGroup(
       rejectionReason:
         "",
 
-      /*
-       * Owner controls.
-       *
-       * These fields will be used by
-       * group-chat.js and admin later.
-       */
-
       chatLocked:
         false,
 
@@ -3580,10 +3592,6 @@ async function createGroup(
 
       deleted:
         false,
-
-      /*
-       * Latest message information.
-       */
 
       lastMessageId:
         "",
@@ -3847,10 +3855,6 @@ function setupMenu() {
     );
   }
 
-
-  /*
-   * Close menu after navigation.
-   */
 
   sideMenu
     .querySelectorAll("a")
@@ -4211,10 +4215,6 @@ function setupCreateGroup() {
   );
 
 
-  /*
-   * Public/private type change.
-   */
-
   document
     .querySelectorAll(
       'input[name="groupType"]'
@@ -4325,14 +4325,6 @@ async function initializeGroups() {
 
   try {
 
-    /*
-     * CONNECTA centralized authentication.
-     *
-     * This recognizes the user who is already
-     * logged in instead of creating another
-     * authentication session.
-     */
-
     const session =
       await getCurrentConnectaUser({
 
@@ -4372,11 +4364,6 @@ async function initializeGroups() {
       true;
 
 
-    /*
-     * Render the user immediately from the
-     * centralized session.
-     */
-
     renderHeaderProfile(
       currentProfile
     );
@@ -4385,11 +4372,6 @@ async function initializeGroups() {
     applyGroupAccountControl();
 
 
-    /*
-     * Continue listening for live profile
-     * and admin changes.
-     */
-
     listenToOwnProfile(
       currentUser.uid
     );
@@ -4397,13 +4379,16 @@ async function initializeGroups() {
 
     /*
      * Approved public + private groups.
+     * No composite index required.
      */
 
     listenToApprovedGroups();
 
 
     /*
-     * Groups where the current user is a member.
+     * Groups where the current user
+     * is a member.
+     * No composite index required.
      */
 
     listenToMyGroups();
