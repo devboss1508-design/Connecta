@@ -97,6 +97,74 @@ let unreadCounts = {};
 let unreadRefreshTimer = null;
 let unreadRefreshToken = 0;
 
+/* =========================================================
+   GROUP LOADING STATE + CACHE
+========================================================= */
+
+let approvedGroupsLoaded = false;
+let myGroupsLoaded = false;
+
+const APPROVED_GROUPS_CACHE_KEY =
+  "connectaApprovedGroupsCache_v1";
+
+const MY_GROUPS_CACHE_KEY =
+  "connectaMyGroupsCache_v1";
+
+
+function getGroupsCache(key) {
+
+  try {
+
+    const raw =
+      localStorage.getItem(key);
+
+    if (!raw) {
+      return [];
+    }
+
+    const parsed =
+      JSON.parse(raw);
+
+    return Array.isArray(parsed)
+      ? parsed
+      : [];
+
+  } catch (error) {
+
+    console.warn(
+      "Groups cache read failed:",
+      error
+    );
+
+    return [];
+  }
+}
+
+
+function saveGroupsCache(
+  key,
+  groups
+) {
+
+  try {
+
+    localStorage.setItem(
+      key,
+      JSON.stringify(
+        Array.isArray(groups)
+          ? groups
+          : []
+      )
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "Groups cache save failed:",
+      error
+    );
+  }
+}
 
 /* =========================================================
    COLLECTIONS
@@ -147,6 +215,75 @@ function showToast(message) {
     );
 }
 
+/* =========================================================
+   GROUP SKELETON LOADING
+========================================================= */
+
+function showGroupsSkeleton() {
+
+  const publicBox =
+    $("publicGroups");
+
+  const myBox =
+    $("myGroups");
+
+
+  /*
+   * Only restore skeleton if the HTML
+   * already contains the skeleton.
+   */
+
+  if (
+    publicBox &&
+    !approvedGroupsLoaded
+  ) {
+
+    publicBox.classList.add(
+      "groups-loading"
+    );
+  }
+
+
+  if (
+    myBox &&
+    !myGroupsLoaded
+  ) {
+
+    myBox.classList.add(
+      "groups-loading"
+    );
+  }
+}
+
+
+function hidePublicGroupsSkeleton() {
+
+  const box =
+    $("publicGroups");
+
+  if (!box) {
+    return;
+  }
+
+  box.classList.remove(
+    "groups-loading"
+  );
+}
+
+
+function hideMyGroupsSkeleton() {
+
+  const box =
+    $("myGroups");
+
+  if (!box) {
+    return;
+  }
+
+  box.classList.remove(
+    "groups-loading"
+  );
+}
 
 /* =========================================================
    ESCAPE HTML
@@ -1669,6 +1806,20 @@ function renderPublicGroups(
   }
 
 
+  /*
+   * Do not replace the skeleton before the first
+   * Firestore snapshot unless cached groups exist.
+   */
+
+  if (
+    !approvedGroupsLoaded &&
+    allGroups.length === 0
+  ) {
+
+    return;
+  }
+
+
   const term =
     String(filter || "")
       .trim()
@@ -1726,6 +1877,17 @@ function renderPublicGroups(
   }
 
 
+  /*
+   * FIRST REAL DATA HAS ARRIVED
+   */
+
+  hidePublicGroupsSkeleton();
+
+
+  /*
+   * No groups after loading.
+   */
+
   if (!groups.length) {
 
     box.innerHTML = `
@@ -1758,6 +1920,10 @@ function renderPublicGroups(
   }
 
 
+  /*
+   * Render groups immediately.
+   */
+
   box.innerHTML =
     groups
       .map(
@@ -1769,7 +1935,6 @@ function renderPublicGroups(
 
   attachGroupActions(box);
 }
-
 
 /* =========================================================
    RENDER MY GROUPS
@@ -1784,6 +1949,20 @@ function renderMyGroups(
 
 
   if (!box) {
+    return;
+  }
+
+
+  /*
+   * Keep skeleton visible until the first
+   * realtime Firestore snapshot arrives.
+   */
+
+  if (
+    !myGroupsLoaded &&
+    myGroups.length === 0
+  ) {
+
     return;
   }
 
@@ -1834,6 +2013,17 @@ function renderMyGroups(
   }
 
 
+  /*
+   * FIRST REAL DATA HAS ARRIVED
+   */
+
+  hideMyGroupsSkeleton();
+
+
+  /*
+   * No groups after loading.
+   */
+
   if (!groups.length) {
 
     box.innerHTML = `
@@ -1866,6 +2056,10 @@ function renderMyGroups(
   }
 
 
+  /*
+   * Render groups immediately.
+   */
+
   box.innerHTML =
     groups
       .map(
@@ -1882,7 +2076,6 @@ function renderMyGroups(
 
   attachGroupActions(box);
 }
-
 
 /* =========================================================
    REFRESH RENDERS
@@ -4948,13 +5141,12 @@ function scheduleUnreadRefresh() {
 /* =========================================================
    REALTIME APPROVED GROUPS
    ---------------------------------------------------------
-   IMPORTANT:
-   NO orderBy() HERE.
+   CACHE-FIRST + REALTIME
 
-   Firestore only filters by status.
-   JavaScript sorts by createdAt.
-
-   This avoids composite-index errors.
+   - Show cached groups immediately
+   - Keep skeleton if no cache exists
+   - Firestore then replaces cache with fresh data
+   - No orderBy()
 ========================================================= */
 
 function listenToApprovedGroups() {
@@ -4969,6 +5161,57 @@ function listenToApprovedGroups() {
       null;
   }
 
+
+  /*
+   * =======================================================
+   * CACHE-FIRST
+   * =======================================================
+   */
+
+  const cachedGroups =
+    getGroupsCache(
+      APPROVED_GROUPS_CACHE_KEY
+    );
+
+
+  if (
+    cachedGroups.length
+  ) {
+
+    allGroups =
+      sortGroupsByDate(
+        cachedGroups,
+        "createdAt"
+      );
+
+
+    /*
+     * Cached groups are displayed immediately.
+     */
+
+    approvedGroupsLoaded =
+      true;
+
+
+    renderPublicGroups(
+      $("groupSearch")?.value ||
+      ""
+    );
+
+
+    /*
+     * The realtime listener will refresh
+     * the data moments later.
+     */
+
+  }
+
+
+  /*
+   * =======================================================
+   * FIRESTORE REALTIME QUERY
+   * =======================================================
+   */
 
   const groupsQuery =
     query(
@@ -5018,6 +5261,29 @@ function listenToApprovedGroups() {
           );
 
 
+        /*
+         * Save fresh groups for the
+         * next page visit.
+         */
+
+        saveGroupsCache(
+          APPROVED_GROUPS_CACHE_KEY,
+          allGroups
+        );
+
+
+        /*
+         * First server response has arrived.
+         */
+
+        approvedGroupsLoaded =
+          true;
+
+
+        /*
+         * Render immediately.
+         */
+
         renderPublicGroups(
           $("groupSearch")?.value ||
           ""
@@ -5054,6 +5320,13 @@ function listenToApprovedGroups() {
         );
 
 
+        approvedGroupsLoaded =
+          true;
+
+
+        hidePublicGroupsSkeleton();
+
+
         const box =
           $("publicGroups");
 
@@ -5083,16 +5356,15 @@ function listenToApprovedGroups() {
     );
 }
 
-
 /* =========================================================
    REALTIME MY GROUPS
    ---------------------------------------------------------
-   NO orderBy() HERE EITHER.
+   CACHE-FIRST + REALTIME
 
-   Firestore filters membership.
-   JavaScript sorts by updatedAt.
-
-   This avoids another composite-index requirement.
+   - Show cached groups immediately
+   - Keep skeleton if no cache exists
+   - Firestore refreshes the cache
+   - No orderBy()
 ========================================================= */
 
 function listenToMyGroups() {
@@ -5107,6 +5379,51 @@ function listenToMyGroups() {
       null;
   }
 
+
+  /*
+   * =======================================================
+   * CACHE-FIRST
+   * =======================================================
+   */
+
+  const cachedGroups =
+    getGroupsCache(
+      MY_GROUPS_CACHE_KEY
+    );
+
+
+  if (
+    cachedGroups.length
+  ) {
+
+    myGroups =
+      sortGroupsByDate(
+        cachedGroups,
+        "updatedAt"
+      );
+
+
+    myGroupsLoaded =
+      true;
+
+
+    /*
+     * Render cached groups immediately.
+     */
+
+    renderMyGroups(
+      $("groupSearch")?.value ||
+      ""
+    );
+
+  }
+
+
+  /*
+   * =======================================================
+   * FIRESTORE REALTIME QUERY
+   * =======================================================
+   */
 
   const groupsQuery =
     query(
@@ -5156,13 +5473,40 @@ function listenToMyGroups() {
           );
 
 
+        /*
+         * Save fresh data.
+         */
+
+        saveGroupsCache(
+          MY_GROUPS_CACHE_KEY,
+          myGroups
+        );
+
+
+        /*
+         * First realtime response has arrived.
+         */
+
+        myGroupsLoaded =
+          true;
+
+
+        /*
+         * Render immediately.
+         */
+
         renderMyGroups(
           $("groupSearch")?.value ||
           ""
         );
 
 
+        /*
+         * Refresh unread counts.
+         */
+
         scheduleUnreadRefresh();
+
       },
 
       error => {
@@ -5171,6 +5515,13 @@ function listenToMyGroups() {
           "My groups listener:",
           error
         );
+
+
+        myGroupsLoaded =
+          true;
+
+
+        hideMyGroupsSkeleton();
 
 
         const box =
@@ -6497,6 +6848,9 @@ window.addEventListener(
 
 async function initializeGroups() {
 
+   approvedGroupsLoaded = false;
+   myGroupsLoaded = false;
+
   try {
 
     const session =
@@ -6544,6 +6898,17 @@ async function initializeGroups() {
 
 
     applyGroupAccountControl();
+
+/*
+ * Keep the Groups skeleton visible while
+ * Firestore data is being loaded.
+ *
+ * If cached groups exist, the realtime
+ * listeners will replace the skeleton
+ * almost immediately.
+ */
+
+   showGroupsSkeleton();
 
 
     listenToOwnProfile(
