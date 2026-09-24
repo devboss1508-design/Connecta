@@ -4071,11 +4071,20 @@ function setupGroupInfo() {
                 event.stopPropagation();
 
                 /*
-                 * Everyone can open group information.
-                 * Owner controls remain available through
-                 * the owner menu.
+                 * GROUP OWNER:
+                 * The three-dot button opens the owner menu.
+                 *
+                 * OTHER USERS:
+                 * The same button opens normal group information.
                  */
-                openGroupInfo();
+                if (isGroupOwner()) {
+
+                    toggleOwnerMenu();
+
+                } else {
+
+                    openGroupInfo();
+                }
             }
         );
     }
