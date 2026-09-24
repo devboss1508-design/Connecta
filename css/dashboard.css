@@ -174,37 +174,50 @@ body {
 
 /* ========================================
    CONNECTA DASHBOARD SKELETON
+   Matches CONNECTA chat.html skeleton
 ======================================== */
 
-@keyframes connectaSkeletonShimmer {
+@keyframes connectaSkeleton {
 
   0% {
-    background-position: -700px 0;
+    background-position: 100% 0;
+    opacity: .55;
+  }
+
+  50% {
+    background-position: 0 0;
+    opacity: .9;
   }
 
   100% {
-    background-position: 700px 0;
+    background-position: -100% 0;
+    opacity: .55;
   }
 
 }
+
+
+/* ========================================
+   COMMON SKELETON
+======================================== */
 
 .connecta-skeleton {
 
   background:
     linear-gradient(
       90deg,
-      #edf2ee 25%,
-      #f8faf8 50%,
-      #edf2ee 75%
+      rgba(255,255,255,.85),
+      rgba(230,237,232,.95),
+      rgba(255,255,255,.85)
     );
 
-  background-size: 1400px 100%;
+  background-size: 220% 100%;
 
   animation:
-    connectaSkeletonShimmer
-    1.25s infinite linear;
-
-  border-radius: 12px;
+    connectaSkeleton
+    1.35s
+    ease-in-out
+    infinite;
 
 }
 
@@ -215,88 +228,32 @@ body {
 
 .connecta-skeleton-users {
 
-  display: flex;
+  display:flex;
 
-  flex-direction: row;
+  flex-direction:row;
 
-  flex-wrap: nowrap;
+  flex-wrap:nowrap;
 
-  gap: 11px;
+  gap:11px;
 
-  width: 100%;
+  width:100%;
 
-  overflow: hidden;
+  overflow:hidden;
 
-}
-
-
-.connecta-skeleton-user {
-
-  min-width: 138px;
-
-  max-width: 138px;
-
-  flex: 0 0 138px;
-
-  height: 166px;
-
-  border-radius: 18px;
-
-  padding: 12px 8px;
+  padding:2px 1px 8px;
 
 }
 
-
-/* ========================================
-   CHAT SKELETON
-======================================== */
-
-.connecta-skeleton-chat {
-
-  width: 100%;
-
-  height: 68px;
-
-  margin-bottom: 8px;
-
-  border-radius: 12px;
-
-}
-
-
-/* ========================================
-   MOBILE SKELETON
-======================================== */
-
-@media (max-width: 600px) {
-
-  .connecta-skeleton-user {
-
-    min-width: 122px;
-
-    max-width: 122px;
-
-    flex: 0 0 122px;
-
-    height: 154px;
-
-  }
-
-}
-
-/* ========================================
-   USER CARD SKELETON
-======================================== */
 
 .skeleton-user-card {
 
-  min-width: 138px;
+  min-width:138px;
 
-  max-width: 138px;
+  max-width:138px;
 
-  flex: 0 0 138px;
+  flex:0 0 138px;
 
-  height: 166px;
+  height:166px;
 
   background:#fff;
 
@@ -304,13 +261,15 @@ body {
 
   border-radius:18px;
 
-  padding:12px 8px;
+  padding:12px 8px 9px;
 
   display:flex;
 
   flex-direction:column;
 
   align-items:center;
+
+  box-sizing:border-box;
 
 }
 
@@ -320,6 +279,8 @@ body {
   width:64px;
 
   height:64px;
+
+  min-width:64px;
 
   border-radius:50%;
 
@@ -334,7 +295,7 @@ body {
 
   height:11px;
 
-  border-radius:8px;
+  border-radius:10px;
 
   margin-bottom:8px;
 
@@ -347,7 +308,7 @@ body {
 
   height:8px;
 
-  border-radius:8px;
+  border-radius:10px;
 
   margin-bottom:auto;
 
@@ -362,16 +323,38 @@ body {
 
   border-radius:20px;
 
+  background:
+    linear-gradient(
+      90deg,
+      rgba(34,197,94,.35),
+      rgba(125,239,163,.55),
+      rgba(34,197,94,.35)
+    );
+
+  background-size:220% 100%;
+
+  animation:
+    connectaSkeleton
+    1.35s
+    ease-in-out
+    infinite;
+
 }
 
 
 /* ========================================
-   CHAT SKELETON
+   RECENT CHAT SKELETON
 ======================================== */
 
 .skeleton-chat-list {
 
   width:100%;
+
+  display:flex;
+
+  flex-direction:column;
+
+  gap:8px;
 
 }
 
@@ -386,11 +369,17 @@ body {
 
   width:100%;
 
-  height:68px;
+  min-height:68px;
 
   padding:10px 7px;
 
-  border-bottom:1px solid #edf0ee;
+  background:#fff;
+
+  border:1px solid #edf0ee;
+
+  border-radius:14px;
+
+  box-sizing:border-box;
 
 }
 
@@ -414,6 +403,12 @@ body {
 
   min-width:0;
 
+  display:flex;
+
+  flex-direction:column;
+
+  gap:9px;
+
 }
 
 
@@ -423,9 +418,7 @@ body {
 
   height:11px;
 
-  border-radius:8px;
-
-  margin-bottom:9px;
+  border-radius:10px;
 
 }
 
@@ -438,7 +431,7 @@ body {
 
   height:9px;
 
-  border-radius:8px;
+  border-radius:10px;
 
 }
 
@@ -449,16 +442,27 @@ body {
 
   height:8px;
 
-  border-radius:8px;
+  border-radius:10px;
+
+  align-self:flex-start;
+
+  margin-top:4px;
 
 }
 
 
 /* ========================================
-   MOBILE
+   MOBILE SKELETON
 ======================================== */
 
 @media (max-width:600px) {
+
+  .connecta-skeleton-users {
+
+    gap:10px;
+
+  }
+
 
   .skeleton-user-card {
 
@@ -479,6 +483,8 @@ body {
 
     height:58px;
 
+    min-width:58px;
+
   }
 
 
@@ -494,6 +500,17 @@ body {
     padding-left:4px;
 
     padding-right:4px;
+
+  }
+
+
+  .skeleton-chat-avatar {
+
+    width:42px;
+
+    height:42px;
+
+    min-width:42px;
 
   }
 
