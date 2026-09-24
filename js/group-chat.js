@@ -168,6 +168,15 @@ const messagesInner =
 const chatLoading =
     document.getElementById("chatLoading");
 
+const composerSkeleton =
+    document.getElementById("composerSkeleton");
+
+const groupNameSkeleton =
+    document.getElementById("groupNameSkeleton");
+
+const groupStatusSkeleton =
+    document.getElementById("groupStatusSkeleton");
+
 const typingArea =
     document.getElementById("typingArea");
 
@@ -648,13 +657,21 @@ function isGroupDeleted(group) {
 
 
 /* =========================================================
-   LOADING
+   LOADING / SKELETON
 ========================================================= */
 
 function showLoading() {
 
     if (chatLoading) {
         chatLoading.style.display = "flex";
+    }
+
+    if (composerSkeleton) {
+        composerSkeleton.style.display = "flex";
+    }
+
+    if (composerWrap) {
+        composerWrap.style.display = "none";
     }
 }
 
@@ -663,6 +680,50 @@ function hideLoading() {
 
     if (chatLoading) {
         chatLoading.style.display = "none";
+    }
+
+    /*
+     * The real composer is controlled by
+     * updateComposerState().
+     */
+    if (composerSkeleton) {
+        composerSkeleton.style.display = "none";
+    }
+
+    if (composerWrap) {
+        composerWrap.style.display = "";
+    }
+}
+
+
+function hideGroupHeaderSkeleton() {
+
+    if (groupAvatar) {
+        groupAvatar.classList.remove("skeleton");
+    }
+
+    if (groupNameSkeleton) {
+        groupNameSkeleton.style.display = "none";
+    }
+
+    if (groupStatusSkeleton) {
+        groupStatusSkeleton.style.display = "none";
+    }
+}
+
+
+function showGroupHeaderSkeleton() {
+
+    if (groupAvatar) {
+        groupAvatar.classList.add("skeleton");
+    }
+
+    if (groupNameSkeleton) {
+        groupNameSkeleton.style.display = "";
+    }
+
+    if (groupStatusSkeleton) {
+        groupStatusSkeleton.style.display = "";
     }
 }
 
@@ -1622,6 +1683,7 @@ async function loadGroup() {
 
 
     showLoading();
+   showGroupHeaderSkeleton();
 
 
     const cached =
@@ -1937,8 +1999,11 @@ function setupGroupListener() {
 function renderGroup() {
 
     if (!currentGroup) {
+        showGroupHeaderSkeleton();
         return;
     }
+
+    hideGroupHeaderSkeleton();
 
 
     const name =
@@ -2260,25 +2325,30 @@ function loadCachedMessages() {
 
 
     if (
-        Array.isArray(cached) &&
-        cached.length
+        !Array.isArray(cached) ||
+        !cached.length
     ) {
-
-        messages =
-            cached
-                .sort(
-                    (a, b) =>
-                        getTimestampMillis(
-                            a.createdAt
-                        ) -
-                        getTimestampMillis(
-                            b.createdAt
-                        )
-                );
-
-
-        renderMessages();
+        return false;
     }
+
+
+    messages =
+        cached
+            .slice()
+            .sort(
+                (a, b) =>
+                    getTimestampMillis(
+                        a.createdAt
+                    ) -
+                    getTimestampMillis(
+                        b.createdAt
+                    )
+            );
+
+
+    renderMessages();
+
+    return true;
 }
 
 
