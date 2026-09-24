@@ -4393,9 +4393,8 @@ async function loadGroupMembers() {
     );
 
 
-    return members;
-   }
-
+   return members;
+}
 /* =========================================================
    MEMBERS MODAL
 ========================================================= */
