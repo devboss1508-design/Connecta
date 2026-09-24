@@ -5654,13 +5654,26 @@ async function initializeDashboard() {
 
         /*
          * -------------------------------------------------
+         * SHOW SKELETON IMMEDIATELY
+         * -------------------------------------------------
+         *
+         * Do this BEFORE waiting for Firebase Auth.
+         * This prevents the raw HTML dashboard from being
+         * visible while authentication is resolving.
+         */
+
+        showDashboardSkeleton();
+
+
+        /*
+         * -------------------------------------------------
          * AUTHENTICATION
          * -------------------------------------------------
          */
 
         const session =
             await getCurrentConnectaUser({
-
+               
                 redirect: true,
 
                 allowBlocked: true
@@ -5851,26 +5864,6 @@ async function initializeDashboard() {
          */
 
         renderProfile();
-
-       /*
- * -------------------------------------------------
- * DASHBOARD SKELETON
- * -------------------------------------------------
- *
- * If there is no cached dashboard data yet,
- * show the skeleton while Firebase loads users,
- * chats and groups.
- *
- * If cached data exists, keep showing the cached
- * dashboard instead of flashing the skeleton.
- */
-
-if (!hasDashboardCache) {
-
-    showDashboardSkeleton();
-
-}
-
 
         /*
          * Save the usable initial profile immediately.
