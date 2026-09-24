@@ -973,85 +973,6 @@ function canJoinGroup(group) {
   };
 }
 
-  /* -------------------------------------------------------
-     PUBLIC GROUP
-  ------------------------------------------------------- */
-
-  if (
-    group.type === "public"
-  ) {
-
-    return {
-
-      allowed: true,
-
-      requiresPayment:
-        false
-    };
-  }
-
-
-  /* -------------------------------------------------------
-     PRIVATE GROUP
-  ------------------------------------------------------- */
-
-  if (
-    group.type === "private"
-  ) {
-
-    if (
-      currentProfile?.isVerified !== true
-    ) {
-
-      return {
-
-        allowed: false,
-
-        reason:
-          "Only verified CONNECTA users can join private groups."
-      };
-    }
-
-
-    const fee =
-      Number(
-        group.subscriptionFee || 0
-      );
-
-
-    if (
-      fee <= 0
-    ) {
-
-      return {
-
-        allowed: false,
-
-        reason:
-          "This private group does not have a valid joining fee."
-      };
-    }
-
-
-    return {
-
-      allowed: true,
-
-      requiresPayment:
-        true
-    };
-  }
-
-
-  return {
-
-    allowed: false,
-
-    reason:
-      "Invalid group type."
-  };
-}
-
 
 /* =========================================================
    TIMESTAMP
@@ -3388,6 +3309,34 @@ async function pollVerificationPayment(
    
 /* =========================================================
    PRIVATE GROUP PAYMENT
+   ---------------------------------------------------------
+   FLOW:
+
+   VERIFIED USER
+        ↓
+   JOIN
+        ↓
+   M-PESA PHONE
+        ↓
+   BACKEND JOIN PAYMENT
+        ↓
+   OPTIMAPAY STK PUSH
+        ↓
+   USER ENTERS M-PESA PIN
+        ↓
+   POLL PAYMENT STATUS
+        ↓
+   BACKEND CONFIRMS PAYMENT
+        ↓
+   BACKEND ADDS USER TO GROUP
+        ↓
+   OPEN GROUP CHAT
+
+   IMPORTANT:
+   - Frontend NEVER adds the user to group.members
+     for paid groups.
+   - Membership is granted only by the backend after
+     payment confirmation.
 ========================================================= */
 
 async function startPaidGroupJoin(
@@ -3395,6 +3344,11 @@ async function startPaidGroupJoin(
 ) {
 
   if (!currentUser) {
+
+    showToast(
+      "Please log in first."
+    );
+
     return;
   }
 
@@ -3430,6 +3384,10 @@ async function startPaidGroupJoin(
   }
 
 
+  /*
+   * Private groups require verification.
+   */
+
   if (
     currentProfile?.isVerified !== true
   ) {
@@ -3449,6 +3407,7 @@ async function startPaidGroupJoin(
 
 
   if (
+    !Number.isFinite(fee) ||
     fee <= 0
   ) {
 
@@ -3461,26 +3420,442 @@ async function startPaidGroupJoin(
 
 
   /*
-   * PAYMENT SECURITY
-   *
-   * Do NOT add the user to group.members here.
-   *
-   * Future backend/payment flow must:
-   *
-   * 1. Create payment request
-   * 2. Verify payment
-   * 3. Confirm transaction
-   * 4. Add user to group
-   * 5. Update memberCount
+   * Ask for M-PESA number.
+   */
+
+  const phone =
+    await showMpesaPhoneModal(
+      "Join Private Group",
+      `Enter your M-PESA phone number to pay the KSh ${fee.toLocaleString(
+        "en-KE"
+      )} joining fee for ${group.name || "this group"}.`,
+      fee,
+      "Pay & Join Group"
+    );
+
+
+  if (!phone) {
+    return;
+  }
+
+
+  /*
+   * Prevent accidental duplicate payment attempts
+   * while the request is being processed.
    */
 
   showToast(
-    `Private group joining fee: KSh ${fee.toLocaleString(
-      "en-KE"
-    )}. Payment checkout will open here.`
+    "Starting group payment..."
   );
+
+
+  try {
+
+    /*
+     * Get a fresh Firebase ID token.
+     */
+
+    const token =
+      await currentUser.getIdToken(
+        true
+      );
+
+
+    /*
+     * Start the payment.
+     *
+     * Backend:
+     * POST /api/groups/:groupId/join-payment
+     */
+
+    const initiateResponse =
+      await fetch(
+        `https://connecta-backend-com.onrender.com/api/groups/${encodeURIComponent(
+          group.groupId
+        )}/join-payment`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            "Authorization":
+              `Bearer ${token}`
+          },
+
+          body:
+            JSON.stringify({
+              phone
+            })
+        }
+      );
+
+
+    const initiateData =
+      await initiateResponse
+        .json()
+        .catch(
+          () => ({})
+        );
+
+
+    if (
+      !initiateResponse.ok
+    ) {
+
+      throw new Error(
+        initiateData.message ||
+        initiateData.error ||
+        "Could not start the group payment."
+      );
+    }
+
+
+    /*
+     * The backend creates groupPayments/{paymentId}.
+     */
+
+    const paymentId =
+      initiateData.paymentId ||
+      initiateData.payment_id;
+
+
+    if (!paymentId) {
+
+      throw new Error(
+        "Payment was started, but no payment ID was returned."
+      );
+    }
+
+
+    showToast(
+      "STK Push sent. Enter your M-PESA PIN."
+    );
+
+
+    /*
+     * Poll our backend.
+     *
+     * IMPORTANT:
+     * We do NOT call OptimaPay directly from the browser.
+     *
+     * The backend verifies the payment and grants
+     * membership only after successful confirmation.
+     */
+
+    const result =
+      await pollPaidGroupJoinPayment(
+        group,
+        paymentId,
+        token
+      );
+
+
+    if (
+      !result
+    ) {
+
+      return;
+    }
+
+
+    /*
+     * Payment has been confirmed and the backend
+     * has already added the user to the group.
+     */
+
+    showToast(
+      "Payment confirmed. You joined the group!"
+    );
+
+
+    /*
+     * Give Firestore listener a moment to receive
+     * the updated group membership.
+     */
+
+    setTimeout(
+      () => {
+
+        location.href =
+          `group-chat.html?groupId=${encodeURIComponent(
+            group.groupId
+          )}`;
+
+      },
+      500
+    );
+
+
+  } catch (error) {
+
+    console.error(
+      "Private group payment error:",
+      error
+    );
+
+
+    showToast(
+      error.message ||
+      "Could not start the group payment."
+    );
+  }
 }
 
+
+/* =========================================================
+   POLL PRIVATE GROUP PAYMENT
+   ---------------------------------------------------------
+   Backend endpoint:
+
+   POST
+   /api/groups/:groupId/join-payment/status
+
+   Body:
+
+   {
+     paymentId
+   }
+
+   The backend is responsible for:
+   - Checking OptimaPay
+   - Confirming payment
+   - Adding the user to the group
+   - Updating memberCount
+   - Marking groupPayments completed
+========================================================= */
+
+async function pollPaidGroupJoinPayment(
+  group,
+  paymentId,
+  token
+) {
+
+  const maxAttempts =
+    30;
+
+
+  /*
+   * 2 seconds × 30 attempts
+   * = approximately 60 seconds.
+   */
+
+  const delay =
+    2000;
+
+
+  for (
+    let attempt = 0;
+    attempt < maxAttempts;
+    attempt++
+  ) {
+
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          delay
+        )
+    );
+
+
+    try {
+
+      const response =
+        await fetch(
+          `https://connecta-backend-com.onrender.com/api/groups/${encodeURIComponent(
+            group.groupId
+          )}/join-payment/status`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              "Authorization":
+                `Bearer ${token}`
+            },
+
+            body:
+              JSON.stringify({
+                paymentId
+              })
+          }
+        );
+
+
+      const data =
+        await response
+          .json()
+          .catch(
+            () => ({})
+          );
+
+
+      /*
+       * Backend errors.
+       */
+
+      if (!response.ok) {
+
+        throw new Error(
+          data.message ||
+          data.error ||
+          "Could not check group payment status."
+        );
+      }
+
+
+      const status =
+        String(
+          data.status ||
+          data.payment_status ||
+          ""
+        )
+          .trim()
+          .toLowerCase();
+
+
+      /*
+       * SUCCESS
+       *
+       * The backend should only return completed
+       * after membership has been granted.
+       */
+
+      if (
+        [
+          "completed",
+          "success",
+          "successful",
+          "paid"
+        ].includes(
+          status
+        )
+      ) {
+
+        return true;
+      }
+
+
+      /*
+       * Some backends return a direct success
+       * flag as well.
+       */
+
+      if (
+        data.success === true &&
+        (
+          data.joined === true ||
+          data.membershipAdded === true ||
+          data.completed === true
+        )
+      ) {
+
+        return true;
+      }
+
+
+      /*
+       * PAYMENT FAILED / CANCELLED
+       */
+
+      if (
+        [
+          "failed",
+          "cancelled",
+          "canceled",
+          "rejected",
+          "expired",
+          "timeout"
+        ].includes(
+          status
+        )
+      ) {
+
+        showToast(
+          "Group payment was not completed."
+        );
+
+        return false;
+      }
+
+
+      /*
+       * Still pending.
+       */
+
+      if (
+        attempt ===
+        4
+      ) {
+
+        showToast(
+          "Waiting for M-PESA payment confirmation..."
+        );
+      }
+
+
+      if (
+        attempt ===
+        14
+      ) {
+
+        showToast(
+          "Still checking your payment..."
+        );
+      }
+
+
+      /*
+       * Last attempt.
+       */
+
+      if (
+        attempt ===
+        maxAttempts - 1
+      ) {
+
+        showToast(
+          "Payment confirmation is taking longer than expected. Please check again shortly."
+        );
+
+        return false;
+      }
+
+    } catch (error) {
+
+      console.error(
+        "Group payment status error:",
+        error
+      );
+
+
+      /*
+       * Do not immediately fail because of one
+       * temporary network request error.
+       */
+
+      if (
+        attempt ===
+        maxAttempts - 1
+      ) {
+
+        showToast(
+          error.message ||
+          "Could not confirm the group payment."
+        );
+
+        return false;
+      }
+    }
+  }
+
+
+  return false;
+}
 
 /* =========================================================
    ONE GROUP UNREAD COUNT
