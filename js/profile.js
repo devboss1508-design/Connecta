@@ -3318,6 +3318,148 @@ function setVerificationMessage(
         `verification-message ${type}`.trim();
 }
 
+/* =========================================================
+   RESET VERIFICATION STATE
+   Used when payment fails, expires, is cancelled,
+   or confirmation times out.
+========================================================= */
+
+async function resetVerificationState(
+    reason = ""
+) {
+
+    if (!currentUser?.uid) {
+        return false;
+    }
+
+
+    const resetData = {
+
+        isVerified:
+            false,
+
+        verificationStatus:
+            "not_submitted",
+
+        verificationAmount:
+            0,
+
+        verificationTransactionCode:
+            "",
+
+        verifiedAt:
+            null
+
+    };
+
+
+    try {
+
+        await updateDoc(
+
+            doc(
+                db,
+                "users",
+                currentUser.uid
+            ),
+
+            resetData
+
+        );
+
+
+        /* =============================================
+           UPDATE CURRENT PROFILE
+        ============================================= */
+
+        if (viewedUser) {
+
+            Object.assign(
+                viewedUser,
+                resetData
+            );
+        }
+
+
+        /* =============================================
+           UPDATE LOCAL CACHE
+        ============================================= */
+
+        const cached =
+            getOwnProfileCache();
+
+
+        if (cached) {
+
+            Object.assign(
+                cached,
+                resetData
+            );
+
+
+            cached.cachedAt =
+                Date.now();
+
+
+            localStorage.setItem(
+                OWN_PROFILE_CACHE_KEY,
+                JSON.stringify(cached)
+            );
+        }
+
+
+        /* =============================================
+           REFRESH PROFILE UI
+        ============================================= */
+
+        if (viewedUser) {
+
+            renderProfile(
+                viewedUser
+            );
+        }
+
+
+        console.log(
+            "CONNECTA verification state reset:",
+            reason
+        );
+
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+            "Unable to reset verification state:",
+            error
+        );
+
+
+        /*
+         * Even if Firestore reset fails,
+         * restore the local UI so the user
+         * can try again.
+         */
+
+        if (viewedUser) {
+
+            Object.assign(
+                viewedUser,
+                resetData
+            );
+
+
+            renderProfile(
+                viewedUser
+            );
+        }
+
+
+        return false;
+    }
+}
+
 
 /* =========================================================
    START VERIFICATION
@@ -3373,6 +3515,26 @@ async function startVerification() {
 
         return;
     }
+
+
+    /*
+     * Stop an old polling session before
+     * starting another verification attempt.
+     */
+
+    if (verificationPollTimer) {
+
+        clearInterval(
+            verificationPollTimer
+        );
+
+        verificationPollTimer =
+            null;
+    }
+
+
+    verificationPolling =
+        false;
 
 
     submitButton.disabled =
@@ -3461,32 +3623,35 @@ async function startVerification() {
             "Waiting for payment...";
 
 
-        if (
-            data.reference
-        ) {
+        const reference =
+            data.reference ||
+            data.checkout_request_id;
 
-            startVerificationPolling(
-                data.reference
+
+        if (!reference) {
+
+            /*
+             * Payment was supposedly initiated,
+             * but no reference came back.
+             *
+             * Do NOT leave the account pending.
+             */
+
+            await resetVerificationState(
+                "No verification payment reference returned"
             );
 
-        }
-
-        else if (
-            data.checkout_request_id
-        ) {
-
-            startVerificationPolling(
-                data.checkout_request_id
-            );
-
-        }
-
-        else {
 
             throw new Error(
-                "Payment started but no payment reference was returned."
+                "Payment started but no payment reference was returned. You can try again."
             );
         }
+
+
+        startVerificationPolling(
+            reference
+        );
+
 
     } catch (error) {
 
@@ -3496,9 +3661,20 @@ async function startVerification() {
         );
 
 
+        /*
+         * IMPORTANT:
+         * Reset Firestore pending state so the
+         * profile does not remain stuck.
+         */
+
+        await resetVerificationState(
+            "Verification initiation failed"
+        );
+
+
         setVerificationMessage(
             error.message ||
-            "Unable to start verification payment.",
+            "Unable to start verification payment. Please try again.",
             "error"
         );
 
@@ -3580,6 +3756,10 @@ function startVerificationPolling(
                     }
 
 
+                    /*
+                     * Payment has not completed yet.
+                     */
+
                     if (
                         attempts >=
                         maxAttempts
@@ -3598,6 +3778,18 @@ function startVerificationPolling(
                             false;
 
 
+                        /*
+                         * IMPORTANT:
+                         * No response after the maximum
+                         * polling period means we must
+                         * release the pending state.
+                         */
+
+                        await resetVerificationState(
+                            "Verification payment confirmation timed out"
+                        );
+
+
                         const button =
                             $("verificationSubmit");
 
@@ -3614,9 +3806,10 @@ function startVerificationPolling(
 
 
                         setVerificationMessage(
-                            "Payment confirmation is taking longer than expected. Please check your profile again shortly.",
-                            "pending"
+                            "No payment confirmation was received. Your account is ready for another verification attempt.",
+                            "error"
                         );
+
                     }
 
                 } catch (error) {
@@ -3627,6 +3820,13 @@ function startVerificationPolling(
                     );
 
 
+                    /*
+                     * Do not immediately cancel because
+                     * one status request failed.
+                     *
+                     * Keep polling until maxAttempts.
+                     */
+
                     if (
                         attempts >=
                         maxAttempts
@@ -3645,6 +3845,11 @@ function startVerificationPolling(
                             false;
 
 
+                        await resetVerificationState(
+                            "Verification status checking timed out"
+                        );
+
+
                         const button =
                             $("verificationSubmit");
 
@@ -3661,8 +3866,8 @@ function startVerificationPolling(
 
 
                         setVerificationMessage(
-                            "Payment confirmation is taking longer than expected. Please check your profile again shortly.",
-                            "pending"
+                            "We could not confirm the payment. Your account is ready for another verification attempt.",
+                            "error"
                         );
                     }
                 }
@@ -3672,7 +3877,7 @@ function startVerificationPolling(
             3000
         );
 }
-
+    
 
 /* =========================================================
    CHECK VERIFICATION STATUS
@@ -3733,11 +3938,17 @@ async function checkVerificationStatus(
     }
 
 
+    /* =====================================================
+       SUCCESS
+    ===================================================== */
+
     if (
         data.success === true &&
         (
             data.status === "completed" ||
-            data.status === "verified"
+            data.status === "verified" ||
+            data.status === "successful" ||
+            data.status === "paid"
         )
     ) {
 
@@ -3781,14 +3992,44 @@ async function checkVerificationStatus(
     }
 
 
+    /* =====================================================
+       FAILED / CANCELLED / REJECTED / EXPIRED
+    ===================================================== */
+
+    const failedStatuses = [
+
+        "failed",
+
+        "cancelled",
+
+        "canceled",
+
+        "rejected",
+
+        "expired",
+
+        "timeout",
+
+        "declined"
+
+    ];
+
+
     if (
-        data.status === "failed"
+        failedStatuses.includes(
+            String(
+                data.status || ""
+            ).toLowerCase()
+        )
     ) {
 
-        setVerificationMessage(
-            data.message ||
-            "The verification payment failed. Please try again.",
-            "error"
+        /*
+         * CRITICAL:
+         * Remove payment_pending from Firestore.
+         */
+
+        await resetVerificationState(
+            `Verification payment ${data.status || "failed"}`
         );
 
 
@@ -3807,9 +4048,20 @@ async function checkVerificationStatus(
         }
 
 
+        setVerificationMessage(
+            data.message ||
+            "The verification payment was not completed. You can try again.",
+            "error"
+        );
+
+
         return true;
     }
 
+
+    /* =====================================================
+       STILL PROCESSING
+    ===================================================== */
 
     setVerificationMessage(
         "Waiting for M-PESA payment confirmation...",
