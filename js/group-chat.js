@@ -5088,13 +5088,16 @@ async function saveMessagingMode() {
         );
 
 
-        currentGroup = {
+               currentGroup = {
 
-            ...currentGroup,
+                  ...currentGroup,
 
-            announcementOnly:
-                adminOnly
-        };
+                   announcementOnly:
+                      adminOnly,
+
+                updatedAt:
+                    new Date()
+             };
 
 
         groupControl =
@@ -6959,6 +6962,25 @@ function cleanup() {
         );
 
         ownerPreviewURL = "";
+    }
+
+
+        /*
+     * Remove dynamically created owner modals.
+     */
+    if (membersModal) {
+
+        membersModal.remove();
+
+        membersModal = null;
+    }
+
+
+    if (messagingModal) {
+
+        messagingModal.remove();
+
+        messagingModal = null;
     }
 
 
