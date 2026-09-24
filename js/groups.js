@@ -62,7 +62,8 @@ import {
   query,
   where,
   serverTimestamp,
-  runTransaction
+  runTransaction,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 
@@ -2415,6 +2416,11 @@ async function startPrivateGroupVerification(
 ) {
 
   if (!currentUser) {
+
+    showToast(
+      "Please log in first."
+    );
+
     return;
   }
 
@@ -2444,12 +2450,23 @@ async function startPrivateGroupVerification(
   }
 
 
+  /*
+   * =======================================================
+   * SHOW PROCESSING MODAL IMMEDIATELY
+   * =======================================================
+   */
+
+  showPaymentProcessingModal(
+    "Starting Verification",
+    "We're initiating your KSh 999 verification payment..."
+  );
+
+
   try {
 
-    showToast(
-      "Sending verification STK Push..."
-    );
-
+    /*
+     * Get a fresh Firebase ID token.
+     */
 
     const firebaseUser =
       currentUser;
@@ -2460,6 +2477,21 @@ async function startPrivateGroupVerification(
         true
       );
 
+
+    /*
+     * Tell the user what is happening.
+     */
+
+    updatePaymentProcessingMessage(
+      "Connecting to the payment gateway..."
+    );
+
+
+    /*
+     * =====================================================
+     * INITIATE VERIFICATION PAYMENT
+     * =====================================================
+     */
 
     const response =
       await fetch(
@@ -2484,7 +2516,8 @@ async function startPrivateGroupVerification(
 
 
     const data =
-      await response.json()
+      await response
+        .json()
         .catch(
           () => ({})
         );
@@ -2521,10 +2554,41 @@ async function startPrivateGroupVerification(
     }
 
 
-    showToast(
-      "STK Push sent. Enter your M-PESA PIN."
+    /*
+     * =====================================================
+     * STK PUSH SENT
+     * =====================================================
+     */
+
+    updatePaymentProcessingMessage(
+      "STK Push sent. Check your phone and enter your M-PESA PIN."
     );
 
+
+    /*
+     * Give the user a short moment to see the message
+     * before status polling begins.
+     */
+
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          800
+        )
+    );
+
+
+    updatePaymentProcessingMessage(
+      "Waiting for M-PESA payment confirmation..."
+    );
+
+
+    /*
+     * =====================================================
+     * POLL PAYMENT
+     * =====================================================
+     */
 
     const paid =
       await pollVerificationPayment(
@@ -2533,27 +2597,142 @@ async function startPrivateGroupVerification(
       );
 
 
+    /*
+     * =====================================================
+     * PAYMENT FAILED / CANCELLED / TIMEOUT
+     * =====================================================
+     */
+
     if (!paid) {
+
+      closePaymentProcessingModal();
+
+
+      /*
+       * IMPORTANT:
+       *
+       * Return the user's verification profile to
+       * normal so they can try again.
+       */
+
+      await resetVerificationState(
+        "Verification payment was not completed or could not be confirmed."
+      );
+
+
+      showToast(
+        "Verification was not completed. You can try again."
+      );
+
+
+      /*
+       * Re-render groups so the private-group button
+       * changes from "Verification Pending..." / pending
+       * back to "Verify".
+       */
+
+      refreshGroupRenders();
+
 
       return;
     }
 
 
-    showToast(
-      "Account verified successfully."
+    /*
+     * =====================================================
+     * VERIFICATION SUCCESS
+     * =====================================================
+     */
+
+    updatePaymentProcessingMessage(
+      "Payment confirmed! Verifying your CONNECTA account..."
     );
 
-
-    /*
-     * Refresh the current user's profile.
-     */
 
     await refreshCurrentGroupProfile();
 
 
     /*
-     * If the group requires a joining fee,
-     * continue directly to the group payment.
+     * Make sure the profile really became verified.
+     */
+
+    if (
+      currentProfile?.isVerified !== true
+    ) {
+
+      closePaymentProcessingModal();
+
+
+      await resetVerificationState(
+        "Payment completed but verification was not reflected in the profile."
+      );
+
+
+      showToast(
+        "Payment was received, but verification could not be confirmed. Please try again."
+      );
+
+
+      return;
+    }
+
+
+    /*
+     * Success UI.
+     */
+
+    updatePaymentProcessingMessage(
+      "Verification successful! Your account is now verified."
+    );
+
+
+    const processingModal =
+      document.getElementById(
+        "connectaPaymentProcessingModal"
+      );
+
+
+    const spinner =
+      processingModal?.querySelector(
+        "div > div"
+      );
+
+
+    if (spinner) {
+
+      spinner.style.animation =
+        "none";
+
+      spinner.style.border =
+        "4px solid #22c55e";
+
+      spinner.innerHTML =
+        "✓";
+
+      spinner.style.color =
+        "#22c55e";
+
+      spinner.style.fontWeight =
+        "900";
+
+      spinner.style.fontSize =
+        "22px";
+
+      spinner.style.display =
+        "flex";
+
+      spinner.style.alignItems =
+        "center";
+
+      spinner.style.justifyContent =
+        "center";
+    }
+
+
+    /*
+     * =====================================================
+     * CONTINUE TO PRIVATE GROUP PAYMENT
+     * =====================================================
      */
 
     const fee =
@@ -2567,14 +2746,16 @@ async function startPrivateGroupVerification(
     ) {
 
       setTimeout(
-        () => {
+        async () => {
 
-          startPaidGroupJoin(
+          closePaymentProcessingModal();
+
+          await startPaidGroupJoin(
             group
           );
 
         },
-        500
+        1200
       );
 
       return;
@@ -2582,11 +2763,22 @@ async function startPrivateGroupVerification(
 
 
     /*
-     * Verified private group with no fee.
+     * =====================================================
+     * VERIFIED PRIVATE GROUP WITH NO FEE
+     * =====================================================
      */
 
-    await joinFreeGroup(
-      group
+    setTimeout(
+      async () => {
+
+        closePaymentProcessingModal();
+
+        await joinFreeGroup(
+          group
+        );
+
+      },
+      1200
     );
 
 
@@ -2598,9 +2790,23 @@ async function startPrivateGroupVerification(
     );
 
 
+    closePaymentProcessingModal();
+
+
+    /*
+     * If initiation itself failed, make sure the
+     * account is not left in a pending state.
+     */
+
+    await resetVerificationState(
+      error.message ||
+      "Verification initiation failed."
+    );
+
+
     showToast(
       error.message ||
-      "Verification payment could not be completed."
+      "Verification payment could not be completed. You can try again."
     );
   }
 }
@@ -3174,7 +3380,162 @@ async function refreshCurrentGroupProfile() {
 
 
 /* =========================================================
+   RESET VERIFICATION STATE
+   ---------------------------------------------------------
+   If verification fails, is cancelled, expires, or cannot
+   be confirmed, return the account to a normal state so
+   the user can start verification again.
+========================================================= */
+
+async function resetVerificationState(
+  reason = ""
+) {
+
+  if (!currentUser) {
+    return;
+  }
+
+  try {
+
+    const userRef =
+      doc(
+        db,
+        "users",
+        currentUser.uid
+      );
+
+    /*
+     * Reset the verification fields.
+     *
+     * Keep isVerified false.
+     * The user must successfully complete payment
+     * before becoming verified.
+     */
+
+    await updateDoc(
+      userRef,
+      {
+        isVerified: false,
+
+        verificationStatus:
+          "not_submitted",
+
+        verificationAmount:
+          0,
+
+        verificationTransactionCode:
+          "",
+
+        verifiedAt:
+          null
+      }
+    );
+
+
+    /*
+     * Immediately update the local profile too.
+     * This prevents the UI from continuing to show
+     * "Verification Pending..." while Firestore
+     * realtime data catches up.
+     */
+
+    currentProfile = {
+
+      ...(currentProfile || {}),
+
+      uid:
+        currentUser.uid,
+
+      isVerified:
+        false,
+
+      verificationStatus:
+        "not_submitted",
+
+      verificationAmount:
+        0,
+
+      verificationTransactionCode:
+        "",
+
+      verifiedAt:
+        null
+    };
+
+
+    renderHeaderProfile(
+      currentProfile
+    );
+
+
+    applyGroupAccountControl();
+
+
+    console.log(
+      "CONNECTA verification state reset:",
+      reason
+    );
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      "Could not reset verification state:",
+      error
+    );
+
+    /*
+     * Even if Firestore reset fails, make the local
+     * profile normal so the current screen does not
+     * remain visually stuck.
+     */
+
+    currentProfile = {
+
+      ...(currentProfile || {}),
+
+      uid:
+        currentUser.uid,
+
+      isVerified:
+        false,
+
+      verificationStatus:
+        "not_submitted",
+
+      verificationAmount:
+        0,
+
+      verificationTransactionCode:
+        "",
+
+      verifiedAt:
+        null
+    };
+
+
+    renderHeaderProfile(
+      currentProfile
+    );
+
+
+    applyGroupAccountControl();
+
+
+    return false;
+  }
+}
+
+/* =========================================================
    VERIFICATION PAYMENT POLLING
+   ---------------------------------------------------------
+   The processing modal remains visible while payment
+   confirmation is being checked.
+
+   FAILED / CANCELLED / EXPIRED / TIMEOUT
+   → returns false
+   → caller resets verification state
 ========================================================= */
 
 async function pollVerificationPayment(
@@ -3195,6 +3556,10 @@ async function pollVerificationPayment(
     attempt < maxAttempts;
     attempt++
   ) {
+
+    /*
+     * Wait before checking status.
+     */
 
     await new Promise(
       resolve =>
@@ -3231,7 +3596,8 @@ async function pollVerificationPayment(
 
 
       const data =
-        await response.json()
+        await response
+          .json()
           .catch(
             () => ({})
           );
@@ -3253,8 +3619,15 @@ async function pollVerificationPayment(
           data.payment_status ||
           ""
         )
+          .trim()
           .toLowerCase();
 
+
+      /*
+       * ===================================================
+       * PAYMENT SUCCESS
+       * ===================================================
+       */
 
       if (
         [
@@ -3267,9 +3640,20 @@ async function pollVerificationPayment(
         )
       ) {
 
+        updatePaymentProcessingMessage(
+          "Payment confirmed. Completing verification..."
+        );
+
+
         return true;
       }
 
+
+      /*
+       * ===================================================
+       * PAYMENT FAILED
+       * ===================================================
+       */
 
       if (
         [
@@ -3277,29 +3661,85 @@ async function pollVerificationPayment(
           "cancelled",
           "canceled",
           "rejected",
-          "timeout",
-          "expired"
+          "expired",
+          "timeout"
         ].includes(
           status
         )
       ) {
 
-        showToast(
-          "Verification payment was not completed."
+        updatePaymentProcessingMessage(
+          "The verification payment was not completed."
         );
+
+
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              1000
+            )
+        );
+
 
         return false;
       }
 
+
+      /*
+       * ===================================================
+       * UPDATE PROCESSING MESSAGE
+       * ===================================================
+       */
+
+      if (
+        attempt < 5
+      ) {
+
+        updatePaymentProcessingMessage(
+          "Waiting for M-PESA payment confirmation..."
+        );
+
+      } else if (
+        attempt < 15
+      ) {
+
+        updatePaymentProcessingMessage(
+          "Still waiting for M-PESA confirmation..."
+        );
+
+      } else {
+
+        updatePaymentProcessingMessage(
+          "M-PESA is taking a little longer. Please wait..."
+        );
+      }
+
+
+      /*
+       * ===================================================
+       * LAST ATTEMPT / NO RESPONSE
+       * ===================================================
+       */
 
       if (
         attempt ===
         maxAttempts - 1
       ) {
 
-        showToast(
-          "Payment is taking longer than expected. Please check your verification status."
+        updatePaymentProcessingMessage(
+          "We couldn't confirm the payment. You can try verification again."
         );
+
+
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              1200
+            )
+        );
+
 
         return false;
       }
@@ -3312,15 +3752,38 @@ async function pollVerificationPayment(
       );
 
 
+      /*
+       * Do NOT immediately fail on a temporary network
+       * problem. Continue polling.
+       */
+
+      updatePaymentProcessingMessage(
+        "We're checking your payment. Please wait..."
+      );
+
+
+      /*
+       * Only stop after the final attempt.
+       */
+
       if (
         attempt ===
         maxAttempts - 1
       ) {
 
-        showToast(
-          error.message ||
-          "Could not confirm verification payment."
+        updatePaymentProcessingMessage(
+          "We couldn't confirm the payment. You can try again."
         );
+
+
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              1200
+            )
+        );
+
 
         return false;
       }
@@ -3448,8 +3911,8 @@ function showPaymentProcessingModal(
         "
       >
         Please complete the M-PESA payment on your phone.
-        <br>
-        <strong>Do not close this page.</strong>
+      <br>
+     <strong>Keep this page open while we confirm your payment.</strong>
       </div>
 
     </div>
