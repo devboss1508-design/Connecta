@@ -110,6 +110,9 @@ let isSavingGroup = false;
 let isDeletingMessage = false;
 let isDeletingGroup = false;
 
+let isUpdatingMessagingMode = false;
+let isLoadingMembers = false;
+
 let typingTimer = null;
 
 let selectedMessageId = "";
@@ -291,6 +294,13 @@ const confirmDeleteMessage =
 
 const deleteModeBar =
     document.getElementById("deleteModeBar");
+
+/* =========================================================
+   OWNER EXTRA CONTROLS
+========================================================= */
+
+let membersModal = null;
+let messagingModal = null;
 
 const deleteModeText =
     document.getElementById("deleteModeText");
@@ -4119,6 +4129,10 @@ function updateOwnerControls() {
 
             ownerMenu.style.display =
                 "none";
+
+        } else {
+
+            ensureOwnerExtraControls();
         }
     }
 
@@ -4143,6 +4157,993 @@ function updateOwnerControls() {
     }
 }
 
+
+/* =========================================================
+   OWNER EXTRA CONTROLS UI
+========================================================= */
+
+function ensureOwnerExtraControls() {
+
+    if (!isGroupOwner()) {
+        return;
+    }
+
+    /*
+     * Add View Members button.
+     */
+    if (
+        ownerMenu &&
+        !document.getElementById(
+            "viewGroupMembersBtn"
+        )
+    ) {
+
+        const button =
+            document.createElement("button");
+
+        button.id =
+            "viewGroupMembersBtn";
+
+        button.type =
+            "button";
+
+        button.className =
+            "owner-menu-item";
+
+        button.innerHTML = `
+            <span>👥</span>
+            <span>View Members</span>
+        `;
+
+        button.addEventListener(
+            "click",
+            openMembersModal
+        );
+
+        ownerMenu.appendChild(button);
+    }
+
+
+    /*
+     * Add messaging permissions button.
+     */
+    if (
+        ownerMenu &&
+        !document.getElementById(
+            "groupMessagingSettingsBtn"
+        )
+    ) {
+
+        const button =
+            document.createElement("button");
+
+        button.id =
+            "groupMessagingSettingsBtn";
+
+        button.type =
+            "button";
+
+        button.className =
+            "owner-menu-item";
+
+        button.innerHTML = `
+            <span>🔒</span>
+            <span>Messaging Permissions</span>
+        `;
+
+        button.addEventListener(
+            "click",
+            openMessagingSettings
+        );
+
+        ownerMenu.appendChild(button);
+    }
+}
+
+/* =========================================================
+   GROUP MEMBERS
+========================================================= */
+
+async function loadGroupMembers() {
+
+    if (
+        !currentGroup ||
+        !isGroupOwner()
+    ) {
+        return [];
+    }
+
+
+    const memberIds = [
+        ...new Set([
+            ...(Array.isArray(
+                currentGroup.memberIds
+            )
+                ? currentGroup.memberIds
+                : []),
+
+            ...(Array.isArray(
+                currentGroup.members
+            )
+                ? currentGroup.members
+                : []),
+
+            currentGroup.ownerId
+        ].filter(Boolean))
+    ];
+
+
+    if (!memberIds.length) {
+        return [];
+    }
+
+
+    const members = [];
+
+
+    for (
+        const uid of memberIds
+    ) {
+
+        try {
+
+            const snapshot =
+                await getDoc(
+                    doc(
+                        db,
+                        "users",
+                        uid
+                    )
+                );
+
+
+            if (!snapshot.exists()) {
+                continue;
+            }
+
+
+            const data =
+                snapshot.data();
+
+
+            members.push({
+
+                uid,
+
+                displayName:
+                    data.displayName ||
+                    [
+                        data.firstName,
+                        data.lastName
+                    ]
+                        .filter(Boolean)
+                        .join(" ") ||
+                    "CONNECTA User",
+
+                username:
+                    data.username ||
+                    "",
+
+                photoURL:
+                    data.photoURL ||
+                    "",
+
+                isOnline:
+                    data.isOnline === true,
+
+                isVerified:
+                    data.isVerified === true,
+
+                isOwner:
+                    String(uid) ===
+                    String(
+                        currentGroup.ownerId
+                    )
+            });
+
+        } catch (error) {
+
+            console.warn(
+                "Could not load group member:",
+                uid,
+                error
+            );
+        }
+    }
+
+
+    /*
+     * Owner first.
+     */
+    members.sort(
+        (a, b) => {
+
+            if (
+                a.isOwner &&
+                !b.isOwner
+            ) {
+                return -1;
+            }
+
+            if (
+                !a.isOwner &&
+                b.isOwner
+            ) {
+                return 1;
+            }
+
+            if (
+                a.isOnline &&
+                !b.isOnline
+            ) {
+                return -1;
+            }
+
+            if (
+                !a.isOnline &&
+                b.isOnline
+            ) {
+                return 1;
+            }
+
+            return a.displayName.localeCompare(
+                b.displayName
+            );
+        }
+    );
+
+
+    return members;
+   }
+
+/* =========================================================
+   MEMBERS MODAL
+========================================================= */
+
+function createMembersModal() {
+
+    if (membersModal) {
+        return membersModal;
+    }
+
+
+    membersModal =
+        document.createElement("div");
+
+    membersModal.id =
+        "connectaMembersModal";
+
+    membersModal.className =
+        "connecta-owner-modal";
+
+    membersModal.innerHTML = `
+
+        <div class="connecta-owner-modal-card">
+
+            <div class="connecta-owner-modal-header">
+
+                <div>
+                    <h3>Group Members</h3>
+                    <p id="membersModalCount">
+                        Loading members...
+                    </p>
+                </div>
+
+                <button
+                    type="button"
+                    id="closeMembersModal"
+                    class="connecta-modal-close"
+                >
+                    ×
+                </button>
+
+            </div>
+
+            <div
+                id="membersModalList"
+                class="connecta-members-list"
+            >
+                <div
+                    class="connecta-members-loading"
+                >
+                    Loading members...
+                </div>
+            </div>
+
+        </div>
+    `;
+
+
+    document.body.appendChild(
+        membersModal
+    );
+
+
+    document
+        .getElementById(
+            "closeMembersModal"
+        )
+        ?.addEventListener(
+            "click",
+            closeMembersModal
+        );
+
+
+    membersModal.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target ===
+                membersModal
+            ) {
+
+                closeMembersModal();
+            }
+        }
+    );
+
+
+    return membersModal;
+}
+
+
+async function openMembersModal() {
+
+    if (!isGroupOwner()) {
+
+        showToast(
+            "Only the group owner can view group members."
+        );
+
+        return;
+    }
+
+
+    closeOwnerMenu();
+
+
+    createMembersModal();
+
+
+    membersModal.classList.add(
+        "open"
+    );
+
+
+    const list =
+        document.getElementById(
+            "membersModalList"
+        );
+
+    const count =
+        document.getElementById(
+            "membersModalCount"
+        );
+
+
+    if (list) {
+
+        list.innerHTML = `
+            <div
+                class="connecta-members-loading"
+            >
+                Loading members...
+            </div>
+        `;
+    }
+
+
+    isLoadingMembers = true;
+
+
+    try {
+
+        const members =
+            await loadGroupMembers();
+
+
+        if (count) {
+
+            count.textContent =
+                `${members.length} ${
+                    members.length === 1
+                        ? "member"
+                        : "members"
+                }`;
+        }
+
+
+        if (!list) {
+            return;
+        }
+
+
+        if (!members.length) {
+
+            list.innerHTML = `
+                <div
+                    class="connecta-members-empty"
+                >
+                    No members found.
+                </div>
+            `;
+
+            return;
+        }
+
+
+        list.innerHTML =
+            members
+                .map(
+                    member => `
+
+                        <div
+                            class="connecta-member-row"
+                        >
+
+                            <div
+                                class="connecta-member-avatar"
+                            >
+
+                                ${
+                                    member.photoURL
+                                        ? `
+                                            <img
+                                                src="${escapeAttribute(
+                                                    member.photoURL
+                                                )}"
+                                                alt=""
+                                            >
+                                        `
+                                        : `
+                                            ${escapeHTML(
+                                                getInitials(
+                                                    member.displayName
+                                                )
+                                            )}
+                                        `
+                                }
+
+                                <span
+                                    class="
+                                        connecta-member-online
+                                        ${
+                                            member.isOnline
+                                                ? "online"
+                                                : ""
+                                        }
+                                    "
+                                ></span>
+
+                            </div>
+
+
+                            <div
+                                class="connecta-member-details"
+                            >
+
+                                <div
+                                    class="connecta-member-name"
+                                >
+
+                                    ${escapeHTML(
+                                        member.displayName
+                                    )}
+
+                                    ${
+                                        member.isVerified
+                                            ? `
+                                                <span
+                                                    class="connecta-member-verified"
+                                                    title="Verified"
+                                                >
+                                                    ✓
+                                                </span>
+                                            `
+                                            : ""
+                                    }
+
+                                    ${
+                                        member.isOwner
+                                            ? `
+                                                <span
+                                                    class="connecta-member-owner"
+                                                >
+                                                    OWNER
+                                                </span>
+                                            `
+                                            : ""
+                                    }
+
+                                </div>
+
+
+                                ${
+                                    member.username
+                                        ? `
+                                            <div
+                                                class="connecta-member-username"
+                                            >
+                                                @${escapeHTML(
+                                                    member.username
+                                                )}
+                                            </div>
+                                        `
+                                        : ""
+                                }
+
+
+                                <div
+                                    class="connecta-member-status"
+                                >
+                                    ${
+                                        member.isOnline
+                                            ? "Online"
+                                            : "Offline"
+                                    }
+                                </div>
+
+                            </div>
+
+                        </div>
+                    `
+                )
+                .join("");
+
+    } catch (error) {
+
+        console.error(
+            "Load group members error:",
+            error
+        );
+
+
+        if (list) {
+
+            list.innerHTML = `
+                <div
+                    class="connecta-members-empty"
+                >
+                    Could not load members.
+                </div>
+            `;
+        }
+
+    } finally {
+
+        isLoadingMembers = false;
+    }
+}
+
+
+function closeMembersModal() {
+
+    if (!membersModal) {
+        return;
+    }
+
+
+    membersModal.classList.remove(
+        "open"
+    );
+}
+
+/* =========================================================
+   MESSAGING PERMISSIONS
+========================================================= */
+
+function createMessagingModal() {
+
+    if (messagingModal) {
+        return messagingModal;
+    }
+
+
+    messagingModal =
+        document.createElement("div");
+
+    messagingModal.id =
+        "connectaMessagingModal";
+
+    messagingModal.className =
+        "connecta-owner-modal";
+
+    messagingModal.innerHTML = `
+
+        <div
+            class="connecta-owner-modal-card"
+        >
+
+            <div
+                class="connecta-owner-modal-header"
+            >
+
+                <div>
+
+                    <h3>
+                        Messaging Permissions
+                    </h3>
+
+                    <p>
+                        Control who can send messages
+                    </p>
+
+                </div>
+
+                <button
+                    type="button"
+                    id="closeMessagingModal"
+                    class="connecta-modal-close"
+                >
+                    ×
+                </button>
+
+            </div>
+
+
+            <div
+                class="connecta-messaging-options"
+            >
+
+                <label
+                    class="connecta-messaging-option"
+                >
+
+                    <input
+                        type="radio"
+                        name="groupMessagingMode"
+                        value="everyone"
+                        id="messagingEveryone"
+                    >
+
+                    <span>
+                        <strong>
+                            Everyone can message
+                        </strong>
+
+                        <small>
+                            All group members can send
+                            messages and photos.
+                        </small>
+                    </span>
+
+                </label>
+
+
+                <label
+                    class="connecta-messaging-option"
+                >
+
+                    <input
+                        type="radio"
+                        name="groupMessagingMode"
+                        value="admin"
+                        id="messagingAdminOnly"
+                    >
+
+                    <span>
+                        <strong>
+                            Only admin can message
+                        </strong>
+
+                        <small>
+                            Only the group owner can
+                            send messages and photos.
+                        </small>
+                    </span>
+
+                </label>
+
+            </div>
+
+
+            <button
+                type="button"
+                id="saveMessagingMode"
+                class="connecta-owner-save-btn"
+            >
+                Save
+            </button>
+
+        </div>
+    `;
+
+
+    document.body.appendChild(
+        messagingModal
+    );
+
+
+    document
+        .getElementById(
+            "closeMessagingModal"
+        )
+        ?.addEventListener(
+            "click",
+            closeMessagingSettings
+        );
+
+
+    document
+        .getElementById(
+            "saveMessagingMode"
+        )
+        ?.addEventListener(
+            "click",
+            saveMessagingMode
+        );
+
+
+    messagingModal.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target ===
+                messagingModal
+            ) {
+
+                closeMessagingSettings();
+            }
+        }
+    );
+
+
+    return messagingModal;
+}
+
+
+function openMessagingSettings() {
+
+    if (!isGroupOwner()) {
+
+        showToast(
+            "Only the group owner can change messaging permissions."
+        );
+
+        return;
+    }
+
+
+    closeOwnerMenu();
+
+
+    createMessagingModal();
+
+
+    const everyone =
+        document.getElementById(
+            "messagingEveryone"
+        );
+
+    const adminOnly =
+        document.getElementById(
+            "messagingAdminOnly"
+        );
+
+
+    const adminOnlyMode =
+        currentGroup?.announcementOnly === true;
+
+
+    if (everyone) {
+        everyone.checked =
+            !adminOnlyMode;
+    }
+
+
+    if (adminOnly) {
+        adminOnly.checked =
+            adminOnlyMode;
+    }
+
+
+    messagingModal.classList.add(
+        "open"
+    );
+}
+
+
+function closeMessagingSettings() {
+
+    if (!messagingModal) {
+        return;
+    }
+
+
+    messagingModal.classList.remove(
+        "open"
+    );
+}
+
+
+async function saveMessagingMode() {
+
+    if (!isGroupOwner()) {
+
+        showToast(
+            "Only the group owner can change messaging permissions."
+        );
+
+        return;
+    }
+
+
+    if (
+        !currentGroup ||
+        isUpdatingMessagingMode
+    ) {
+        return;
+    }
+
+
+    const selected =
+        document.querySelector(
+            'input[name="groupMessagingMode"]:checked'
+        );
+
+
+    if (!selected) {
+
+        showToast(
+            "Select a messaging option."
+        );
+
+        return;
+    }
+
+
+    const adminOnly =
+        selected.value === "admin";
+
+
+    isUpdatingMessagingMode = true;
+
+
+    const saveButton =
+        document.getElementById(
+            "saveMessagingMode"
+        );
+
+
+    if (saveButton) {
+
+        saveButton.disabled =
+            true;
+
+        saveButton.textContent =
+            "Saving...";
+    }
+
+
+    try {
+
+        const groupRef =
+            doc(
+                db,
+                GROUPS_COLLECTION,
+                groupId
+            );
+
+
+        const snapshot =
+            await getDoc(groupRef);
+
+
+        if (!snapshot.exists()) {
+
+            throw new Error(
+                "This group no longer exists."
+            );
+        }
+
+
+        const latestGroup =
+            snapshot.data();
+
+
+        if (
+            String(
+                latestGroup.ownerId || ""
+            ) !==
+            String(
+                currentUser.uid
+            )
+        ) {
+
+            throw new Error(
+                "Only the group owner can change messaging permissions."
+            );
+        }
+
+
+        /*
+         * announcementOnly is the owner-controlled
+         * "only admin can message" mode.
+         *
+         * chatLocked remains reserved for a
+         * complete group chat lock.
+         */
+        await updateDoc(
+
+            groupRef,
+
+            {
+
+                announcementOnly:
+                    adminOnly,
+
+                updatedAt:
+                    serverTimestamp()
+            }
+        );
+
+
+        currentGroup = {
+
+            ...currentGroup,
+
+            announcementOnly:
+                adminOnly
+        };
+
+
+        groupControl =
+            getGroupControl(
+                currentGroup
+            );
+
+
+        saveGroupCache(
+            currentGroup
+        );
+
+
+        renderGroup();
+
+        updateComposerState();
+
+        updateAccessUI();
+
+
+        closeMessagingSettings();
+
+
+        showToast(
+            adminOnly
+                ? "Only the admin can now send messages."
+                : "All members can now send messages."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Save messaging mode error:",
+            error
+        );
+
+
+        showToast(
+            error?.message ||
+            "Could not update messaging permissions."
+        );
+
+    } finally {
+
+        isUpdatingMessagingMode = false;
+
+
+        if (saveButton) {
+
+            saveButton.disabled =
+                false;
+
+            saveButton.textContent =
+                "Save";
+        }
+    }
+}
 
 /* =========================================================
    OWNER MENU
