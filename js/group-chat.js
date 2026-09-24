@@ -3935,37 +3935,37 @@ function setupPhotoUpload() {
 
 
     photoInput.addEventListener(
-        "change",
-        async () => {
+    "change",
+    async () => {
 
-            const file =
-                photoInput.files?.[0];
-
-
-            photoInput.value = "";
+        const file =
+            photoInput.files?.[0];
 
 
-            if (!file) {
-                return;
-            }
+        photoInput.value = "";
 
 
-            if (
-                photoInputMode === "group"
-            ) {
-
-                handleOwnerPhotoFile(file);
-
-                photoInputMode =
-                    "message";
-
-                return;
-            }
-
-
-            await sendPhotoMessage(file);
+        if (!file) {
+            return;
         }
-    );
+
+
+        if (
+            photoInputMode === "group"
+        ) {
+
+            photoInputMode =
+                "message";
+
+            await uploadGroupPhotoNow(file);
+
+            return;
+         }
+
+
+          await sendPhotoMessage(file);
+       }
+   );
 }
 
 
@@ -4012,6 +4012,262 @@ function handleOwnerPhotoFile(file) {
     ownerPhotoFile = file;
 
     renderOwnerPhotoPreview();
+}
+
+/* =========================================================
+   CHANGE GROUP PHOTO — DIRECT UPLOAD
+========================================================= */
+
+async function uploadGroupPhotoNow(file) {
+
+    if (!isGroupOwner()) {
+
+        showToast(
+            "Only the group owner can change the group photo."
+        );
+
+        return;
+    }
+
+
+    if (
+        !file ||
+        !ALLOWED_IMAGE_TYPES.includes(
+            file.type
+        )
+    ) {
+
+        showToast(
+            "Only JPG, PNG and WebP photos are allowed."
+        );
+
+        return;
+    }
+
+
+    if (file.size > MAX_PHOTO_SIZE) {
+
+        showToast(
+            "Group photo must be 5MB or smaller."
+        );
+
+        return;
+    }
+
+
+    if (isSavingGroup) {
+        return;
+    }
+
+
+    isSavingGroup = true;
+
+
+    showToast(
+        "Uploading group photo..."
+    );
+
+
+    try {
+
+        const groupRef =
+            doc(
+                db,
+                GROUPS_COLLECTION,
+                groupId
+            );
+
+
+        /*
+         * Always reload the latest group first.
+         */
+        const snapshot =
+            await getDoc(groupRef);
+
+
+        if (!snapshot.exists()) {
+
+            throw new Error(
+                "This group no longer exists."
+            );
+        }
+
+
+        const latestGroup =
+            snapshot.data();
+
+
+        /*
+         * Confirm ownership again from Firestore.
+         */
+        if (
+            String(
+                latestGroup.ownerId || ""
+            ) !==
+            String(
+                currentUser?.uid || ""
+            )
+        ) {
+
+            throw new Error(
+                "Only the group owner can change the group photo."
+            );
+        }
+
+
+        let extension = "jpg";
+
+
+        if (
+            file.type === "image/png"
+        ) {
+
+            extension = "png";
+
+        } else if (
+            file.type === "image/webp"
+        ) {
+
+            extension = "webp";
+        }
+
+
+        const storagePath =
+            `groupProfilePhotos/${groupId}/group-photo.${extension}`;
+
+
+        const storageRef =
+            ref(
+                storage,
+                storagePath
+            );
+
+
+        /*
+         * Upload the new group photo.
+         */
+        await uploadBytes(
+
+            storageRef,
+
+            file,
+
+            {
+                contentType:
+                    file.type
+            }
+        );
+
+
+        const photoURL =
+            await getDownloadURL(
+                storageRef
+            );
+
+
+        /*
+         * Remove the previous photo if its path
+         * is different from the new one.
+         */
+        const previousStoragePath =
+            latestGroup.photoStoragePath ||
+            "";
+
+
+        if (
+            previousStoragePath &&
+            previousStoragePath !== storagePath
+        ) {
+
+            try {
+
+                await deleteObject(
+                    ref(
+                        storage,
+                        previousStoragePath
+                    )
+                );
+
+            } catch (error) {
+
+                console.warn(
+                    "Could not delete previous group photo:",
+                    error
+                );
+            }
+        }
+
+
+        /*
+         * Save the new photo URL to Firestore.
+         */
+        await updateDoc(
+
+            groupRef,
+
+            {
+
+                photoURL,
+
+                photoStoragePath:
+                    storagePath,
+
+                updatedAt:
+                    serverTimestamp()
+            }
+        );
+
+
+        /*
+         * Update local state immediately.
+         */
+        currentGroup = {
+
+            ...currentGroup,
+
+            photoURL,
+
+            photoStoragePath:
+                storagePath
+        };
+
+
+        saveGroupCache(
+            currentGroup
+        );
+
+
+        /*
+         * Refresh the header and group info immediately.
+         */
+        renderGroup();
+
+        renderGroupInfo();
+
+        updateOwnerControls();
+
+
+        showToast(
+            "Group photo updated successfully."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Change group photo error:",
+            error
+        );
+
+
+        showToast(
+            error?.message ||
+            "Could not change the group photo."
+        );
+
+    } finally {
+
+        isSavingGroup = false;
+    }
 }
 
 
@@ -4205,9 +4461,15 @@ function ensureOwnerExtraControls() {
         `;
 
         button.addEventListener(
-            "click",
-            openMembersModal
-        );
+         "click",
+          event => {
+
+            event.preventDefault();
+            event.stopPropagation();
+
+             openMembersModal();
+          }
+       );
 
         ownerMenu.appendChild(button);
     }
@@ -4241,9 +4503,15 @@ function ensureOwnerExtraControls() {
         `;
 
         button.addEventListener(
-            "click",
-            openMessagingSettings
-        );
+        "click",
+         event => {
+
+           event.preventDefault();
+           event.stopPropagation();
+
+          openMessagingSettings();
+       }
+    );
 
         ownerMenu.appendChild(button);
     }
@@ -4290,79 +4558,143 @@ async function loadGroupMembers() {
     const members = [];
 
 
+    /*
+     * Load members in parallel batches instead of
+     * reading 2,000 users one-by-one.
+     *
+     * 25 users per batch keeps the browser and
+     * Firestore requests manageable.
+     */
+    const BATCH_SIZE = 25;
+
+
     for (
-        const uid of memberIds
+        let start = 0;
+        start < memberIds.length;
+        start += BATCH_SIZE
     ) {
 
-        try {
-
-            const snapshot =
-                await getDoc(
-                    doc(
-                        db,
-                        "users",
-                        uid
-                    )
-                );
-
-
-            if (!snapshot.exists()) {
-                continue;
-            }
-
-
-            const data =
-                snapshot.data();
-
-
-            members.push({
-
-                uid,
-
-                displayName:
-                    data.displayName ||
-                    [
-                        data.firstName,
-                        data.lastName
-                    ]
-                        .filter(Boolean)
-                        .join(" ") ||
-                    "CONNECTA User",
-
-                username:
-                    data.username ||
-                    "",
-
-                photoURL:
-                    data.photoURL ||
-                    "",
-
-                isOnline:
-                    data.isOnline === true,
-
-                isVerified:
-                    data.isVerified === true,
-
-                isOwner:
-                    String(uid) ===
-                    String(
-                        currentGroup.ownerId
-                    )
-            });
-
-        } catch (error) {
-
-            console.warn(
-                "Could not load group member:",
-                uid,
-                error
+        const batchIds =
+            memberIds.slice(
+                start,
+                start + BATCH_SIZE
             );
+
+
+        const results =
+            await Promise.all(
+
+                batchIds.map(
+                    async uid => {
+
+                        try {
+
+                            const snapshot =
+                                await getDoc(
+                                    doc(
+                                        db,
+                                        "users",
+                                        uid
+                                    )
+                                );
+
+
+                            if (
+                                !snapshot.exists()
+                            ) {
+                                return null;
+                            }
+
+
+                            const data =
+                                snapshot.data();
+
+
+                            return {
+
+                                uid,
+
+                                displayName:
+                                    data.displayName ||
+                                    [
+                                        data.firstName,
+                                        data.lastName
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" ") ||
+                                    "CONNECTA User",
+
+                                username:
+                                    data.username ||
+                                    "",
+
+                                photoURL:
+                                    data.photoURL ||
+                                    "",
+
+                                isOnline:
+                                    data.isOnline === true,
+
+                                isVerified:
+                                    data.isVerified === true,
+
+                                isOwner:
+                                    String(uid) ===
+                                    String(
+                                        currentGroup.ownerId
+                                    )
+                            };
+
+                        } catch (error) {
+
+                            console.warn(
+                                "Could not load group member:",
+                                uid,
+                                error
+                            );
+
+                            return null;
+                        }
+                    }
+                )
+            );
+
+
+        results.forEach(
+            member => {
+
+                if (member) {
+                    members.push(member);
+                }
+            }
+        );
+
+
+        /*
+         * Update the loading count while large
+         * groups are being loaded.
+         */
+        const count =
+            document.getElementById(
+                "membersModalCount"
+            );
+
+
+        if (count) {
+
+            count.textContent =
+                `Loading ${Math.min(
+                    start + BATCH_SIZE,
+                    memberIds.length
+                )} of ${memberIds.length} members...`;
         }
     }
 
 
     /*
      * Owner first.
+     * Then online members.
+     * Then alphabetical order.
      */
     members.sort(
         (a, b) => {
@@ -4402,13 +4734,473 @@ async function loadGroupMembers() {
     );
 
 
-   return members;
+    return members;
 }
+
+/* =========================================================
+   OWNER EXTRA MODAL STYLES
+========================================================= */
+
+function ensureOwnerModalStyles() {
+
+    if (
+        document.getElementById(
+            "connectaOwnerModalStyles"
+        )
+    ) {
+        return;
+    }
+
+
+    const style =
+        document.createElement("style");
+
+    style.id =
+        "connectaOwnerModalStyles";
+
+
+    style.textContent = `
+
+        .connecta-owner-modal {
+
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 99999;
+
+            display: none;
+
+            align-items: center;
+
+            justify-content: center;
+
+            padding: 20px;
+
+            background:
+                rgba(0, 0, 0, 0.48);
+
+        }
+
+
+        .connecta-owner-modal.open {
+
+            display: flex;
+
+        }
+
+
+        .connecta-owner-modal-card {
+
+            width: min(
+                100%,
+                520px
+            );
+
+            max-height: 85vh;
+
+            overflow: hidden;
+
+            background: #ffffff;
+
+            border-radius: 24px;
+
+            box-shadow:
+                0 20px 60px
+                rgba(0, 0, 0, 0.22);
+
+            display: flex;
+
+            flex-direction: column;
+
+        }
+
+
+        .connecta-owner-modal-header {
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: space-between;
+
+            gap: 15px;
+
+            padding: 20px;
+
+            border-bottom:
+                1px solid #edf2ef;
+
+        }
+
+
+        .connecta-owner-modal-header h3 {
+
+            margin: 0;
+
+            color: #17211b;
+
+            font-size: 20px;
+
+        }
+
+
+        .connecta-owner-modal-header p {
+
+            margin: 5px 0 0;
+
+            color: #718078;
+
+            font-size: 13px;
+
+        }
+
+
+        .connecta-modal-close {
+
+            width: 40px;
+
+            height: 40px;
+
+            border: 0;
+
+            border-radius: 50%;
+
+            background: #f0f5f2;
+
+            color: #17211b;
+
+            font-size: 26px;
+
+            line-height: 1;
+
+            cursor: pointer;
+
+        }
+
+
+        .connecta-members-list {
+
+            padding: 10px 15px 20px;
+
+            overflow-y: auto;
+
+            max-height: 65vh;
+
+        }
+
+
+        .connecta-members-loading,
+
+        .connecta-members-empty {
+
+            padding: 35px 15px;
+
+            text-align: center;
+
+            color: #718078;
+
+        }
+
+
+        .connecta-member-row {
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 12px;
+
+            padding: 11px 5px;
+
+            border-bottom:
+                1px solid #f0f3f1;
+
+        }
+
+
+        .connecta-member-avatar {
+
+            position: relative;
+
+            width: 48px;
+
+            height: 48px;
+
+            flex: 0 0 48px;
+
+            border-radius: 50%;
+
+            overflow: hidden;
+
+            background: #e9f6ee;
+
+            color: #15803d;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            font-weight: 700;
+
+        }
+
+
+        .connecta-member-avatar img {
+
+            width: 100%;
+
+            height: 100%;
+
+            object-fit: cover;
+
+        }
+
+
+        .connecta-member-online {
+
+            position: absolute;
+
+            right: 1px;
+
+            bottom: 1px;
+
+            width: 11px;
+
+            height: 11px;
+
+            border-radius: 50%;
+
+            background: #cbd5cf;
+
+            border: 2px solid #ffffff;
+
+        }
+
+
+        .connecta-member-online.online {
+
+            background: #22c55e;
+
+        }
+
+
+        .connecta-member-details {
+
+            min-width: 0;
+
+            flex: 1;
+
+        }
+
+
+        .connecta-member-name {
+
+            color: #17211b;
+
+            font-weight: 700;
+
+            font-size: 15px;
+
+        }
+
+
+        .connecta-member-username {
+
+            margin-top: 2px;
+
+            color: #718078;
+
+            font-size: 13px;
+
+        }
+
+
+        .connecta-member-status {
+
+            margin-top: 2px;
+
+            color: #8a9690;
+
+            font-size: 12px;
+
+        }
+
+
+        .connecta-member-verified {
+
+            display: inline-flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            width: 17px;
+
+            height: 17px;
+
+            margin-left: 4px;
+
+            border-radius: 50%;
+
+            background: #20c56a;
+
+            color: #ffffff;
+
+            font-size: 11px;
+
+        }
+
+
+        .connecta-member-owner {
+
+            display: inline-block;
+
+            margin-left: 5px;
+
+            padding: 2px 6px;
+
+            border-radius: 6px;
+
+            background: #e9f7ee;
+
+            color: #168346;
+
+            font-size: 9px;
+
+            font-weight: 800;
+
+        }
+
+
+        .connecta-messaging-options {
+
+            padding: 18px;
+
+            display: grid;
+
+            gap: 12px;
+
+        }
+
+
+        .connecta-messaging-option {
+
+            display: flex;
+
+            align-items: flex-start;
+
+            gap: 12px;
+
+            padding: 15px;
+
+            border: 1px solid #e3ebe6;
+
+            border-radius: 15px;
+
+            cursor: pointer;
+
+            background: #ffffff;
+
+        }
+
+
+        .connecta-messaging-option:has(
+            input:checked
+        ) {
+
+            border-color: #20c56a;
+
+            background: #f0fbf4;
+
+        }
+
+
+        .connecta-messaging-option input {
+
+            margin-top: 4px;
+
+            accent-color: #20c56a;
+
+        }
+
+
+        .connecta-messaging-option span {
+
+            display: grid;
+
+            gap: 5px;
+
+        }
+
+
+        .connecta-messaging-option strong {
+
+            color: #17211b;
+
+            font-size: 15px;
+
+        }
+
+
+        .connecta-messaging-option small {
+
+            color: #718078;
+
+            line-height: 1.4;
+
+            font-size: 12px;
+
+        }
+
+
+        .connecta-owner-save-btn {
+
+            margin: 0 18px 18px;
+
+            border: 0;
+
+            border-radius: 14px;
+
+            padding: 14px;
+
+            background: #20c56a;
+
+            color: #ffffff;
+
+            font-size: 15px;
+
+            font-weight: 700;
+
+            cursor: pointer;
+
+        }
+
+
+        .connecta-owner-save-btn:disabled {
+
+            opacity: 0.6;
+
+            cursor: not-allowed;
+
+        }
+
+    `;
+
+
+    document.head.appendChild(style);
+}
+
 /* =========================================================
    MEMBERS MODAL
 ========================================================= */
 
 function createMembersModal() {
+
+    ensureOwnerModalStyles();
+
 
     if (membersModal) {
         return membersModal;
@@ -4742,6 +5534,9 @@ function closeMembersModal() {
 ========================================================= */
 
 function createMessagingModal() {
+
+    ensureOwnerModalStyles();
+
 
     if (messagingModal) {
         return messagingModal;
