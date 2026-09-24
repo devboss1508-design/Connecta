@@ -1467,6 +1467,19 @@ function updateGroupModeBanner() {
 
 function updateComposerState() {
 
+if (!currentGroup || !groupControl.loaded) {
+
+    if (composerSkeleton) {
+        composerSkeleton.style.display = "flex";
+    }
+
+    if (composerWrap) {
+        composerWrap.style.display = "none";
+    }
+
+    return;
+}
+
     const canSend =
         canSendMessages();
 
@@ -1813,8 +1826,18 @@ function showAccessError(
 ) {
 
     if (chatLoading) {
-        chatLoading.style.display = "none";
-    }
+    chatLoading.style.display = "none";
+}
+
+if (composerSkeleton) {
+    composerSkeleton.style.display = "none";
+}
+
+if (composerWrap) {
+    composerWrap.style.display = "none";
+}
+
+showGroupHeaderSkeleton();
 
 
     if (messagesInner) {
