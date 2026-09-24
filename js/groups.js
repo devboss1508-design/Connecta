@@ -3551,11 +3551,15 @@ function closePaymentProcessingModal() {
         ↓
    USER ENTERS M-PESA PIN
         ↓
+   PAYMENT PROCESSING MODAL
+        ↓
    POLL PAYMENT STATUS
         ↓
    BACKEND CONFIRMS PAYMENT
         ↓
    BACKEND ADDS USER TO GROUP
+        ↓
+   SUCCESS MESSAGE
         ↓
    OPEN GROUP CHAT
 
@@ -3667,8 +3671,7 @@ async function startPaidGroupJoin(
 
 
   /*
-   * Prevent accidental duplicate payment attempts
-   * while the request is being processed.
+   * Start payment.
    */
 
   showToast(
@@ -3740,7 +3743,9 @@ async function startPaidGroupJoin(
 
 
     /*
-     * The backend creates groupPayments/{paymentId}.
+     * Backend creates:
+     *
+     * groupPayments/{paymentId}
      */
 
     const paymentId =
@@ -3757,81 +3762,37 @@ async function startPaidGroupJoin(
 
 
     /*
- * STK Push has been successfully started.
- *
- * The native M-PESA prompt may still be visible.
- * Once the user completes/cancels it, this
- * CONNECTA processing modal remains visible while
- * our backend confirms the payment.
- */
+     * =====================================================
+     * PAYMENT PROCESSING MODAL
+     * =====================================================
+     *
+     * This replaces the temporary toast.
+     *
+     * The modal remains visible while the backend
+     * checks the M-PESA payment.
+     */
 
-showPaymentProcessingModal(
-  "Payment Processing",
-  "Waiting for M-PESA payment confirmation..."
-);
-
-
-/*
- * Poll our backend.
- *
- * IMPORTANT:
- * We do NOT call OptimaPay directly from the browser.
- *
- * The backend verifies the payment and grants
- * membership only after successful confirmation.
- */
-
-const result =
-  await pollPaidGroupJoinPayment(
-    group,
-    paymentId,
-    token
-);
+    showPaymentProcessingModal(
+      "Payment Processing",
+      "Waiting for M-PESA payment confirmation..."
+    );
 
 
-if (
-  !result
-) {
+    /*
+     * =====================================================
+     * POLL BACKEND
+     * =====================================================
+     *
+     * We NEVER call OptimaPay directly from the browser.
+     *
+     * The backend:
+     * 1. Checks OptimaPay
+     * 2. Confirms payment
+     * 3. Adds the user to the group
+     * 4. Updates memberCount
+     * 5. Marks groupPayments completed
+     */
 
-  closePaymentProcessingModal();
-
-  return;
-}
-
-
-/*
- * Payment has been confirmed and the backend
- * has already added the user to the group.
- */
-
-updatePaymentProcessingMessage(
-  "Payment confirmed! You have successfully joined the group."
-);
-
-
-/*
- * Give the user a short success moment before
- * opening the group.
- */
-
-setTimeout(
-  () => {
-
-    closePaymentProcessingModal();
-
-
-    location.href =
-      `group-chat.html?groupId=${encodeURIComponent(
-        group.groupId
-      )}`;
-
-  },
-  1200
-);
-
-return;
-     
-   
     const result =
       await pollPaidGroupJoinPayment(
         group,
@@ -3840,12 +3801,102 @@ return;
       );
 
 
+    /*
+     * =====================================================
+     * PAYMENT NOT COMPLETED
+     * =====================================================
+     */
+
     if (
       !result
     ) {
 
+      closePaymentProcessingModal();
+
       return;
     }
+
+
+    /*
+     * =====================================================
+     * PAYMENT SUCCESS
+     * =====================================================
+     *
+     * At this point the backend has already granted
+     * group membership.
+     */
+
+    updatePaymentProcessingMessage(
+      "Payment confirmed! You have successfully joined the group."
+    );
+
+
+    /*
+     * Stop the spinner and show success.
+     */
+
+    const processingModal =
+      document.getElementById(
+        "connectaPaymentProcessingModal"
+      );
+
+
+    const spinner =
+      processingModal?.querySelector(
+        "div > div"
+      );
+
+
+    if (spinner) {
+
+      spinner.style.animation =
+        "none";
+
+      spinner.style.border =
+        "4px solid #22c55e";
+
+      spinner.style.display =
+        "flex";
+
+      spinner.style.alignItems =
+        "center";
+
+      spinner.style.justifyContent =
+        "center";
+
+
+      spinner.innerHTML =
+        "✓";
+
+      spinner.style.color =
+        "#22c55e";
+
+      spinner.style.fontWeight =
+        "900";
+
+      spinner.style.fontSize =
+        "22px";
+    }
+
+
+    /*
+     * Give the success message a moment to be visible.
+     */
+
+    setTimeout(
+      () => {
+
+        closePaymentProcessingModal();
+
+
+        location.href =
+          `group-chat.html?groupId=${encodeURIComponent(
+            group.groupId
+          )}`;
+
+      },
+      1200
+    );
 
 
   } catch (error) {
@@ -3854,6 +3905,9 @@ return;
       "Private group payment error:",
       error
     );
+
+
+    closePaymentProcessingModal();
 
 
     showToast(
