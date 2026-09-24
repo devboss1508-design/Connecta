@@ -3330,6 +3330,209 @@ async function pollVerificationPayment(
 
   return false;
 }
+
+/* =========================================================
+   PAYMENT PROCESSING MODAL
+   ---------------------------------------------------------
+   Stays visible while M-PESA payment is being confirmed.
+========================================================= */
+
+function showPaymentProcessingModal(
+  title = "Processing Payment",
+  message = "Waiting for M-PESA payment confirmation..."
+) {
+
+  document
+    .getElementById(
+      "connectaPaymentProcessingModal"
+    )
+    ?.remove();
+
+
+  const modal =
+    document.createElement("div");
+
+
+  modal.id =
+    "connectaPaymentProcessingModal";
+
+
+  modal.style.cssText = `
+    position:fixed;
+    inset:0;
+    z-index:99999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:rgba(15,23,42,.62);
+    backdrop-filter:blur(5px);
+  `;
+
+
+  modal.innerHTML = `
+    <div
+      style="
+        width:100%;
+        max-width:370px;
+        background:#ffffff;
+        border-radius:24px;
+        padding:28px 22px;
+        text-align:center;
+        box-shadow:0 25px 70px rgba(0,0,0,.28);
+      "
+    >
+
+      <div
+        style="
+          width:72px;
+          height:72px;
+          margin:0 auto 18px;
+          border-radius:50%;
+          background:#ecfdf5;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+        "
+      >
+
+        <div
+          style="
+            width:42px;
+            height:42px;
+            border:4px solid #bbf7d0;
+            border-top-color:#22c55e;
+            border-radius:50%;
+            animation:connectaPaymentSpin .85s linear infinite;
+          "
+        ></div>
+
+      </div>
+
+
+      <h3
+        style="
+          margin:0;
+          color:#14532d;
+          font-size:20px;
+          font-weight:900;
+        "
+      >
+        ${escapeHtml(title)}
+      </h3>
+
+
+      <p
+        id="connectaPaymentProcessingMessage"
+        style="
+          margin:10px 0 0;
+          color:#6b7280;
+          font-size:13px;
+          line-height:1.55;
+        "
+      >
+        ${escapeHtml(message)}
+      </p>
+
+
+      <div
+        style="
+          margin-top:18px;
+          padding:12px 13px;
+          border-radius:14px;
+          background:#f0fdf4;
+          border:1px solid #bbf7d0;
+          color:#166534;
+          font-size:11px;
+          line-height:1.5;
+        "
+      >
+        Please complete the M-PESA payment on your phone.
+        <br>
+        <strong>Do not close this page.</strong>
+      </div>
+
+    </div>
+  `;
+
+
+  document.body.appendChild(
+    modal
+  );
+
+
+  /*
+   * Add spinner animation once.
+   */
+
+  if (
+    !document.getElementById(
+      "connectaPaymentSpinnerStyle"
+    )
+  ) {
+
+    const style =
+      document.createElement("style");
+
+
+    style.id =
+      "connectaPaymentSpinnerStyle";
+
+
+    style.textContent = `
+      @keyframes connectaPaymentSpin {
+        from {
+          transform:rotate(0deg);
+        }
+
+        to {
+          transform:rotate(360deg);
+        }
+      }
+    `;
+
+
+    document.head.appendChild(
+      style
+    );
+  }
+}
+
+
+/* =========================================================
+   UPDATE PAYMENT PROCESSING MESSAGE
+========================================================= */
+
+function updatePaymentProcessingMessage(
+  message
+) {
+
+  const messageElement =
+    document.getElementById(
+      "connectaPaymentProcessingMessage"
+    );
+
+
+  if (messageElement) {
+
+    messageElement.textContent =
+      String(message || "");
+  }
+}
+
+
+/* =========================================================
+   CLOSE PAYMENT PROCESSING MODAL
+========================================================= */
+
+function closePaymentProcessingModal() {
+
+  document
+    .getElementById(
+      "connectaPaymentProcessingModal"
+    )
+    ?.remove();
+}
    
 /* =========================================================
    PRIVATE GROUP PAYMENT
@@ -3553,21 +3756,82 @@ async function startPaidGroupJoin(
     }
 
 
-    showToast(
-      "STK Push sent. Enter your M-PESA PIN."
-    );
-
-
     /*
-     * Poll our backend.
-     *
-     * IMPORTANT:
-     * We do NOT call OptimaPay directly from the browser.
-     *
-     * The backend verifies the payment and grants
-     * membership only after successful confirmation.
-     */
+ * STK Push has been successfully started.
+ *
+ * The native M-PESA prompt may still be visible.
+ * Once the user completes/cancels it, this
+ * CONNECTA processing modal remains visible while
+ * our backend confirms the payment.
+ */
 
+showPaymentProcessingModal(
+  "Payment Processing",
+  "Waiting for M-PESA payment confirmation..."
+);
+
+
+/*
+ * Poll our backend.
+ *
+ * IMPORTANT:
+ * We do NOT call OptimaPay directly from the browser.
+ *
+ * The backend verifies the payment and grants
+ * membership only after successful confirmation.
+ */
+
+const result =
+  await pollPaidGroupJoinPayment(
+    group,
+    paymentId,
+    token
+);
+
+
+if (
+  !result
+) {
+
+  closePaymentProcessingModal();
+
+  return;
+}
+
+
+/*
+ * Payment has been confirmed and the backend
+ * has already added the user to the group.
+ */
+
+updatePaymentProcessingMessage(
+  "Payment confirmed! You have successfully joined the group."
+);
+
+
+/*
+ * Give the user a short success moment before
+ * opening the group.
+ */
+
+setTimeout(
+  () => {
+
+    closePaymentProcessingModal();
+
+
+    location.href =
+      `group-chat.html?groupId=${encodeURIComponent(
+        group.groupId
+      )}`;
+
+  },
+  1200
+);
+
+return;
+     
+   
     const result =
       await pollPaidGroupJoinPayment(
         group,
@@ -3582,34 +3846,6 @@ async function startPaidGroupJoin(
 
       return;
     }
-
-
-    /*
-     * Payment has been confirmed and the backend
-     * has already added the user to the group.
-     */
-
-    showToast(
-      "Payment confirmed. You joined the group!"
-    );
-
-
-    /*
-     * Give Firestore listener a moment to receive
-     * the updated group membership.
-     */
-
-    setTimeout(
-      () => {
-
-        location.href =
-          `group-chat.html?groupId=${encodeURIComponent(
-            group.groupId
-          )}`;
-
-      },
-      500
-    );
 
 
   } catch (error) {
@@ -3799,12 +4035,19 @@ async function pollPaidGroupJoinPayment(
         )
       ) {
 
-        showToast(
-          "Group payment was not completed."
-        );
+        updatePaymentProcessingMessage(
+  "The M-PESA payment was not completed."
+);
 
-        return false;
-      }
+setTimeout(
+  () => {
+    closePaymentProcessingModal();
+  },
+  1600
+);
+
+ return false;
+}
 
 
       /*
@@ -3812,25 +4055,23 @@ async function pollPaidGroupJoinPayment(
        */
 
       if (
-        attempt ===
-        4
-      ) {
+        attempt === 4
+       ) {
 
-        showToast(
-          "Waiting for M-PESA payment confirmation..."
-        );
-      }
+  updatePaymentProcessingMessage(
+    "Waiting for M-PESA payment confirmation..."
+  );
+}
 
 
-      if (
-        attempt ===
-        14
-      ) {
+if (
+  attempt === 14
+) {
 
-        showToast(
-          "Still checking your payment..."
-        );
-      }
+  updatePaymentProcessingMessage(
+    "M-PESA is taking a little longer. Please wait..."
+  );
+}
 
 
       /*
@@ -3842,11 +4083,18 @@ async function pollPaidGroupJoinPayment(
         maxAttempts - 1
       ) {
 
-        showToast(
-          "Payment confirmation is taking longer than expected. Please check again shortly."
-        );
+        updatePaymentProcessingMessage(
+  "Payment confirmation is taking longer than expected. Please try again shortly."
+);
 
-        return false;
+setTimeout(
+  () => {
+    closePaymentProcessingModal();
+  },
+  2200
+);
+
+return false;
       }
 
     } catch (error) {
@@ -3863,16 +4111,22 @@ async function pollPaidGroupJoinPayment(
        */
 
       if (
-        attempt ===
-        maxAttempts - 1
-      ) {
+  attempt ===
+  maxAttempts - 1
+) {
 
-        showToast(
-          error.message ||
-          "Could not confirm the group payment."
-        );
+  updatePaymentProcessingMessage(
+    "We could not confirm the payment right now. Please check your M-PESA transaction before trying again."
+  );
 
-        return false;
+  setTimeout(
+    () => {
+      closePaymentProcessingModal();
+    },
+    2500
+  );
+
+  return false;
       }
     }
   }
