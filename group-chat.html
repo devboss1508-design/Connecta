@@ -481,54 +481,358 @@
 
 
         /* =========================================================
-           LOADING
-        ========================================================= */
+   INSTANT GROUP CHAT SKELETON
+========================================================= */
 
-        .chat-loading {
+@keyframes connectaGroupChatSkeleton {
 
-            min-height: 180px;
+    0% {
+        background-position: 100% 0;
+        opacity: .55;
+    }
 
-            display: flex;
+    50% {
+        background-position: 0 0;
+        opacity: .9;
+    }
 
-            align-items: center;
-
-            justify-content: center;
-
-            color: var(--text-muted);
-
-            font-size: 14px;
-        }
-
-
-        .chat-loading-dot {
-
-            width: 8px;
-            height: 8px;
-
-            margin-right: 7px;
-
-            border-radius: 50%;
-
-            background:
-                var(--connecta-green);
-
-            animation:
-                loadingPulse
-                1s infinite ease-in-out;
-        }
+    100% {
+        background-position: -100% 0;
+        opacity: .55;
+    }
+}
 
 
-        @keyframes loadingPulse {
+.group-chat-skeleton-shimmer {
 
-            0%,
-            100% {
-                opacity: .35;
-            }
+    background:
+        linear-gradient(
+            90deg,
+            rgba(255,255,255,.85),
+            rgba(230,237,232,.95),
+            rgba(255,255,255,.85)
+        );
 
-            50% {
-                opacity: 1;
-            }
-        }
+    background-size: 220% 100%;
+
+    animation:
+        connectaGroupChatSkeleton
+        1.35s
+        ease-in-out
+        infinite;
+}
+
+
+/* =========================================================
+   HEADER SKELETON
+========================================================= */
+
+.group-header-avatar.skeleton {
+
+    background:
+        linear-gradient(
+            90deg,
+            #edf2ee,
+            #dfe8e1,
+            #edf2ee
+        );
+
+    background-size: 220% 100%;
+
+    animation:
+        connectaGroupChatSkeleton
+        1.35s
+        ease-in-out
+        infinite;
+
+    color: transparent;
+
+    border: 0;
+}
+
+
+.group-header-skeleton-name {
+
+    width: 125px;
+
+    height: 12px;
+
+    border-radius: 10px;
+
+    margin-bottom: 8px;
+}
+
+
+.group-header-skeleton-status {
+
+    width: 82px;
+
+    height: 8px;
+
+    border-radius: 10px;
+}
+
+
+/* =========================================================
+   MESSAGE SKELETON
+========================================================= */
+
+.group-chat-skeleton {
+
+    width: 100%;
+
+    padding:
+        10px
+        4px
+        20px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 13px;
+}
+
+
+.group-chat-skeleton-row {
+
+    width: 100%;
+
+    display: flex;
+
+    align-items: flex-end;
+
+    gap: 7px;
+}
+
+
+.group-chat-skeleton-row.right {
+
+    justify-content: flex-end;
+}
+
+
+.group-chat-skeleton-row.left {
+
+    justify-content: flex-start;
+}
+
+
+.group-chat-skeleton-avatar {
+
+    width: 29px;
+    height: 29px;
+
+    min-width: 29px;
+
+    border-radius: 50%;
+}
+
+
+.group-chat-skeleton-content {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+
+    max-width: 72%;
+}
+
+
+.group-chat-skeleton-sender {
+
+    width: 72px;
+
+    height: 8px;
+
+    border-radius: 10px;
+
+    margin-left: 6px;
+}
+
+
+.group-chat-skeleton-bubble {
+
+    height: 34px;
+
+    border-radius: 15px;
+
+    width: 155px;
+}
+
+
+.group-chat-skeleton-row:nth-child(2)
+.group-chat-skeleton-bubble {
+
+    width: 210px;
+
+    height: 42px;
+}
+
+
+.group-chat-skeleton-row:nth-child(3)
+.group-chat-skeleton-bubble {
+
+    width: 120px;
+
+    height: 31px;
+}
+
+
+.group-chat-skeleton-row:nth-child(4)
+.group-chat-skeleton-bubble {
+
+    width: 185px;
+
+    height: 38px;
+}
+
+
+.group-chat-skeleton-row:nth-child(5)
+.group-chat-skeleton-bubble {
+
+    width: 135px;
+
+    height: 31px;
+}
+
+
+.group-chat-skeleton-row:nth-child(6)
+.group-chat-skeleton-bubble {
+
+    width: 200px;
+
+    height: 43px;
+}
+
+
+/* =========================================================
+   SKELETON COMPOSER
+========================================================= */
+
+.group-chat-skeleton-composer {
+
+    position: fixed;
+
+    left: 0;
+    right: 0;
+
+    bottom: 0;
+
+    z-index: 89;
+
+    padding:
+        7px
+        9px
+        calc(
+            7px +
+            env(safe-area-inset-bottom)
+        );
+
+    background:
+        rgba(255,255,255,.97);
+
+    border-top:
+        1px solid
+        var(--border);
+}
+
+
+.group-chat-skeleton-composer-inner {
+
+    width: 100%;
+
+    max-width: 680px;
+
+    margin: 0 auto;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 6px;
+}
+
+
+.group-chat-skeleton-button {
+
+    width: 42px;
+    height: 42px;
+
+    min-width: 42px;
+
+    border-radius: 50%;
+}
+
+
+.group-chat-skeleton-input {
+
+    flex: 1;
+
+    height: 42px;
+
+    border-radius: 22px;
+}
+
+
+.group-chat-skeleton-send {
+
+    width: 37px;
+    height: 37px;
+
+    min-width: 37px;
+
+    border-radius: 50%;
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 500px) {
+
+    .group-chat-skeleton {
+
+        padding-left: 2px;
+        padding-right: 2px;
+    }
+
+
+    .group-chat-skeleton-content {
+
+        max-width: 78%;
+    }
+
+
+    .group-chat-skeleton-bubble {
+
+        width: 145px;
+    }
+
+
+    .group-chat-skeleton-row:nth-child(2)
+    .group-chat-skeleton-bubble {
+
+        width: 185px;
+    }
+
+
+    .group-chat-skeleton-row:nth-child(4)
+    .group-chat-skeleton-bubble {
+
+        width: 165px;
+    }
+
+
+    .group-chat-skeleton-row:nth-child(6)
+    .group-chat-skeleton-bubble {
+
+        width: 175px;
+    }
+ }
 
 
         /* =========================================================
@@ -2254,10 +2558,10 @@
         <div class="group-header-info">
 
             <div
-                class="group-header-avatar"
-                id="groupAvatar"
-            >
-                G
+              class="group-header-avatar skeleton"
+               id="groupAvatar"
+              >
+             G
             </div>
 
 
@@ -2266,20 +2570,26 @@
                 <div class="group-header-name-row">
 
                     <h1
-                        class="group-header-name"
-                        id="groupName"
-                    >
-                        Loading...
+                      class="group-header-name"
+                      id="groupName"
+                     >
+                   <span
+                      class="group-header-skeleton-name group-chat-skeleton-shimmer"
+                      id="groupNameSkeleton"
+                  ></span>
                     </h1>
 
                 </div>
 
 
                 <p
-                    class="group-header-status"
-                    id="groupStatus"
-                >
-                    Loading group...
+                   class="group-header-status"
+                   id="groupStatus"
+                 >
+               <span
+                   class="group-header-skeleton-status group-chat-skeleton-shimmer"
+                   id="groupStatusSkeleton"
+               ></span>
                 </p>
 
             </div>
@@ -2430,19 +2740,162 @@
         >
 
             <div
-                class="chat-loading"
-                id="chatLoading"
-            >
+    class="group-chat-skeleton"
+    id="chatLoading"
+>
 
-                <span
-                    class="chat-loading-dot"
-                ></span>
+    <!-- LEFT -->
 
-                Loading group...
+    <div class="group-chat-skeleton-row left">
 
-            </div>
+        <div
+            class="
+                group-chat-skeleton-avatar
+                group-chat-skeleton-shimmer
+            "
+        ></div>
+
+        <div class="group-chat-skeleton-content">
+
+            <div
+                class="
+                    group-chat-skeleton-sender
+                    group-chat-skeleton-shimmer
+                "
+            ></div>
+
+            <div
+                class="
+                    group-chat-skeleton-bubble
+                    group-chat-skeleton-shimmer
+                "
+            ></div>
 
         </div>
+
+    </div>
+
+
+    <!-- RIGHT -->
+
+    <div class="group-chat-skeleton-row right">
+
+        <div class="group-chat-skeleton-content">
+
+            <div
+                class="
+                    group-chat-skeleton-bubble
+                    group-chat-skeleton-shimmer
+                "
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- LEFT -->
+
+    <div class="group-chat-skeleton-row left">
+
+        <div
+            class="
+                group-chat-skeleton-avatar
+                group-chat-skeleton-shimmer
+            "
+        ></div>
+
+        <div class="group-chat-skeleton-content">
+
+            <div
+                class="
+                    group-chat-skeleton-sender
+                    group-chat-skeleton-shimmer
+                "
+            ></div>
+
+            <div
+                class="
+                    group-chat-skeleton-bubble
+                    group-chat-skeleton-shimmer
+                "
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- RIGHT -->
+
+    <div class="group-chat-skeleton-row right">
+
+        <div class="group-chat-skeleton-content">
+
+            <div
+                class="
+                    group-chat-skeleton-bubble
+                    group-chat-skeleton-shimmer
+                "
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- LEFT -->
+
+    <div class="group-chat-skeleton-row left">
+
+        <div
+            class="
+                group-chat-skeleton-avatar
+                group-chat-skeleton-shimmer
+            "
+        ></div>
+
+        <div class="group-chat-skeleton-content">
+
+            <div
+                class="
+                    group-chat-skeleton-sender
+                    group-chat-skeleton-shimmer
+                "
+            ></div>
+
+            <div
+                class="
+                    group-chat-skeleton-bubble
+                    group-chat-skeleton-shimmer
+                "
+            ></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- RIGHT -->
+
+    <div class="group-chat-skeleton-row right">
+
+        <div class="group-chat-skeleton-content">
+
+            <div
+                class="
+                    group-chat-skeleton-bubble
+                    group-chat-skeleton-shimmer
+                "
+            ></div>
+
+        </div>
+
+    </div>
+
+ </div>
+
+ </div>
 
     </main>
 
@@ -2459,13 +2912,51 @@
 
 
     <!-- =====================================================
-         MESSAGE COMPOSER
-    ====================================================== -->
+     MESSAGE COMPOSER SKELETON
+====================================================== -->
 
-    <div
-        class="composer-wrap"
-        id="composerWrap"
-    >
+<div
+    class="group-chat-skeleton-composer"
+    id="composerSkeleton"
+>
+
+    <div class="group-chat-skeleton-composer-inner">
+
+        <div
+            class="
+                group-chat-skeleton-button
+                group-chat-skeleton-shimmer
+            "
+        ></div>
+
+        <div
+            class="
+                group-chat-skeleton-input
+                group-chat-skeleton-shimmer
+            "
+        ></div>
+
+        <div
+            class="
+                group-chat-skeleton-send
+                group-chat-skeleton-shimmer
+            "
+        ></div>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     MESSAGE COMPOSER
+====================================================== -->
+
+<div
+    class="composer-wrap"
+    id="composerWrap"
+    style="display:none;"
+>
 
         <!-- LOCKED COMPOSER MESSAGE -->
 
