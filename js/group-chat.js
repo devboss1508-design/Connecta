@@ -6509,6 +6509,21 @@ async function deleteGroup() {
 
 function setupOwnerControls() {
 
+   const ownerMenuBtn =
+    document.getElementById(
+        "ownerMenuBtn"
+    );
+
+ownerMenuBtn?.addEventListener(
+    "click",
+    event => {
+
+        event.stopPropagation();
+
+        toggleOwnerMenu();
+    }
+);
+
     editGroupBtn?.addEventListener(
         "click",
         openEditGroupModal
