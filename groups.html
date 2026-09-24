@@ -893,6 +893,305 @@
   transform:translate(-50%,0);
 }
 
+/* =========================================================
+   GROUPS LOADING SKELETON
+========================================================= */
+
+@keyframes connectaGroupsSkeleton {
+
+  0% {
+    background-position:100% 0;
+    opacity:.55;
+  }
+
+  50% {
+    background-position:0 0;
+    opacity:.9;
+  }
+
+  100% {
+    background-position:-100% 0;
+    opacity:.55;
+  }
+
+}
+
+
+.groups-skeleton {
+
+  width:100%;
+
+}
+
+
+.groups-skeleton-card {
+
+  display:flex;
+
+  align-items:flex-start;
+
+  gap:12px;
+
+  width:100%;
+
+  min-height:91px;
+
+  padding:14px;
+
+  margin-bottom:10px;
+
+  box-sizing:border-box;
+
+  border-radius:19px;
+
+  background:#ffffff;
+
+  border:1px solid #e4e9e5;
+
+  box-shadow:
+    0 4px 15px rgba(0,0,0,.045);
+
+}
+
+
+/* =========================================================
+   SKELETON SHIMMER
+========================================================= */
+
+.groups-skeleton-shimmer {
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255,255,255,.85),
+      rgba(230,237,232,.95),
+      rgba(255,255,255,.85)
+    );
+
+  background-size:220% 100%;
+
+  animation:
+    connectaGroupsSkeleton
+    1.35s
+    ease-in-out
+    infinite;
+
+}
+
+
+/* =========================================================
+   GROUP AVATAR
+========================================================= */
+
+.groups-skeleton-avatar {
+
+  width:61px;
+
+  height:61px;
+
+  min-width:61px;
+
+  border-radius:17px;
+
+}
+
+
+/* =========================================================
+   GROUP CONTENT
+========================================================= */
+
+.groups-skeleton-content {
+
+  flex:1;
+
+  min-width:0;
+
+  padding-top:2px;
+
+}
+
+
+.groups-skeleton-name {
+
+  width:55%;
+
+  height:12px;
+
+  border-radius:10px;
+
+  margin-bottom:10px;
+
+}
+
+
+.groups-skeleton-description {
+
+  width:88%;
+
+  height:8px;
+
+  border-radius:10px;
+
+  margin-bottom:7px;
+
+}
+
+
+.groups-skeleton-description.short {
+
+  width:65%;
+
+}
+
+
+/* =========================================================
+   META
+========================================================= */
+
+.groups-skeleton-meta {
+
+  display:flex;
+
+  align-items:center;
+
+  gap:6px;
+
+}
+
+
+.groups-skeleton-badge {
+
+  width:58px;
+
+  height:20px;
+
+  border-radius:999px;
+
+}
+
+
+.groups-skeleton-members {
+
+  width:62px;
+
+  height:8px;
+
+  border-radius:10px;
+
+}
+
+
+/* =========================================================
+   ACTION
+========================================================= */
+
+.groups-skeleton-action {
+
+  width:70px;
+
+  min-width:70px;
+
+  height:35px;
+
+  border-radius:11px;
+
+}
+
+
+/* =========================================================
+   LOADING SECTION TITLE
+========================================================= */
+
+.groups-skeleton-title {
+
+  width:125px;
+
+  height:17px;
+
+  border-radius:10px;
+
+}
+
+
+.groups-skeleton-count {
+
+  width:55px;
+
+  height:9px;
+
+  border-radius:10px;
+
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media(max-width:500px){
+
+  .groups-skeleton-card {
+
+    padding:12px;
+
+    gap:9px;
+
+    min-height:79px;
+
+  }
+
+
+  .groups-skeleton-avatar {
+
+    width:55px;
+
+    height:55px;
+
+    min-width:55px;
+
+    border-radius:15px;
+
+  }
+
+
+  .groups-skeleton-action {
+
+    width:63px;
+
+    min-width:63px;
+
+    height:33px;
+
+  }
+
+}
+
+
+@media(max-width:370px){
+
+  .groups-skeleton-card {
+
+    flex-wrap:wrap;
+
+  }
+
+
+  .groups-skeleton-content {
+
+    min-width:
+      calc(100% - 68px);
+
+  }
+
+
+  .groups-skeleton-action {
+
+    margin-left:auto;
+
+  }
+
+}
+
 
 /* =========================================================
    RESPONSIVE
@@ -1336,25 +1635,201 @@
 
     <div id="publicGroups">
 
-      <div class="groups-empty">
+  <div class="groups-skeleton">
 
-        <div class="groups-empty-icon">
-          👥
+    <!-- SKELETON 1 -->
+
+    <div class="groups-skeleton-card">
+
+      <div
+        class="groups-skeleton-avatar groups-skeleton-shimmer"
+      ></div>
+
+
+      <div class="groups-skeleton-content">
+
+        <div
+          class="groups-skeleton-name groups-skeleton-shimmer"
+        ></div>
+
+        <div
+          class="groups-skeleton-description groups-skeleton-shimmer"
+        ></div>
+
+        <div
+          class="groups-skeleton-description short groups-skeleton-shimmer"
+        ></div>
+
+
+        <div class="groups-skeleton-meta">
+
+          <div
+            class="groups-skeleton-badge groups-skeleton-shimmer"
+          ></div>
+
+          <div
+            class="groups-skeleton-members groups-skeleton-shimmer"
+          ></div>
+
         </div>
-
-        <strong>
-          Groups are ready
-        </strong>
-
-        <p>
-          Approved CONNECTA communities will appear here.
-        </p>
 
       </div>
 
+
+      <div
+        class="groups-skeleton-action groups-skeleton-shimmer"
+      ></div>
+
     </div>
 
-  </section>
+
+    <!-- SKELETON 2 -->
+
+    <div class="groups-skeleton-card">
+
+      <div
+        class="groups-skeleton-avatar groups-skeleton-shimmer"
+      ></div>
+
+
+      <div class="groups-skeleton-content">
+
+        <div
+          class="groups-skeleton-name groups-skeleton-shimmer"
+          style="width:68%;"
+        ></div>
+
+        <div
+          class="groups-skeleton-description groups-skeleton-shimmer"
+        ></div>
+
+        <div
+          class="groups-skeleton-description short groups-skeleton-shimmer"
+          style="width:52%;"
+        ></div>
+
+
+        <div class="groups-skeleton-meta">
+
+          <div
+            class="groups-skeleton-badge groups-skeleton-shimmer"
+          ></div>
+
+          <div
+            class="groups-skeleton-members groups-skeleton-shimmer"
+          ></div>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="groups-skeleton-action groups-skeleton-shimmer"
+      ></div>
+
+    </div>
+
+
+    <!-- SKELETON 3 -->
+
+    <div class="groups-skeleton-card">
+
+      <div
+        class="groups-skeleton-avatar groups-skeleton-shimmer"
+      ></div>
+
+
+      <div class="groups-skeleton-content">
+
+        <div
+          class="groups-skeleton-name groups-skeleton-shimmer"
+          style="width:48%;"
+        ></div>
+
+        <div
+          class="groups-skeleton-description groups-skeleton-shimmer"
+        ></div>
+
+        <div
+          class="groups-skeleton-description short groups-skeleton-shimmer"
+        ></div>
+
+
+        <div class="groups-skeleton-meta">
+
+          <div
+            class="groups-skeleton-badge groups-skeleton-shimmer"
+          ></div>
+
+          <div
+            class="groups-skeleton-members groups-skeleton-shimmer"
+          ></div>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="groups-skeleton-action groups-skeleton-shimmer"
+      ></div>
+
+    </div>
+
+
+    <!-- SKELETON 4 -->
+
+    <div class="groups-skeleton-card">
+
+      <div
+        class="groups-skeleton-avatar groups-skeleton-shimmer"
+      ></div>
+
+
+      <div class="groups-skeleton-content">
+
+        <div
+          class="groups-skeleton-name groups-skeleton-shimmer"
+          style="width:61%;"
+        ></div>
+
+        <div
+          class="groups-skeleton-description groups-skeleton-shimmer"
+        ></div>
+
+        <div
+          class="groups-skeleton-description short groups-skeleton-shimmer"
+          style="width:58%;"
+        ></div>
+
+
+        <div class="groups-skeleton-meta">
+
+          <div
+            class="groups-skeleton-badge groups-skeleton-shimmer"
+          ></div>
+
+          <div
+            class="groups-skeleton-members groups-skeleton-shimmer"
+          ></div>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="groups-skeleton-action groups-skeleton-shimmer"
+      ></div>
+
+    </div>
+
+  </div>
+
+  </div>
+
+</section>
 
 
   <!-- =====================================================
@@ -1382,25 +1857,147 @@
 
     <div id="myGroups">
 
-      <div class="groups-empty">
+  <div class="groups-skeleton">
 
-        <div class="groups-empty-icon">
-          👥
+    <div class="groups-skeleton-card">
+
+      <div
+        class="groups-skeleton-avatar groups-skeleton-shimmer"
+      ></div>
+
+
+      <div class="groups-skeleton-content">
+
+        <div
+          class="groups-skeleton-name groups-skeleton-shimmer"
+        ></div>
+
+        <div
+          class="groups-skeleton-description groups-skeleton-shimmer"
+        ></div>
+
+        <div
+          class="groups-skeleton-description short groups-skeleton-shimmer"
+        ></div>
+
+
+        <div class="groups-skeleton-meta">
+
+          <div
+            class="groups-skeleton-badge groups-skeleton-shimmer"
+          ></div>
+
+          <div
+            class="groups-skeleton-members groups-skeleton-shimmer"
+          ></div>
+
         </div>
-
-        <strong>
-          Your groups will appear here
-        </strong>
-
-        <p>
-          Groups you join or create will appear in this section.
-        </p>
 
       </div>
 
+
+      <div
+        class="groups-skeleton-action groups-skeleton-shimmer"
+      ></div>
+
     </div>
 
-  </section>
+
+    <div class="groups-skeleton-card">
+
+      <div
+        class="groups-skeleton-avatar groups-skeleton-shimmer"
+      ></div>
+
+
+      <div class="groups-skeleton-content">
+
+        <div
+          class="groups-skeleton-name groups-skeleton-shimmer"
+          style="width:65%;"
+        ></div>
+
+        <div
+          class="groups-skeleton-description groups-skeleton-shimmer"
+        ></div>
+
+        <div
+          class="groups-skeleton-description short groups-skeleton-shimmer"
+          style="width:55%;"
+        ></div>
+
+
+        <div class="groups-skeleton-meta">
+
+          <div
+            class="groups-skeleton-badge groups-skeleton-shimmer"
+          ></div>
+
+          <div
+            class="groups-skeleton-members groups-skeleton-shimmer"
+          ></div>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="groups-skeleton-action groups-skeleton-shimmer"
+      ></div>
+
+    </div>
+
+
+    <div class="groups-skeleton-card">
+
+      <div
+        class="groups-skeleton-avatar groups-skeleton-shimmer"
+      ></div>
+
+
+      <div class="groups-skeleton-content">
+
+        <div
+          class="groups-skeleton-name groups-skeleton-shimmer"
+          style="width:52%;"
+        ></div>
+
+        <div
+          class="groups-skeleton-description groups-skeleton-shimmer"
+        ></div>
+
+        <div
+          class="groups-skeleton-description short groups-skeleton-shimmer"
+        ></div>
+
+
+        <div class="groups-skeleton-meta">
+
+          <div
+            class="groups-skeleton-badge groups-skeleton-shimmer"
+          ></div>
+
+          <div
+            class="groups-skeleton-members groups-skeleton-shimmer"
+          ></div>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="groups-skeleton-action groups-skeleton-shimmer"
+      ></div>
+
+    </div>
+
+  </div>
+
+  </div>
+
+</section>
 
 </main>
 
