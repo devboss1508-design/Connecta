@@ -280,6 +280,10 @@ function showDashboardSkeleton() {
         $("chatList");
 
 
+    /* ========================================
+       ONLINE USERS
+    ======================================== */
+
     if (onlineBox) {
 
         onlineBox.innerHTML = `
@@ -289,33 +293,46 @@ function showDashboardSkeleton() {
                 aria-hidden="true"
             >
 
-                <div
-                    class="
-                        connecta-skeleton
-                        connecta-skeleton-user
-                    "
-                ></div>
+                ${Array.from(
+                    { length: 5 },
+                    () => `
 
-                <div
-                    class="
-                        connecta-skeleton
-                        connecta-skeleton-user
-                    "
-                ></div>
+                        <div
+                            class="skeleton-user-card"
+                        >
 
-                <div
-                    class="
-                        connecta-skeleton
-                        connecta-skeleton-user
-                    "
-                ></div>
+                            <div
+                                class="
+                                    skeleton-avatar
+                                    connecta-skeleton
+                                "
+                            ></div>
 
-                <div
-                    class="
-                        connecta-skeleton
-                        connecta-skeleton-user
-                    "
-                ></div>
+                            <div
+                                class="
+                                    skeleton-name
+                                    connecta-skeleton
+                                "
+                            ></div>
+
+                            <div
+                                class="
+                                    skeleton-status
+                                    connecta-skeleton
+                                "
+                            ></div>
+
+                            <div
+                                class="
+                                    skeleton-button
+                                    connecta-skeleton
+                                "
+                            ></div>
+
+                        </div>
+
+                    `
+                ).join("")}
 
             </div>
 
@@ -325,35 +342,69 @@ function showDashboardSkeleton() {
             "aria-busy",
             "true"
         );
+
     }
 
+
+    /* ========================================
+       RECENT CHATS
+    ======================================== */
 
     if (chatBox) {
 
         chatBox.innerHTML = `
 
-            <div aria-hidden="true">
+            <div
+                class="skeleton-chat-list"
+                aria-hidden="true"
+            >
 
-                <div
-                    class="
-                        connecta-skeleton
-                        connecta-skeleton-chat
-                    "
-                ></div>
+                ${Array.from(
+                    { length: 4 },
+                    () => `
 
-                <div
-                    class="
-                        connecta-skeleton
-                        connecta-skeleton-chat
-                    "
-                ></div>
+                        <div
+                            class="skeleton-chat-row"
+                        >
 
-                <div
-                    class="
-                        connecta-skeleton
-                        connecta-skeleton-chat
-                    "
-                ></div>
+                            <div
+                                class="
+                                    skeleton-chat-avatar
+                                    connecta-skeleton
+                                "
+                            ></div>
+
+                            <div
+                                class="skeleton-chat-content"
+                            >
+
+                                <div
+                                    class="
+                                        skeleton-chat-name
+                                        connecta-skeleton
+                                    "
+                                ></div>
+
+                                <div
+                                    class="
+                                        skeleton-chat-message
+                                        connecta-skeleton
+                                    "
+                                ></div>
+
+                            </div>
+
+                            <div
+                                class="
+                                    skeleton-chat-time
+                                    connecta-skeleton
+                                "
+                            ></div>
+
+                        </div>
+
+                    `
+                ).join("")}
 
             </div>
 
@@ -363,7 +414,9 @@ function showDashboardSkeleton() {
             "aria-busy",
             "true"
         );
+
     }
+
 }
 
 
