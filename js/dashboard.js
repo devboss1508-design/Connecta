@@ -5445,7 +5445,8 @@ async function initializeDashboard() {
          * "CONNECTA User".
          */
 
-        loadDashboardCache();
+        const hasDashboardCache =
+          loadDashboardCache();
 
 
         /*
@@ -5505,6 +5506,25 @@ async function initializeDashboard() {
          */
 
         renderProfile();
+
+       /*
+ * -------------------------------------------------
+ * DASHBOARD SKELETON
+ * -------------------------------------------------
+ *
+ * If there is no cached dashboard data yet,
+ * show the skeleton while Firebase loads users,
+ * chats and groups.
+ *
+ * If cached data exists, keep showing the cached
+ * dashboard instead of flashing the skeleton.
+ */
+
+if (!hasDashboardCache) {
+
+    showDashboardSkeleton();
+
+}
 
 
         /*
