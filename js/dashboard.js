@@ -105,167 +105,456 @@ const PROFILE_CACHE_KEY =
 
 function installInstantDashboardStyles() {
 
-    if (
-        $("connectaDashboardInstantStyles")
-    ) {
+    if ($("connectaDashboardInstantStyles")) {
         return;
     }
 
-    const style =
-        document.createElement("style");
+    const style = document.createElement("style");
 
-    style.id =
-        "connectaDashboardInstantStyles";
+    style.id = "connectaDashboardInstantStyles";
 
     style.textContent = `
 
-        @keyframes connectaShimmer {
+        /* =====================================================
+           CONNECTA SHIMMER
+           Matches chat.html skeleton animation
+        ===================================================== */
+
+        @keyframes connectaSkeleton {
 
             0% {
-                background-position:-600px 0;
+                background-position: 100% 0;
+                opacity: .55;
+            }
+
+            50% {
+                background-position: 0 0;
+                opacity: .9;
             }
 
             100% {
-                background-position:600px 0;
+                background-position: -100% 0;
+                opacity: .55;
             }
 
         }
+
+
+        /* =====================================================
+           COMMON SKELETON
+        ===================================================== */
 
         .connecta-skeleton {
 
             background:
                 linear-gradient(
                     90deg,
-                    #edf2ee 25%,
-                    #f8faf8 50%,
-                    #edf2ee 75%
+                    rgba(255,255,255,.85),
+                    rgba(230,237,232,.95),
+                    rgba(255,255,255,.85)
                 );
 
-            background-size:1200px 100%;
+            background-size:
+                220% 100%;
 
             animation:
-                connectaShimmer
-                1.25s infinite linear;
-
-            border-radius:16px;
+                connectaSkeleton
+                1.35s
+                ease-in-out
+                infinite;
 
         }
+
+
+        /* =====================================================
+           ONLINE USERS SKELETON
+        ===================================================== */
 
         .connecta-skeleton-users {
 
-            display:flex;
-            gap:10px;
-            width:100%;
-            overflow:hidden;
+            width: 100%;
+
+            display: flex;
+
+            gap: 10px;
+
+            overflow: hidden;
+
+            padding: 2px 1px 6px;
 
         }
 
-        .connecta-skeleton-user {
 
-            min-width:122px;
-            height:150px;
-            flex:0 0 122px;
+        .skeleton-user-card {
+
+            width: 122px;
+
+            min-width: 122px;
+
+            height: 150px;
+
+            flex: 0 0 122px;
+
+            padding: 12px 8px;
+
+            border-radius: 18px;
+
+            background: #ffffff;
+
+            border: 1px solid #e7ece8;
+
+            display: flex;
+
+            flex-direction: column;
+
+            align-items: center;
+
+            box-sizing: border-box;
 
         }
 
-        .connecta-skeleton-chat {
 
-            width:100%;
-            height:68px;
-            margin-bottom:8px;
+        .skeleton-avatar {
+
+            width: 58px;
+
+            height: 58px;
+
+            min-width: 58px;
+
+            border-radius: 50%;
+
+            margin-bottom: 9px;
 
         }
+
+
+        .skeleton-name {
+
+            width: 72px;
+
+            height: 10px;
+
+            border-radius: 10px;
+
+            margin-bottom: 7px;
+
+        }
+
+
+        .skeleton-status {
+
+            width: 48px;
+
+            height: 7px;
+
+            border-radius: 10px;
+
+            margin-bottom: auto;
+
+        }
+
+
+        .skeleton-button {
+
+            width: 78px;
+
+            height: 27px;
+
+            border-radius: 9px;
+
+            margin-top: 8px;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(34,197,94,.25),
+                    rgba(125,239,163,.48),
+                    rgba(34,197,94,.25)
+                );
+
+            background-size: 220% 100%;
+
+            animation:
+                connectaSkeleton
+                1.35s
+                ease-in-out
+                infinite;
+
+        }
+
+
+        /* =====================================================
+           RECENT CHATS SKELETON
+        ===================================================== */
+
+        .skeleton-chat-list {
+
+            width: 100%;
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 8px;
+
+        }
+
+
+        .skeleton-chat-row {
+
+            width: 100%;
+
+            min-height: 68px;
+
+            padding: 9px 10px;
+
+            display: flex;
+
+            align-items: center;
+
+            gap: 11px;
+
+            border-radius: 16px;
+
+            background: #ffffff;
+
+            border: 1px solid #e7ece8;
+
+            box-sizing: border-box;
+
+        }
+
+
+        .skeleton-chat-avatar {
+
+            width: 48px;
+
+            height: 48px;
+
+            min-width: 48px;
+
+            border-radius: 50%;
+
+        }
+
+
+        .skeleton-chat-content {
+
+            flex: 1;
+
+            min-width: 0;
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 8px;
+
+        }
+
+
+        .skeleton-chat-name {
+
+            width: 105px;
+
+            height: 10px;
+
+            border-radius: 10px;
+
+        }
+
+
+        .skeleton-chat-message {
+
+            width: 155px;
+
+            max-width: 75%;
+
+            height: 8px;
+
+            border-radius: 10px;
+
+        }
+
+
+        .skeleton-chat-time {
+
+            width: 38px;
+
+            height: 8px;
+
+            border-radius: 10px;
+
+            align-self: flex-start;
+
+            margin-top: 5px;
+
+        }
+
+
+        /* =====================================================
+           VERIFIED BADGE
+        ===================================================== */
 
         .verified-badge {
 
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
+            display: inline-flex;
 
-            width:16px;
-            height:16px;
+            align-items: center;
 
-            margin-left:3px;
+            justify-content: center;
 
-            border-radius:50%;
+            width: 16px;
 
-            background:#22c55e;
-            color:#fff;
+            height: 16px;
 
-            font-size:10px;
-            font-weight:900;
+            margin-left: 3px;
 
-            vertical-align:middle;
+            border-radius: 50%;
+
+            background: #1d9bf0;
+
+            color: #ffffff;
+
+            font-size: 10px;
+
+            font-weight: 900;
+
+            vertical-align: middle;
 
         }
+
+
+        /* =====================================================
+           CHAT STATUS
+        ===================================================== */
 
         .chat-status-ticks {
 
-            font-size:10px;
-            margin-left:3px;
-            color:#94a3b8;
+            font-size: 10px;
+
+            margin-left: 3px;
+
+            color: #94a3b8;
 
         }
+
 
         .chat-status-ticks.read {
 
-            color:#22c55e;
+            color: #2196f3;
 
         }
+
+
+        /* =====================================================
+           EMPTY
+        ===================================================== */
 
         .connecta-empty {
 
-            width:100%;
-            min-height:100px;
+            width: 100%;
 
-            display:grid;
-            place-items:center;
+            min-height: 100px;
 
-            padding:20px;
+            display: grid;
 
-            color:#718078;
+            place-items: center;
 
-            font-size:13px;
-            text-align:center;
+            padding: 20px;
+
+            color: #718078;
+
+            font-size: 13px;
+
+            text-align: center;
 
         }
+
 
         .connecta-error {
 
-            width:100%;
-            padding:18px;
+            width: 100%;
 
-            color:#b42318;
+            padding: 18px;
 
-            font-size:13px;
-            text-align:center;
+            color: #b42318;
 
-        }
+            font-size: 13px;
 
-        .user-card {
-
-            cursor:pointer;
+            text-align: center;
 
         }
 
+
+        /* =====================================================
+           INTERACTION
+        ===================================================== */
+
+        .user-card,
         .chat-item {
 
-            cursor:pointer;
+            cursor: pointer;
 
         }
+
 
         .group-avatar {
 
-            background:#dcfce7;
-            color:#166534;
+            background: #dcfce7;
+
+            color: #166534;
+
+        }
+
+
+        /* =====================================================
+           SMALL DEVICES
+        ===================================================== */
+
+        @media (max-width: 380px) {
+
+            .skeleton-user-card {
+
+                width: 112px;
+
+                min-width: 112px;
+
+                flex-basis: 112px;
+
+                height: 145px;
+
+            }
+
+
+            .skeleton-chat-row {
+
+                min-height: 64px;
+
+                padding:
+                    8px;
+
+            }
+
+
+            .skeleton-chat-avatar {
+
+                width: 44px;
+
+                height: 44px;
+
+                min-width: 44px;
+
+            }
 
         }
 
     `;
 
     document.head.appendChild(style);
-}
 
+}
 
 /* =========================================================
    SKELETON
@@ -280,9 +569,9 @@ function showDashboardSkeleton() {
         $("chatList");
 
 
-    /* ========================================
+    /* =====================================================
        ONLINE USERS
-    ======================================== */
+    ===================================================== */
 
     if (onlineBox) {
 
@@ -308,12 +597,14 @@ function showDashboardSkeleton() {
                                 "
                             ></div>
 
+
                             <div
                                 class="
                                     skeleton-name
                                     connecta-skeleton
                                 "
                             ></div>
+
 
                             <div
                                 class="
@@ -322,11 +613,9 @@ function showDashboardSkeleton() {
                                 "
                             ></div>
 
+
                             <div
-                                class="
-                                    skeleton-button
-                                    connecta-skeleton
-                                "
+                                class="skeleton-button"
                             ></div>
 
                         </div>
@@ -346,9 +635,9 @@ function showDashboardSkeleton() {
     }
 
 
-    /* ========================================
+    /* =====================================================
        RECENT CHATS
-    ======================================== */
+    ===================================================== */
 
     if (chatBox) {
 
@@ -361,7 +650,7 @@ function showDashboardSkeleton() {
 
                 ${Array.from(
                     { length: 4 },
-                    () => `
+                    (_, index) => `
 
                         <div
                             class="skeleton-chat-row"
@@ -374,6 +663,7 @@ function showDashboardSkeleton() {
                                 "
                             ></div>
 
+
                             <div
                                 class="skeleton-chat-content"
                             >
@@ -385,6 +675,7 @@ function showDashboardSkeleton() {
                                     "
                                 ></div>
 
+
                                 <div
                                     class="
                                         skeleton-chat-message
@@ -393,6 +684,7 @@ function showDashboardSkeleton() {
                                 ></div>
 
                             </div>
+
 
                             <div
                                 class="
