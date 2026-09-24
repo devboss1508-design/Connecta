@@ -2063,85 +2063,109 @@ async function handleGroupAction(
   }
 
 
+  /* -------------------------------------------------------
+     CHECK JOIN PERMISSION
+  ------------------------------------------------------- */
+
   const access =
-  canJoinGroup(group);
+    canJoinGroup(group);
 
 
-if (!access.allowed) {
+  if (
+    !access.allowed
+  ) {
+
+    showToast(
+      access.reason
+    );
+
+    return;
+  }
+
+
+  /* =======================================================
+     PRIVATE GROUP
+  ======================================================= */
+
+  if (
+    group.type === "private"
+  ) {
+
+    /*
+     * PRIVATE GROUPS REQUIRE A VERIFIED ACCOUNT.
+     */
+
+    if (
+      access.requiresVerification
+    ) {
+
+      await startPrivateGroupVerification(
+        group
+      );
+
+      return;
+    }
+
+
+    /*
+     * VERIFIED USER
+     *
+     * Now process the private-group
+     * joining payment.
+     */
+
+    if (
+      access.requiresPayment &&
+      access.fee > 0
+    ) {
+
+      await startPaidGroupJoin(
+        group
+      );
+
+      return;
+    }
+
+
+    /*
+     * This should normally not happen because
+     * private groups are created with a fee.
+     *
+     * Keep this fallback for data safety.
+     */
+
+    showToast(
+      "This private group does not have a valid joining fee."
+    );
+
+    return;
+  }
+
+
+  /* =======================================================
+     PUBLIC FREE GROUP
+  ======================================================= */
+
+  if (
+    group.type === "public"
+  ) {
+
+    await joinFreeGroup(
+      group
+    );
+
+    return;
+  }
+
+
+  /* -------------------------------------------------------
+     INVALID GROUP TYPE
+  ------------------------------------------------------- */
 
   showToast(
-    access.reason
+    "Invalid group type."
   );
-
-  return;
 }
-
-
-/* =======================================================
-   PRIVATE GROUP
-======================================================= */
-
-if (group.type === "private") {
-
-  /*
-   * First make sure the account is verified.
-   *
-   * If not verified, the user is taken through
-   * the KSh 999 CONNECTA verification payment.
-   */
-
-  if (
-    access.requiresVerification
-  ) {
-
-    await startPrivateGroupVerification(
-      group
-    );
-
-    return;
-  }
-
-
-  /*
-   * Account is already verified.
-   *
-   * Now check whether this particular
-   * private group has a joining fee.
-   */
-
-  if (
-    access.requiresPayment &&
-    access.fee > 0
-  ) {
-
-    await startPaidGroupJoin(
-      group
-    );
-
-    return;
-  }
-
-
-  /*
-   * Verified private group with
-   * no joining fee.
-   */
-
-  await joinFreeGroup(
-    group
-  );
-
-  return;
-}
-
-
-/* =======================================================
-   PUBLIC FREE GROUP
-======================================================= */
-
-await joinFreeGroup(
-  group
-);
 
 
 /* =========================================================
