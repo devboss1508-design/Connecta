@@ -12,10 +12,15 @@
 
   <meta
     name="theme-color"
-    content="#22C55E"
+    content="#16A34A"
   >
 
-  <title>Friends — CONNECTA</title>
+  <meta
+    name="description"
+    content="CONNECTA Global Chat — meet new people, make friends and start conversations."
+  >
+
+  <title>Global Chat — CONNECTA</title>
 
   <link
     rel="stylesheet"
@@ -30,31 +35,86 @@
   <style>
 
     /* =========================================================
-       CONNECTA FRIENDS
+       CONNECTA GLOBAL CHAT
     ========================================================= */
 
     :root {
+
       --connecta-green: #22C55E;
       --connecta-dark-green: #16A34A;
+      --connecta-deep-green: #15803D;
+
       --connecta-light: #F0FDF4;
       --connecta-bg: #F5F8F6;
+
       --connecta-text: #17201A;
       --connecta-muted: #6B7280;
+
       --connecta-border: #E5E7EB;
+
+      --connecta-white: #FFFFFF;
+
       --connecta-blue: #2196F3;
+
+      --shadow-sm:
+        0 4px 14px rgba(0, 0, 0, .05);
+
+      --shadow-md:
+        0 10px 30px rgba(0, 0, 0, .08);
+
+      --radius-sm: 12px;
+      --radius-md: 18px;
+      --radius-lg: 24px;
+
+    }
+
+
+    * {
+      box-sizing: border-box;
+    }
+
+
+    html {
+      scroll-behavior: smooth;
     }
 
 
     body {
+      margin: 0;
       background: var(--connecta-bg);
+      color: var(--connecta-text);
     }
 
 
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+
+    button {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+
+    /* =========================================================
+       PAGE
+    ========================================================= */
+
     .friends-page {
+
       width: 100%;
-      max-width: 900px;
+
+      max-width: 960px;
+
       margin: 0 auto;
-      padding: 18px 14px 105px;
+
+      padding:
+        16px
+        14px
+        110px;
+
     }
 
 
@@ -62,63 +122,452 @@
        HERO
     ========================================================= */
 
-    .friends-hero {
+    .global-hero {
+
+      position: relative;
+
+      overflow: hidden;
+
+      padding: 24px 20px;
+
+      margin-bottom: 16px;
+
+      border-radius: 24px;
+
       background:
         linear-gradient(
           135deg,
-          #22C55E,
-          #16A34A
+          #16A34A 0%,
+          #22C55E 52%,
+          #4ADE80 100%
         );
 
-      color: #ffffff;
-
-      border-radius: 22px;
-
-      padding: 22px 18px;
-
-      margin-bottom: 15px;
+      color: #fff;
 
       box-shadow:
-        0 10px 25px rgba(34, 197, 94, 0.18);
+        0 12px 35px rgba(22, 163, 74, .20);
+
     }
 
 
-    .friends-hero .eyebrow {
-      display: inline-block;
+    .global-hero::before {
+
+      content: "";
+
+      position: absolute;
+
+      width: 190px;
+      height: 190px;
+
+      border-radius: 50%;
+
+      right: -75px;
+      top: -85px;
+
+      background:
+        rgba(255,255,255,.12);
+
+    }
+
+
+    .global-hero::after {
+
+      content: "";
+
+      position: absolute;
+
+      width: 110px;
+      height: 110px;
+
+      border-radius: 50%;
+
+      right: 70px;
+      bottom: -65px;
+
+      background:
+        rgba(255,255,255,.08);
+
+    }
+
+
+    .hero-content {
+
+      position: relative;
+
+      z-index: 2;
+
+    }
+
+
+    .hero-eyebrow {
+
+      display: inline-flex;
+
+      align-items: center;
+
+      gap: 7px;
+
+      padding:
+        6px
+        10px;
+
+      margin-bottom: 10px;
+
+      border-radius: 999px;
+
+      background:
+        rgba(255,255,255,.16);
+
+      border:
+        1px solid
+        rgba(255,255,255,.20);
 
       font-size: 11px;
 
       font-weight: 800;
 
-      letter-spacing: 1.2px;
+      letter-spacing: .08em;
 
-      text-transform: uppercase;
-
-      opacity: 0.85;
-
-      margin-bottom: 5px;
     }
 
 
-    .friends-hero h1 {
-      margin: 0 0 7px;
+    .hero-title {
 
-      font-size: 25px;
+      margin: 0 0 8px;
 
-      line-height: 1.2;
+      font-size: clamp(26px, 7vw, 38px);
 
-      font-weight: 800;
+      line-height: 1.08;
+
+      font-weight: 900;
+
+      letter-spacing: -.03em;
+
     }
 
 
-    .friends-hero p {
+    .hero-description {
+
+      max-width: 650px;
+
       margin: 0;
 
       font-size: 14px;
 
+      line-height: 1.6;
+
+      color:
+        rgba(255,255,255,.90);
+
+    }
+
+
+    .hero-note {
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 8px;
+
+      margin-top: 16px;
+
+      font-size: 12px;
+
+      font-weight: 700;
+
+      color:
+        rgba(255,255,255,.90);
+
+    }
+
+
+    /* =========================================================
+       GLOBAL CHAT BADGE
+    ========================================================= */
+
+    .global-chat-badge {
+
+      display: inline-flex;
+
+      align-items: center;
+
+      gap: 7px;
+
+      margin-top: 16px;
+
+      padding:
+        8px
+        12px;
+
+      border-radius: 999px;
+
+      background:
+        rgba(255,255,255,.95);
+
+      color:
+        var(--connecta-dark-green);
+
+      font-size: 12px;
+
+      font-weight: 800;
+
+      box-shadow:
+        0 5px 16px rgba(0,0,0,.08);
+
+    }
+
+
+    /* =========================================================
+       FILTER CARD
+    ========================================================= */
+
+    .global-filter-card {
+
+      background:
+        var(--connecta-white);
+
+      border:
+        1px solid
+        var(--connecta-border);
+
+      border-radius:
+        var(--radius-lg);
+
+      padding: 16px;
+
+      margin-bottom: 16px;
+
+      box-shadow:
+        var(--shadow-sm);
+
+    }
+
+
+    .filter-heading {
+
+      display: flex;
+
+      align-items: flex-start;
+
+      justify-content: space-between;
+
+      gap: 12px;
+
+      margin-bottom: 14px;
+
+    }
+
+
+    .filter-heading h2 {
+
+      margin: 0;
+
+      font-size: 17px;
+
+      font-weight: 900;
+
+    }
+
+
+    .filter-heading p {
+
+      margin: 4px 0 0;
+
+      color:
+        var(--connecta-muted);
+
+      font-size: 12px;
+
       line-height: 1.5;
 
-      opacity: 0.92;
+    }
+
+
+    .filter-icon {
+
+      width: 42px;
+      height: 42px;
+
+      flex:
+        0 0 42px;
+
+      display: grid;
+
+      place-items: center;
+
+      border-radius: 14px;
+
+      background:
+        var(--connecta-light);
+
+      font-size: 21px;
+
+    }
+
+
+    /* =========================================================
+       GENDER FILTER
+    ========================================================= */
+
+    .filter-label {
+
+      display: block;
+
+      margin-bottom: 8px;
+
+      font-size: 12px;
+
+      font-weight: 800;
+
+      color:
+        var(--connecta-text);
+
+    }
+
+
+    .gender-options {
+
+      display: grid;
+
+      grid-template-columns:
+        repeat(3, 1fr);
+
+      gap: 8px;
+
+      margin-bottom: 15px;
+
+    }
+
+
+    .gender-btn {
+
+      min-height: 48px;
+
+      border:
+        1px solid
+        var(--connecta-border);
+
+      border-radius: 14px;
+
+      background:
+        #fff;
+
+      color:
+        var(--connecta-text);
+
+      font-size: 13px;
+
+      font-weight: 800;
+
+      cursor: pointer;
+
+      transition:
+        .18s ease;
+
+    }
+
+
+    .gender-btn:hover {
+
+      border-color:
+        #86EFAC;
+
+    }
+
+
+    .gender-btn.active {
+
+      background:
+        var(--connecta-light);
+
+      border-color:
+        var(--connecta-green);
+
+      color:
+        var(--connecta-dark-green);
+
+      box-shadow:
+        0 0 0 3px
+        rgba(34,197,94,.08);
+
+    }
+
+
+    /* =========================================================
+       SEARCH GRID
+    ========================================================= */
+
+    .filter-grid {
+
+      display: grid;
+
+      grid-template-columns:
+        1fr;
+
+      gap: 10px;
+
+    }
+
+
+    .field-group {
+
+      min-width: 0;
+
+    }
+
+
+    .field-input {
+
+      width: 100%;
+
+      height: 48px;
+
+      padding:
+        0 14px;
+
+      border:
+        1px solid
+        var(--connecta-border);
+
+      border-radius: 14px;
+
+      outline: none;
+
+      background:
+        #FAFAFA;
+
+      color:
+        var(--connecta-text);
+
+      font-size: 13px;
+
+      transition:
+        .18s ease;
+
+    }
+
+
+    .field-input:focus {
+
+      background:
+        #fff;
+
+      border-color:
+        var(--connecta-green);
+
+      box-shadow:
+        0 0 0 3px
+        rgba(34,197,94,.08);
+
+    }
+
+
+    .field-input::placeholder {
+
+      color:
+        #9CA3AF;
+
     }
 
 
@@ -126,143 +575,777 @@
        SEARCH
     ========================================================= */
 
-    .search-card {
-      background: #ffffff;
+    .search-wrap {
 
-      border-radius: 20px;
+      position: relative;
 
-      padding: 15px;
+      margin-top: 10px;
 
-      margin-bottom: 15px;
-
-      border: 1px solid var(--connecta-border);
-
-      box-shadow:
-        0 5px 18px rgba(0, 0, 0, 0.04);
-    }
-
-
-    .search-box {
-      display: flex;
-
-      align-items: center;
-
-      gap: 9px;
-
-      background: #F8FAF9;
-
-      border: 1px solid #DDE7E0;
-
-      border-radius: 14px;
-
-      padding: 0 13px;
     }
 
 
     .search-icon {
-      color: var(--connecta-muted);
 
-      font-size: 18px;
+      position: absolute;
 
-      flex-shrink: 0;
+      left: 14px;
+
+      top: 50%;
+
+      transform:
+        translateY(-50%);
+
+      font-size: 16px;
+
+      pointer-events: none;
+
     }
 
 
     #friendSearch {
-      width: 100%;
 
-      min-width: 0;
+      padding-left: 42px;
 
-      border: 0;
-
-      outline: 0;
-
-      background: transparent;
-
-      padding: 13px 0;
-
-      font-size: 14px;
-
-      color: var(--connecta-text);
-
-      font-family: inherit;
-    }
-
-
-    #friendSearch::placeholder {
-      color: #9CA3AF;
     }
 
 
     /* =========================================================
-       TABS
+       AVAILABLE HEADER
     ========================================================= */
 
-    .friends-tabs {
+    .available-header {
+
+      display: flex;
+
+      align-items: flex-end;
+
+      justify-content: space-between;
+
+      gap: 12px;
+
+      margin:
+        22px 2px 12px;
+
+    }
+
+
+    .available-title {
+
+      margin: 0;
+
+      font-size: 19px;
+
+      font-weight: 900;
+
+      letter-spacing: -.02em;
+
+    }
+
+
+    .available-subtitle {
+
+      margin: 4px 0 0;
+
+      color:
+        var(--connecta-muted);
+
+      font-size: 12px;
+
+    }
+
+
+    .available-count {
+
+      flex:
+        0 0 auto;
+
+      min-width: 34px;
+
+      height: 30px;
+
+      padding:
+        0 10px;
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      border-radius: 999px;
+
+      background:
+        var(--connecta-light);
+
+      color:
+        var(--connecta-dark-green);
+
+      font-size: 12px;
+
+      font-weight: 900;
+
+    }
+
+
+    /* =========================================================
+       DISCOVERY LIST
+    ========================================================= */
+
+    .section-card {
+
+      background:
+        var(--connecta-white);
+
+      border:
+        1px solid
+        var(--connecta-border);
+
+      border-radius:
+        var(--radius-lg);
+
+      padding: 10px;
+
+      box-shadow:
+        var(--shadow-sm);
+
+    }
+
+
+    #discoverList {
+
+      display: grid;
+
+      grid-template-columns:
+        1fr;
+
+      gap: 10px;
+
+    }
+
+
+    /* =========================================================
+       USER CARD
+    ========================================================= */
+
+    .user-card {
+
+      position: relative;
+
+      display: grid;
+
+      grid-template-columns:
+        58px
+        minmax(0, 1fr)
+        auto;
+
+      align-items: center;
+
+      gap: 11px;
+
+      padding: 12px;
+
+      border:
+        1px solid
+        #EDF0EE;
+
+      border-radius: 18px;
+
+      background:
+        #fff;
+
+      transition:
+        transform .18s ease,
+        box-shadow .18s ease,
+        border-color .18s ease;
+
+    }
+
+
+    .user-card:hover {
+
+      transform:
+        translateY(-1px);
+
+      border-color:
+        #D1FAE5;
+
+      box-shadow:
+        0 7px 20px
+        rgba(0,0,0,.06);
+
+    }
+
+
+    .user-avatar {
+
+      position: relative;
+
+      width: 58px;
+      height: 58px;
+
+      flex:
+        0 0 58px;
+
+      display: grid;
+
+      place-items: center;
+
+      overflow: hidden;
+
+      border-radius: 50%;
+
+      background:
+        linear-gradient(
+          135deg,
+          #DCFCE7,
+          #BBF7D0
+        );
+
+      color:
+        var(--connecta-dark-green);
+
+      font-size: 15px;
+
+      font-weight: 900;
+
+      border:
+        2px solid
+        #fff;
+
+      box-shadow:
+        0 0 0 2px
+        rgba(34,197,94,.15);
+
+    }
+
+
+    .user-avatar img {
+
+      width: 100%;
+      height: 100%;
+
+      object-fit: cover;
+
+      display: block;
+
+    }
+
+
+    .online-dot {
+
+      position: absolute;
+
+      right: 1px;
+      bottom: 2px;
+
+      width: 13px;
+      height: 13px;
+
+      border-radius: 50%;
+
+      background:
+        #22C55E;
+
+      border:
+        2px solid
+        #fff;
+
+      box-shadow:
+        0 1px 5px
+        rgba(0,0,0,.12);
+
+    }
+
+
+    .user-info {
+
+      min-width: 0;
+
+      cursor: pointer;
+
+    }
+
+
+    .user-name {
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 5px;
+
+      min-width: 0;
+
+    }
+
+
+    .user-name-text {
+
+      min-width: 0;
+
+      overflow: hidden;
+
+      text-overflow: ellipsis;
+
+      white-space: nowrap;
+
+      font-size: 14px;
+
+      font-weight: 900;
+
+    }
+
+
+    .verified-badge {
+
+      flex:
+        0 0 auto;
+
+      display: inline-flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      width: 17px;
+      height: 17px;
+
+      border-radius: 50%;
+
+      background:
+        var(--connecta-blue);
+
+      color: #fff;
+
+      font-size: 10px;
+
+      font-weight: 900;
+
+    }
+
+
+    .username {
+
+      margin-top: 2px;
+
+      overflow: hidden;
+
+      text-overflow: ellipsis;
+
+      white-space: nowrap;
+
+      color:
+        var(--connecta-muted);
+
+      font-size: 11px;
+
+    }
+
+
+    .online-status {
+
+      margin-top: 5px;
+
+      font-size: 10px;
+
+      font-weight: 700;
+
+    }
+
+
+    .online-status.online {
+
+      color:
+        var(--connecta-dark-green);
+
+    }
+
+
+    .online-status.offline {
+
+      color:
+        #9CA3AF;
+
+    }
+
+
+    /* =========================================================
+       GLOBAL CHAT PROFILE DETAILS
+    ========================================================= */
+
+    .global-user-details {
+
+      margin-top: 7px;
+
+      display: flex;
+
+      flex-wrap: wrap;
+
+      gap: 5px;
+
+    }
+
+
+    .user-meta-chip {
+
+      display: inline-flex;
+
+      align-items: center;
+
+      gap: 4px;
+
+      max-width: 100%;
+
+      padding:
+        4px 7px;
+
+      border-radius: 999px;
+
+      background:
+        #F9FAFB;
+
+      border:
+        1px solid
+        #EEF0F1;
+
+      color:
+        #6B7280;
+
+      font-size: 9px;
+
+      font-weight: 700;
+
+    }
+
+
+    .global-bio {
+
+      margin-top: 6px;
+
+      display: -webkit-box;
+
+      -webkit-line-clamp: 2;
+
+      -webkit-box-orient: vertical;
+
+      overflow: hidden;
+
+      color:
+        #4B5563;
+
+      font-size: 10px;
+
+      line-height: 1.45;
+
+    }
+
+
+    /* =========================================================
+       CARD ACTIONS
+    ========================================================= */
+
+    .user-actions {
+
+      display: flex;
+
+      flex-direction: column;
+
+      align-items: stretch;
+
+      gap: 6px;
+
+    }
+
+
+    .follow-btn,
+    .chat-btn {
+
+      min-width: 78px;
+
+      min-height: 35px;
+
+      padding:
+        0 10px;
+
+      border-radius: 11px;
+
+      cursor: pointer;
+
+      font-size: 10px;
+
+      font-weight: 900;
+
+      transition:
+        .18s ease;
+
+    }
+
+
+    .follow-btn {
+
+      border:
+        1px solid
+        #BBF7D0;
+
+      background:
+        #F0FDF4;
+
+      color:
+        var(--connecta-dark-green);
+
+    }
+
+
+    .follow-btn:hover {
+
+      background:
+        #DCFCE7;
+
+    }
+
+
+    .follow-btn.following {
+
+      background:
+        #fff;
+
+      border-color:
+        var(--connecta-border);
+
+      color:
+        #6B7280;
+
+    }
+
+
+    .chat-btn {
+
+      border:
+        1px solid
+        var(--connecta-dark-green);
+
+      background:
+        var(--connecta-green);
+
+      color:
+        #fff;
+
+      box-shadow:
+        0 5px 12px
+        rgba(34,197,94,.16);
+
+    }
+
+
+    .chat-btn:hover {
+
+      background:
+        var(--connecta-dark-green);
+
+    }
+
+
+    .chat-btn:active,
+    .follow-btn:active {
+
+      transform:
+        scale(.97);
+
+    }
+
+
+    /* =========================================================
+       PAYMENT LABEL
+    ========================================================= */
+
+    .chat-fee-label {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: center;
+
+      gap: 3px;
+
+      color:
+        #6B7280;
+
+      font-size: 9px;
+
+      font-weight: 700;
+
+    }
+
+
+    /* =========================================================
+       EMPTY STATE
+    ========================================================= */
+
+    .empty-state {
+
+      min-height: 190px;
+
+      display: flex;
+
+      flex-direction: column;
+
+      align-items: center;
+
+      justify-content: center;
+
+      gap: 8px;
+
+      padding: 30px 18px;
+
+      text-align: center;
+
+      color:
+        var(--connecta-muted);
+
+      font-size: 13px;
+
+      line-height: 1.5;
+
+    }
+
+
+    .empty-icon {
+
+      width: 54px;
+      height: 54px;
+
+      display: grid;
+
+      place-items: center;
+
+      border-radius: 18px;
+
+      background:
+        var(--connecta-light);
+
+      font-size: 25px;
+
+    }
+
+
+    .empty-title {
+
+      margin-top: 3px;
+
+      color:
+        var(--connecta-text);
+
+      font-size: 14px;
+
+      font-weight: 900;
+
+    }
+
+
+    .empty-text {
+
+      max-width: 360px;
+
+      color:
+        var(--connecta-muted);
+
+      font-size: 11px;
+
+    }
+
+
+    /* =========================================================
+       OLD TABS
+       Kept because the existing friends.js still references
+       them. They remain available below the Global Chat area.
+    ========================================================= */
+
+    .community-section {
+
+      margin-top: 22px;
+
+    }
+
+
+    .community-toggle {
+
       display: grid;
 
       grid-template-columns:
         repeat(3, 1fr);
 
-      gap: 7px;
+      gap: 6px;
 
-      margin-bottom: 15px;
+      padding: 5px;
+
+      background:
+        #EAF3EC;
+
+      border-radius: 14px;
+
+      margin-bottom: 12px;
+
     }
 
 
     .friend-tab {
+
+      min-height: 40px;
+
       border: 0;
 
-      background: #ffffff;
+      border-radius: 10px;
 
-      color: var(--connecta-muted);
+      background:
+        transparent;
 
-      border: 1px solid var(--connecta-border);
+      color:
+        #6B7280;
 
-      border-radius: 13px;
-
-      padding: 11px 7px;
-
-      font-family: inherit;
-
-      font-size: 12px;
+      font-size: 11px;
 
       font-weight: 800;
 
       cursor: pointer;
+
     }
 
 
     .friend-tab.active {
-      background: var(--connecta-green);
 
-      color: #ffffff;
+      background:
+        #fff;
 
-      border-color: var(--connecta-green);
-    }
-
-
-    /* =========================================================
-       SECTION CARD
-    ========================================================= */
-
-    .friends-section {
-      background: #ffffff;
-
-      border-radius: 20px;
-
-      padding: 17px;
-
-      margin-bottom: 15px;
-
-      border: 1px solid var(--connecta-border);
+      color:
+        var(--connecta-dark-green);
 
       box-shadow:
-        0 5px 18px rgba(0, 0, 0, 0.035);
+        0 3px 10px
+        rgba(0,0,0,.05);
+
     }
 
 
-    .section-heading {
+    .community-section-card {
+
+      background:
+        #fff;
+
+      border:
+        1px solid
+        var(--connecta-border);
+
+      border-radius:
+        20px;
+
+      padding: 10px;
+
+    }
+
+
+    .community-section-header {
+
       display: flex;
 
       align-items: center;
@@ -271,42 +1354,24 @@
 
       gap: 10px;
 
-      margin-bottom: 13px;
+      padding:
+        6px 5px 10px;
+
     }
 
 
-    .section-heading h2 {
+    .community-section-header h3 {
+
       margin: 0;
 
-      color: var(--connecta-text);
+      font-size: 15px;
 
-      font-size: 18px;
+      font-weight: 900;
 
-      font-weight: 800;
     }
 
 
-    .section-heading p {
-      margin: 3px 0 0;
-
-      color: var(--connecta-muted);
-
-      font-size: 12px;
-    }
-
-
-    .count-badge {
-      min-width: 30px;
-
-      height: 27px;
-
-      padding: 0 9px;
-
-      border-radius: 999px;
-
-      background: var(--connecta-light);
-
-      color: var(--connecta-dark-green);
+    .community-count {
 
       display: inline-flex;
 
@@ -314,310 +1379,515 @@
 
       justify-content: center;
 
-      font-size: 11px;
+      min-width: 30px;
+
+      height: 26px;
+
+      padding:
+        0 8px;
+
+      border-radius: 999px;
+
+      background:
+        var(--connecta-light);
+
+      color:
+        var(--connecta-dark-green);
+
+      font-size: 10px;
 
       font-weight: 900;
+
+    }
+
+
+    #followingList,
+    #followersList {
+
+      display: grid;
+
+      grid-template-columns:
+        1fr;
+
+      gap: 8px;
+
     }
 
 
     /* =========================================================
-       USER LIST
+       SUMMARY CARDS
     ========================================================= */
 
-    .users-list {
+    .community-summary {
+
       display: grid;
 
+      grid-template-columns:
+        repeat(2, 1fr);
+
       gap: 9px;
+
+      margin-top: 12px;
+
     }
 
 
-    .user-card {
+    .summary-card {
+
+      display: flex;
+
+      align-items: center;
+
+      gap: 10px;
+
+      padding: 12px;
+
+      border:
+        1px solid
+        var(--connecta-border);
+
+      border-radius: 16px;
+
+      background:
+        #fff;
+
+    }
+
+
+    .summary-icon {
+
+      width: 38px;
+      height: 38px;
+
+      display: grid;
+
+      place-items: center;
+
+      flex:
+        0 0 38px;
+
+      border-radius: 12px;
+
+      background:
+        var(--connecta-light);
+
+      font-size: 17px;
+
+    }
+
+
+    .summary-value {
+
+      font-size: 17px;
+
+      font-weight: 900;
+
+      line-height: 1;
+
+    }
+
+
+    .summary-label {
+
+      margin-top: 4px;
+
+      color:
+        var(--connecta-muted);
+
+      font-size: 9px;
+
+      font-weight: 700;
+
+    }
+
+
+    /* =========================================================
+       PAYMENT MODAL
+    ========================================================= */
+
+    .connecta-modal-overlay {
+
+      position: fixed;
+
+      inset: 0;
+
+      z-index: 9999;
+
+      display: none;
+
+      align-items: flex-end;
+
+      justify-content: center;
+
+      padding: 14px;
+
+      background:
+        rgba(15,23,42,.58);
+
+      backdrop-filter:
+        blur(5px);
+
+    }
+
+
+    .connecta-modal-overlay.show {
+
+      display: flex;
+
+    }
+
+
+    .connecta-payment-modal {
+
+      width: 100%;
+
+      max-width: 440px;
+
+      background:
+        #fff;
+
+      border-radius:
+        25px;
+
+      padding: 20px;
+
+      box-shadow:
+        0 25px 70px
+        rgba(0,0,0,.20);
+
+      animation:
+        modalUp .22s ease;
+
+    }
+
+
+    @keyframes modalUp {
+
+      from {
+
+        opacity: 0;
+
+        transform:
+          translateY(20px);
+
+      }
+
+      to {
+
+        opacity: 1;
+
+        transform:
+          translateY(0);
+
+      }
+
+    }
+
+
+    .modal-handle {
+
+      width: 40px;
+      height: 4px;
+
+      margin:
+        -5px auto 17px;
+
+      border-radius: 999px;
+
+      background:
+        #D1D5DB;
+
+    }
+
+
+    .payment-user {
+
       display: flex;
 
       align-items: center;
 
       gap: 11px;
 
-      padding: 11px;
+      margin-bottom: 16px;
 
-      background: #F8FAF9;
-
-      border: 1px solid #E8EEE9;
-
-      border-radius: 15px;
     }
 
 
-    .user-avatar {
-      width: 46px;
+    .payment-user-avatar {
 
-      height: 46px;
+      width: 52px;
+      height: 52px;
 
-      border-radius: 50%;
+      display: grid;
 
-      flex-shrink: 0;
-
-      background: var(--connecta-light);
-
-      color: var(--connecta-green);
-
-      display: flex;
-
-      align-items: center;
-
-      justify-content: center;
-
-      font-weight: 900;
+      place-items: center;
 
       overflow: hidden;
 
-      position: relative;
+      flex:
+        0 0 52px;
+
+      border-radius: 50%;
+
+      background:
+        #DCFCE7;
+
+      color:
+        var(--connecta-dark-green);
+
+      font-weight: 900;
+
     }
 
 
-    .user-avatar img {
-      width: 100%;
+    .payment-user-avatar img {
 
+      width: 100%;
       height: 100%;
 
       object-fit: cover;
+
     }
 
 
-    .online-dot {
-      position: absolute;
+    .payment-user-name {
 
-      right: 0;
-
-      bottom: 1px;
-
-      width: 12px;
-
-      height: 12px;
-
-      border-radius: 50%;
-
-      background: #22C55E;
-
-      border: 2px solid #ffffff;
-    }
-
-
-    .user-info {
-      min-width: 0;
-
-      flex: 1;
-
-      cursor: pointer;
-    }
-
-
-    .user-name {
-      display: flex;
-
-      align-items: center;
-
-      min-width: 0;
-
-      color: var(--connecta-text);
-
-      font-size: 13px;
-
-      font-weight: 800;
-    }
-
-
-    .user-name-text {
-      min-width: 0;
-
-      overflow: hidden;
-
-      text-overflow: ellipsis;
-
-      white-space: nowrap;
-    }
-
-
-    .verified-badge {
-      display: inline-flex;
-
-      align-items: center;
-
-      justify-content: center;
-
-      width: 17px;
-
-      height: 17px;
-
-      margin-left: 5px;
-
-      border-radius: 50%;
-
-      background: var(--connecta-blue);
-
-      color: #ffffff;
-
-      font-size: 10px;
+      font-size: 15px;
 
       font-weight: 900;
 
-      line-height: 1;
-
-      flex-shrink: 0;
     }
 
 
-    .username {
-      margin-top: 2px;
+    .payment-user-label {
 
-      color: var(--connecta-muted);
+      margin-top: 3px;
+
+      color:
+        var(--connecta-muted);
 
       font-size: 11px;
 
-      white-space: nowrap;
-
-      overflow: hidden;
-
-      text-overflow: ellipsis;
     }
 
 
-    .online-status {
-      margin-top: 2px;
+    .payment-title {
 
-      font-size: 10px;
-
-      font-weight: 700;
-    }
-
-
-    .online-status.online {
-      color: var(--connecta-green);
-    }
-
-
-    .online-status.offline {
-      color: #9CA3AF;
-    }
-
-
-    /* =========================================================
-       ACTION BUTTON
-    ========================================================= */
-
-    .follow-btn {
-      border: 0;
-
-      border-radius: 10px;
-
-      padding: 8px 12px;
-
-      min-width: 72px;
-
-      background: var(--connecta-green);
-
-      color: #ffffff;
-
-      font-family: inherit;
-
-      font-size: 11px;
-
-      font-weight: 800;
-
-      cursor: pointer;
-
-      flex-shrink: 0;
-    }
-
-
-    .follow-btn.following {
-      background: #E8F5EC;
-
-      color: var(--connecta-dark-green);
-
-      border: 1px solid #BBF7D0;
-    }
-
-
-    .follow-btn:disabled {
-      opacity: 0.6;
-
-      cursor: wait;
-    }
-
-
-    /* =========================================================
-       EMPTY / LOADING
-    ========================================================= */
-
-    .empty-state {
-      text-align: center;
-
-      padding: 28px 15px;
-
-      color: var(--connecta-muted);
-
-      font-size: 13px;
-
-      line-height: 1.5;
-    }
-
-
-    .empty-icon {
-      font-size: 30px;
-
-      margin-bottom: 7px;
-    }
-
-
-    /* =========================================================
-       FRIEND COUNT INFO
-    ========================================================= */
-
-    .connection-summary {
-      display: grid;
-
-      grid-template-columns:
-        repeat(2, 1fr);
-
-      gap: 10px;
-
-      margin-bottom: 15px;
-    }
-
-
-    .summary-card {
-      background: #ffffff;
-
-      border: 1px solid var(--connecta-border);
-
-      border-radius: 17px;
-
-      padding: 15px;
-
-      text-align: center;
-    }
-
-
-    .summary-value {
-      display: block;
+      margin: 0 0 7px;
 
       font-size: 20px;
 
       font-weight: 900;
 
-      color: var(--connecta-green);
     }
 
 
-    .summary-label {
-      display: block;
+    .payment-description {
 
-      margin-top: 3px;
+      margin: 0;
 
-      color: var(--connecta-muted);
+      color:
+        var(--connecta-muted);
+
+      font-size: 12px;
+
+      line-height: 1.55;
+
+    }
+
+
+    .payment-amount-box {
+
+      display: flex;
+
+      align-items: center;
+
+      justify-content: space-between;
+
+      margin:
+        16px 0;
+
+      padding:
+        14px;
+
+      border-radius: 16px;
+
+      background:
+        var(--connecta-light);
+
+      border:
+        1px solid
+        #DCFCE7;
+
+    }
+
+
+    .payment-amount-label {
+
+      color:
+        #4B5563;
 
       font-size: 11px;
+
+      font-weight: 700;
+
+    }
+
+
+    .payment-amount {
+
+      color:
+        var(--connecta-dark-green);
+
+      font-size: 22px;
+
+      font-weight: 900;
+
+    }
+
+
+    .payment-phone-label {
+
+      display: block;
+
+      margin-bottom: 7px;
+
+      font-size: 11px;
+
+      font-weight: 800;
+
+    }
+
+
+    #chatPaymentPhone {
+
+      width: 100%;
+
+      height: 49px;
+
+      padding:
+        0 14px;
+
+      border:
+        1px solid
+        var(--connecta-border);
+
+      border-radius: 14px;
+
+      outline: none;
+
+      background:
+        #FAFAFA;
+
+    }
+
+
+    #chatPaymentPhone:focus {
+
+      background: #fff;
+
+      border-color:
+        var(--connecta-green);
+
+      box-shadow:
+        0 0 0 3px
+        rgba(34,197,94,.08);
+
+    }
+
+
+    .payment-security-note {
+
+      display: flex;
+
+      gap: 7px;
+
+      margin-top: 10px;
+
+      color:
+        #6B7280;
+
+      font-size: 10px;
+
+      line-height: 1.45;
+
+    }
+
+
+    .modal-actions {
+
+      display: grid;
+
+      grid-template-columns:
+        1fr 1.4fr;
+
+      gap: 9px;
+
+      margin-top: 17px;
+
+    }
+
+
+    .modal-btn {
+
+      min-height: 47px;
+
+      border-radius: 14px;
+
+      cursor: pointer;
+
+      font-size: 12px;
+
+      font-weight: 900;
+
+    }
+
+
+    .modal-cancel {
+
+      border:
+        1px solid
+        var(--connecta-border);
+
+      background:
+        #fff;
+
+      color:
+        #6B7280;
+
+    }
+
+
+    .modal-pay {
+
+      border: 0;
+
+      background:
+        var(--connecta-green);
+
+      color: #fff;
+
+      box-shadow:
+        0 7px 16px
+        rgba(34,197,94,.18);
+
+    }
+
+
+    .modal-pay:hover {
+
+      background:
+        var(--connecta-dark-green);
+
+    }
+
+
+    .modal-pay:disabled {
+
+      opacity: .65;
+
+      cursor: not-allowed;
+
     }
 
 
@@ -625,66 +1895,235 @@
        TOAST
     ========================================================= */
 
-    .friends-toast {
+    #friendsToast {
+
       position: fixed;
 
       left: 50%;
 
-      bottom: 88px;
+      bottom: 82px;
 
-      transform:
-        translate(-50%, 15px);
+      z-index: 10000;
 
-      background: #17201A;
+      width:
+        max-content;
 
-      color: #ffffff;
+      max-width:
+        calc(100% - 30px);
 
-      padding: 11px 16px;
+      padding:
+        11px 15px;
 
-      border-radius: 12px;
+      border-radius: 999px;
 
-      font-size: 13px;
+      background:
+        #17201A;
+
+      color:
+        #fff;
+
+      font-size: 11px;
 
       font-weight: 700;
 
-      z-index: 9999;
+      box-shadow:
+        0 10px 30px
+        rgba(0,0,0,.18);
 
       opacity: 0;
 
       pointer-events: none;
 
+      transform:
+        translate(-50%, 10px);
+
       transition:
-        opacity 0.2s ease,
-        transform 0.2s ease;
+        .2s ease;
 
-      max-width: calc(100% - 30px);
-
-      text-align: center;
     }
 
 
-    .friends-toast.show {
+    #friendsToast.show {
+
       opacity: 1;
 
       transform:
         translate(-50%, 0);
+
     }
 
 
     /* =========================================================
-       RESPONSIVE
+       MOBILE
     ========================================================= */
 
-    @media (min-width: 700px) {
+    @media (max-width: 520px) {
 
       .friends-page {
-        padding-top: 25px;
+
+        padding:
+          12px
+          10px
+          105px;
+
       }
 
 
-      .users-list {
+      .global-hero {
+
+        padding: 21px 17px;
+
+        border-radius: 21px;
+
+      }
+
+
+      .hero-title {
+
+        font-size: 27px;
+
+      }
+
+
+      .global-filter-card {
+
+        padding: 13px;
+
+        border-radius: 20px;
+
+      }
+
+
+      .user-card {
+
         grid-template-columns:
-          repeat(2, minmax(0, 1fr));
+          52px
+          minmax(0,1fr)
+          auto;
+
+        gap: 9px;
+
+        padding: 10px;
+
+        border-radius: 16px;
+
+      }
+
+
+      .user-avatar {
+
+        width: 52px;
+        height: 52px;
+
+        flex-basis: 52px;
+
+      }
+
+
+      .follow-btn,
+      .chat-btn {
+
+        min-width: 69px;
+
+        min-height: 32px;
+
+        padding:
+          0 7px;
+
+        font-size: 9px;
+
+      }
+
+
+      .chat-fee-label {
+
+        font-size: 8px;
+
+      }
+
+    }
+
+
+    /* =========================================================
+       TABLET / DESKTOP
+    ========================================================= */
+
+    @media (min-width: 650px) {
+
+      .friends-page {
+
+        padding:
+          22px
+          18px
+          110px;
+
+      }
+
+
+      .filter-grid {
+
+        grid-template-columns:
+          1fr 1fr;
+
+      }
+
+
+      .search-wrap {
+
+        margin-top: 12px;
+
+      }
+
+
+      #discoverList {
+
+        grid-template-columns:
+          repeat(2, minmax(0,1fr));
+
+      }
+
+
+      #followingList,
+      #followersList {
+
+        grid-template-columns:
+          repeat(2, minmax(0,1fr));
+
+      }
+
+
+      .connecta-modal-overlay {
+
+        align-items: center;
+
+      }
+
+    }
+
+
+    @media (min-width: 900px) {
+
+      .friends-page {
+
+        max-width: 1080px;
+
+      }
+
+
+      #discoverList {
+
+        grid-template-columns:
+          repeat(3, minmax(0,1fr));
+
+      }
+
+
+      #followingList,
+      #followersList {
+
+        grid-template-columns:
+          repeat(3, minmax(0,1fr));
+
       }
 
     }
@@ -698,50 +2137,62 @@
 
 
   <!-- =======================================================
-       HEADER
+       EXISTING CONNECTA HEADER
   ======================================================== -->
 
-  <header class="app-header">
+  <header class="topbar">
 
     <button
-      class="icon-btn"
       id="menuBtn"
+      class="icon-btn"
+      type="button"
       aria-label="Open menu"
     >
       ☰
     </button>
 
 
-    <a
-      class="header-brand"
-      href="dashboard.html"
-    >
-      CONNECTA
-    </a>
+    <div class="brand">
+
+      <div class="brand-mark">
+        C
+      </div>
+
+      <div class="brand-text">
+        CONNECTA
+      </div>
+
+    </div>
 
 
-    <div class="header-right">
+    <div class="topbar-right">
 
-      <div
-        class="balance"
-        id="balancePill"
-      >
-        KSh.
-        <span id="balanceAmount">0.00</span>
+      <div class="balance-box">
+
+        <span class="balance-label">
+          Balance
+        </span>
+
+        <strong id="balanceAmount">
+          0.00
+        </strong>
+
       </div>
 
 
       <button
-        class="connection-btn"
         id="connectionBtn"
+        class="connection-btn"
+        type="button"
       >
         Get Connection
       </button>
 
 
       <button
-        class="profile-btn"
         id="profileBtn"
+        class="profile-btn"
+        type="button"
         aria-label="Open profile"
       >
         U
@@ -757,113 +2208,108 @@
        SIDE MENU
   ======================================================== -->
 
+  <div
+    id="menuOverlay"
+    class="menu-overlay"
+  ></div>
+
+
   <aside
-    class="side-menu"
     id="sideMenu"
+    class="side-menu"
     aria-hidden="true"
   >
 
-    <div class="menu-brand">
-
-      <span class="brand-mark">
-        C
-      </span>
-
-      CONNECTA
-
-    </div>
-
-
-    <div class="menu-user">
+    <div class="side-menu-profile">
 
       <div
-        class="avatar"
         id="menuAvatar"
+        class="menu-avatar"
       >
         U
       </div>
 
-      <div>
+
+      <div class="menu-user-info">
 
         <strong id="menuName">
           CONNECTA User
         </strong>
 
-        <small id="menuUsername">
+        <span id="menuUsername">
           @username
-        </small>
+        </span>
 
       </div>
 
     </div>
 
 
-    <a href="dashboard.html">
-      💬
-      <span>Chats</span>
-    </a>
+    <nav class="side-nav">
+
+      <a href="dashboard.html">
+        💬
+        <span>Chats</span>
+      </a>
 
 
-    <a href="groups.html">
-      👥
-      <span>Groups</span>
-    </a>
+      <a href="groups.html">
+        👥
+        <span>Groups</span>
+      </a>
 
 
-    <a href="stories.html">
-      ◉
-      <span>Stories</span>
-    </a>
+      <a href="stories.html">
+        ⭕
+        <span>Stories</span>
+      </a>
 
 
-    <a
-      class="active"
-      href="friends.html"
-    >
-      👤
-      <span>Friends</span>
-    </a>
+      <a
+        href="friends.html"
+        class="active"
+      >
+        🌍
+        <span>Global Chat</span>
+      </a>
 
 
-    <a href="online.html">
-      🟢
-      <span>Online Users</span>
-    </a>
+      <a href="online.html">
+        🟢
+        <span>Online Users</span>
+      </a>
 
 
-    <a href="verification.html">
-      ✓
-      <span>Verification</span>
-    </a>
+      <a href="verification.html">
+        ✓
+        <span>Verification</span>
+      </a>
 
 
-    <a href="earn.html">
-      🎁
-      <span>Refer & Earn</span>
-    </a>
+      <a href="earn.html">
+        💰
+        <span>Refer &amp; Earn</span>
+      </a>
 
 
-    <a href="settings.html">
-      ⚙
-      <span>Settings</span>
-    </a>
+      <a href="settings.html">
+        ⚙️
+        <span>Settings</span>
+      </a>
 
 
-    <button
-      id="logoutBtn"
-      class="logout-link"
-    >
-      ↪
-      <span>Logout</span>
-    </button>
+      <button
+        id="logoutBtn"
+        type="button"
+        class="side-nav-logout"
+      >
+        🚪
+        <span>Logout</span>
+      </button>
+
+    </nav>
 
   </aside>
-
-
-  <div
-    class="menu-overlay"
-    id="menuOverlay"
-  ></div>
 
 
 
@@ -878,368 +2324,640 @@
          HERO
     ====================================================== -->
 
-    <section class="friends-hero">
+    <section class="global-hero">
 
-      <span class="eyebrow">
-        CONNECTA COMMUNITY
+      <div class="hero-content">
+
+        <div class="hero-eyebrow">
+          🌍 CONNECTA GLOBAL CHAT
+        </div>
+
+
+        <h1 class="hero-title">
+          Meet &amp; Chat
+        </h1>
+
+
+        <p class="hero-description">
+          Discover people who are available to chat,
+          choose who you want to meet, and start a new
+          conversation on CONNECTA.
+        </p>
+
+
+        <div class="global-chat-badge">
+          💬 Find someone new to talk to
+        </div>
+
+
+        <div class="hero-note">
+          🔒 You only pay when you choose to unlock a conversation.
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         FILTERS
+    ====================================================== -->
+
+    <section class="global-filter-card">
+
+      <div class="filter-heading">
+
+        <div>
+
+          <h2>
+            Who do you want to meet?
+          </h2>
+
+          <p>
+            Choose your preferred chat partner.
+          </p>
+
+        </div>
+
+
+        <div class="filter-icon">
+          🌍
+        </div>
+
+      </div>
+
+
+      <label class="filter-label">
+        Gender
+      </label>
+
+
+      <div
+        class="gender-options"
+        id="genderOptions"
+      >
+
+        <button
+          type="button"
+          class="gender-btn active"
+          data-gender="everyone"
+        >
+          👥 Everyone
+        </button>
+
+
+        <button
+          type="button"
+          class="gender-btn"
+          data-gender="male"
+        >
+          👨 Male
+        </button>
+
+
+        <button
+          type="button"
+          class="gender-btn"
+          data-gender="female"
+        >
+          👩 Female
+        </button>
+
+      </div>
+
+
+
+      <div class="filter-grid">
+
+        <div class="field-group">
+
+          <label
+            class="filter-label"
+            for="countryFilter"
+          >
+            Country
+          </label>
+
+          <select
+            id="countryFilter"
+            class="field-input"
+          >
+
+            <option value="all">
+              🌍 Any country
+            </option>
+
+            <option value="kenya">
+              🇰🇪 Kenya
+            </option>
+
+            <option value="uganda">
+              🇺🇬 Uganda
+            </option>
+
+            <option value="tanzania">
+              🇹🇿 Tanzania
+            </option>
+
+            <option value="nigeria">
+              🇳🇬 Nigeria
+            </option>
+
+            <option value="ghana">
+              🇬🇭 Ghana
+            </option>
+
+            <option value="south-africa">
+              🇿🇦 South Africa
+            </option>
+
+            <option value="united-states">
+              🇺🇸 United States
+            </option>
+
+            <option value="united-kingdom">
+              🇬🇧 United Kingdom
+            </option>
+
+            <option value="canada">
+              🇨🇦 Canada
+            </option>
+
+            <option value="australia">
+              🇦🇺 Australia
+            </option>
+
+            <option value="germany">
+              🇩🇪 Germany
+            </option>
+
+            <option value="france">
+              🇫🇷 France
+            </option>
+
+            <option value="other">
+              🌐 Other
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="field-group">
+
+          <label
+            class="filter-label"
+            for="friendSearch"
+          >
+            Search
+          </label>
+
+
+          <div class="search-wrap">
+
+            <span class="search-icon">
+              🔎
+            </span>
+
+            <input
+              id="friendSearch"
+              class="field-input"
+              type="search"
+              autocomplete="off"
+              placeholder="Search name or username..."
+            >
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         AVAILABLE PEOPLE
+    ====================================================== -->
+
+    <div class="available-header">
+
+      <div>
+
+        <h2 class="available-title">
+          People Available for Chat
+        </h2>
+
+        <p class="available-subtitle">
+          Users who have chosen to meet new people.
+        </p>
+
+      </div>
+
+
+      <span
+        id="discoverCount"
+        class="available-count"
+      >
+        0
       </span>
-
-      <h1>
-        Find your friends 👥
-      </h1>
-
-      <p>
-        Discover people on CONNECTA, follow them,
-        and start connecting.
-      </p>
-
-    </section>
-
-
-
-    <!-- =====================================================
-         SEARCH
-    ====================================================== -->
-
-    <section class="search-card">
-
-      <div class="search-box">
-
-        <span class="search-icon">
-          🔎
-        </span>
-
-        <input
-          id="friendSearch"
-          type="search"
-          placeholder="Search by name or username..."
-          autocomplete="off"
-        >
-
-      </div>
-
-    </section>
-
-
-
-    <!-- =====================================================
-         SUMMARY
-    ====================================================== -->
-
-    <section class="connection-summary">
-
-      <div class="summary-card">
-
-        <span
-          class="summary-value"
-          id="followingCount"
-        >
-          0
-        </span>
-
-        <span class="summary-label">
-          Following
-        </span>
-
-      </div>
-
-
-      <div class="summary-card">
-
-        <span
-          class="summary-value"
-          id="followersCount"
-        >
-          0
-        </span>
-
-        <span class="summary-label">
-          Followers
-        </span>
-
-      </div>
-
-    </section>
-
-
-
-    <!-- =====================================================
-         TABS
-    ====================================================== -->
-
-    <div class="friends-tabs">
-
-      <button
-        class="friend-tab active"
-        data-tab="discover"
-      >
-        Discover
-      </button>
-
-
-      <button
-        class="friend-tab"
-        data-tab="following"
-      >
-        Following
-      </button>
-
-
-      <button
-        class="friend-tab"
-        data-tab="followers"
-      >
-        Followers
-      </button>
 
     </div>
 
 
+    <section class="section-card">
 
-    <!-- =====================================================
-         DISCOVER
-    ====================================================== -->
-
-    <section
-      class="friends-section"
-      id="discoverSection"
-    >
-
-      <div class="section-heading">
-
-        <div>
-
-          <h2>
-            Discover People
-          </h2>
-
-          <p>
-            People you can connect with
-          </p>
-
-        </div>
-
-
-        <span
-          class="count-badge"
-          id="discoverCount"
-        >
-          0
-        </span>
-
-      </div>
-
-
-      <div
-        class="users-list"
-        id="discoverList"
-      >
+      <div id="discoverList">
 
         <div class="empty-state">
 
           <div class="empty-icon">
+            🌍
+          </div>
+
+          <div class="empty-title">
+            Finding people...
+          </div>
+
+          <div class="empty-text">
+            We're looking for CONNECTA users who are
+            available for Global Chat.
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         FOLLOWING / FOLLOWERS
+         Kept for compatibility with existing friends.js.
+    ====================================================== -->
+
+    <section class="community-section">
+
+      <div class="community-toggle">
+
+        <button
+          type="button"
+          class="friend-tab active"
+          data-tab="discover"
+        >
+          🌍 Discover
+        </button>
+
+
+        <button
+          type="button"
+          class="friend-tab"
+          data-tab="following"
+        >
+          Following
+        </button>
+
+
+        <button
+          type="button"
+          class="friend-tab"
+          data-tab="followers"
+        >
+          Followers
+        </button>
+
+      </div>
+
+
+
+      <!-- FOLLOWING -->
+
+      <section
+        id="followingSection"
+        class="community-section-card"
+        hidden
+      >
+
+        <div class="community-section-header">
+
+          <h3>
+            People You Follow
+          </h3>
+
+          <span
+            id="followingListCount"
+            class="community-count"
+          >
+            0
+          </span>
+
+        </div>
+
+
+        <div id="followingList"></div>
+
+      </section>
+
+
+
+      <!-- FOLLOWERS -->
+
+      <section
+        id="followersSection"
+        class="community-section-card"
+        hidden
+      >
+
+        <div class="community-section-header">
+
+          <h3>
+            Your Followers
+          </h3>
+
+          <span
+            id="followersListCount"
+            class="community-count"
+          >
+            0
+          </span>
+
+        </div>
+
+
+        <div id="followersList"></div>
+
+      </section>
+
+
+
+      <!-- DISCOVER COMPATIBILITY -->
+
+      <section
+        id="discoverSection"
+        class="community-section-card"
+        hidden
+      >
+
+        <div class="community-section-header">
+
+          <h3>
+            Global Chat
+          </h3>
+
+          <span
+            id="discoverCount"
+            class="community-count"
+          >
+            0
+          </span>
+
+        </div>
+
+
+        <div id="discoverList"></div>
+
+      </section>
+
+
+      <!-- SUMMARY -->
+
+      <div class="community-summary">
+
+        <div class="summary-card">
+
+          <div class="summary-icon">
+            ➡️
+          </div>
+
+          <div>
+
+            <div
+              id="followingCount"
+              class="summary-value"
+            >
+              0
+            </div>
+
+            <div class="summary-label">
+              Following
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="summary-card">
+
+          <div class="summary-icon">
             👥
           </div>
 
-          Loading people...
+          <div>
 
-        </div>
+            <div
+              id="followersCount"
+              class="summary-value"
+            >
+              0
+            </div>
 
-      </div>
+            <div class="summary-label">
+              Followers
+            </div>
 
-    </section>
-
-
-
-    <!-- =====================================================
-         FOLLOWING
-    ====================================================== -->
-
-    <section
-      class="friends-section"
-      id="followingSection"
-      hidden
-    >
-
-      <div class="section-heading">
-
-        <div>
-
-          <h2>
-            Following
-          </h2>
-
-          <p>
-            People you follow
-          </p>
-
-        </div>
-
-
-        <span
-          class="count-badge"
-          id="followingListCount"
-        >
-          0
-        </span>
-
-      </div>
-
-
-      <div
-        class="users-list"
-        id="followingList"
-      >
-
-        <div class="empty-state">
-
-          <div class="empty-icon">
-            👤
           </div>
 
-          You are not following anyone yet.
-
         </div>
 
       </div>
 
     </section>
-
-
-
-    <!-- =====================================================
-         FOLLOWERS
-    ====================================================== -->
-
-    <section
-      class="friends-section"
-      id="followersSection"
-      hidden
-    >
-
-      <div class="section-heading">
-
-        <div>
-
-          <h2>
-            Followers
-          </h2>
-
-          <p>
-            People following you
-          </p>
-
-        </div>
-
-
-        <span
-          class="count-badge"
-          id="followersListCount"
-        >
-          0
-        </span>
-
-      </div>
-
-
-      <div
-        class="users-list"
-        id="followersList"
-      >
-
-        <div class="empty-state">
-
-          <div class="empty-icon">
-            👥
-          </div>
-
-          You don't have any followers yet.
-
-        </div>
-
-      </div>
-
-    </section>
-
 
   </main>
 
 
 
   <!-- =======================================================
-       BOTTOM NAV
+       PAYMENT MODAL
   ======================================================== -->
 
-  <nav
-    class="bottom-nav"
-    aria-label="Main navigation"
+  <div
+    id="chatPaymentOverlay"
+    class="connecta-modal-overlay"
+    aria-hidden="true"
   >
 
+    <div
+      id="chatPaymentModal"
+      class="connecta-payment-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="chatPaymentTitle"
+    >
+
+      <div class="modal-handle"></div>
+
+
+      <div class="payment-user">
+
+        <div
+          id="chatPaymentAvatar"
+          class="payment-user-avatar"
+        >
+          U
+        </div>
+
+
+        <div>
+
+          <div
+            id="chatPaymentUserName"
+            class="payment-user-name"
+          >
+            CONNECTA User
+          </div>
+
+          <div class="payment-user-label">
+            Global Chat
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <h2
+        id="chatPaymentTitle"
+        class="payment-title"
+      >
+        Unlock Conversation
+      </h2>
+
+
+      <p class="payment-description">
+
+        Pay the conversation fee to unlock your
+        conversation request. Payment unlocks the
+        ability to start the conversation; the other
+        person may accept, ignore or block the request.
+
+      </p>
+
+
+      <div class="payment-amount-box">
+
+        <span class="payment-amount-label">
+          Conversation fee
+        </span>
+
+        <strong
+          id="chatPaymentAmount"
+          class="payment-amount"
+        >
+          KSh 20
+        </strong>
+
+      </div>
+
+
+      <label
+        for="chatPaymentPhone"
+        class="payment-phone-label"
+      >
+        M-PESA phone number
+      </label>
+
+
+      <input
+        id="chatPaymentPhone"
+        type="tel"
+        inputmode="numeric"
+        autocomplete="tel"
+        placeholder="e.g. 0712345678"
+      >
+
+
+      <div class="payment-security-note">
+
+        <span>🔒</span>
+
+        <span>
+          Your payment is processed through CONNECTA's
+          secure payment system. The conversation is only
+          unlocked after payment is verified.
+        </span>
+
+      </div>
+
+
+      <div class="modal-actions">
+
+        <button
+          id="chatPaymentCancel"
+          type="button"
+          class="modal-btn modal-cancel"
+        >
+          Cancel
+        </button>
+
+
+        <button
+          id="chatPaymentSubmit"
+          type="button"
+          class="modal-btn modal-pay"
+        >
+          Pay &amp; Start Chat
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <!-- =======================================================
+       BOTTOM NAVIGATION
+  ======================================================== -->
+
+  <nav class="bottom-nav">
+
     <a href="dashboard.html">
-
-      <span>
-        💬
-      </span>
-
-      <small>
-        Chats
-      </small>
-
+      <span>💬</span>
+      <small>Chats</small>
     </a>
 
 
     <a href="groups.html">
-
-      <span>
-        👥
-      </span>
-
-      <small>
-        Groups
-      </small>
-
+      <span>👥</span>
+      <small>Groups</small>
     </a>
 
 
     <a href="stories.html">
-
-      <span>
-        ◉
-      </span>
-
-      <small>
-        Stories
-      </small>
-
+      <span>⭕</span>
+      <small>Stories</small>
     </a>
 
 
     <a
-      class="active"
       href="friends.html"
+      class="active"
     >
-
-      <span>
-        👤
-      </span>
-
-      <small>
-        Friends
-      </small>
-
+      <span>🌍</span>
+      <small>Global</small>
     </a>
 
 
     <a href="earn.html">
-
-      <span>
-        🎁
-      </span>
-
-      <small>
-        Earn
-      </small>
-
+      <span>💰</span>
+      <small>Earn</small>
     </a>
 
   </nav>
@@ -1251,19 +2969,150 @@
   ======================================================== -->
 
   <div
-    class="friends-toast"
     id="friendsToast"
     role="status"
+    aria-live="polite"
   ></div>
 
 
 
   <!-- =======================================================
-       JAVASCRIPT
+       SCRIPT
   ======================================================== -->
 
-  <script type="module" src="js/friends.js"></script>
+  <script
+    type="module"
+    src="js/friends.js"
+  ></script>
+
+
+  <!-- =======================================================
+       SMALL UI HELPERS
+       These only control the new HTML UI. Firebase/payment
+       functionality will be handled by friends.js/backend.
+  ======================================================== -->
+
+  <script>
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      () => {
+
+        /*
+         * Gender selection.
+         */
+
+        const genderButtons =
+          document.querySelectorAll(
+            ".gender-btn"
+          );
+
+
+        genderButtons.forEach(
+          button => {
+
+            button.addEventListener(
+              "click",
+              () => {
+
+                genderButtons.forEach(
+                  item => {
+
+                    item.classList.remove(
+                      "active"
+                    );
+
+                  }
+                );
+
+
+                button.classList.add(
+                  "active"
+                );
+
+              }
+            );
+
+          }
+        );
+
+
+        /*
+         * Payment modal close.
+         * The actual open/payment logic will be
+         * connected in friends.js.
+         */
+
+        const overlay =
+          document.getElementById(
+            "chatPaymentOverlay"
+          );
+
+
+        const cancel =
+          document.getElementById(
+            "chatPaymentCancel"
+          );
+
+
+        if (cancel) {
+
+          cancel.addEventListener(
+            "click",
+            () => {
+
+              if (overlay) {
+
+                overlay.classList.remove(
+                  "show"
+                );
+
+                overlay.setAttribute(
+                  "aria-hidden",
+                  "true"
+                );
+
+              }
+
+            }
+          );
+
+        }
+
+
+        if (overlay) {
+
+          overlay.addEventListener(
+            "click",
+            event => {
+
+              if (
+                event.target ===
+                overlay
+              ) {
+
+                overlay.classList.remove(
+                  "show"
+                );
+
+                overlay.setAttribute(
+                  "aria-hidden",
+                  "true"
+                );
+
+              }
+
+            }
+          );
+
+        }
+
+      }
+    );
+
+  </script>
+
 
 </body>
 
-</html>
+  </html>
