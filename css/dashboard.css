@@ -171,3 +171,330 @@ body {
   max-width: 100%;
   min-width: 0;
 }
+
+/* ========================================
+   CONNECTA DASHBOARD SKELETON
+======================================== */
+
+@keyframes connectaSkeletonShimmer {
+
+  0% {
+    background-position: -700px 0;
+  }
+
+  100% {
+    background-position: 700px 0;
+  }
+
+}
+
+.connecta-skeleton {
+
+  background:
+    linear-gradient(
+      90deg,
+      #edf2ee 25%,
+      #f8faf8 50%,
+      #edf2ee 75%
+    );
+
+  background-size: 1400px 100%;
+
+  animation:
+    connectaSkeletonShimmer
+    1.25s infinite linear;
+
+  border-radius: 12px;
+
+}
+
+
+/* ========================================
+   ONLINE USERS SKELETON
+======================================== */
+
+.connecta-skeleton-users {
+
+  display: flex;
+
+  flex-direction: row;
+
+  flex-wrap: nowrap;
+
+  gap: 11px;
+
+  width: 100%;
+
+  overflow: hidden;
+
+}
+
+
+.connecta-skeleton-user {
+
+  min-width: 138px;
+
+  max-width: 138px;
+
+  flex: 0 0 138px;
+
+  height: 166px;
+
+  border-radius: 18px;
+
+  padding: 12px 8px;
+
+}
+
+
+/* ========================================
+   CHAT SKELETON
+======================================== */
+
+.connecta-skeleton-chat {
+
+  width: 100%;
+
+  height: 68px;
+
+  margin-bottom: 8px;
+
+  border-radius: 12px;
+
+}
+
+
+/* ========================================
+   MOBILE SKELETON
+======================================== */
+
+@media (max-width: 600px) {
+
+  .connecta-skeleton-user {
+
+    min-width: 122px;
+
+    max-width: 122px;
+
+    flex: 0 0 122px;
+
+    height: 154px;
+
+  }
+
+}
+
+/* ========================================
+   USER CARD SKELETON
+======================================== */
+
+.skeleton-user-card {
+
+  min-width: 138px;
+
+  max-width: 138px;
+
+  flex: 0 0 138px;
+
+  height: 166px;
+
+  background:#fff;
+
+  border:1px solid #e5e9e6;
+
+  border-radius:18px;
+
+  padding:12px 8px;
+
+  display:flex;
+
+  flex-direction:column;
+
+  align-items:center;
+
+}
+
+
+.skeleton-avatar {
+
+  width:64px;
+
+  height:64px;
+
+  border-radius:50%;
+
+  margin-bottom:9px;
+
+}
+
+
+.skeleton-name {
+
+  width:82px;
+
+  height:11px;
+
+  border-radius:8px;
+
+  margin-bottom:8px;
+
+}
+
+
+.skeleton-status {
+
+  width:55px;
+
+  height:8px;
+
+  border-radius:8px;
+
+  margin-bottom:auto;
+
+}
+
+
+.skeleton-button {
+
+  width:100%;
+
+  height:30px;
+
+  border-radius:20px;
+
+}
+
+
+/* ========================================
+   CHAT SKELETON
+======================================== */
+
+.skeleton-chat-list {
+
+  width:100%;
+
+}
+
+
+.skeleton-chat-row {
+
+  display:flex;
+
+  align-items:center;
+
+  gap:12px;
+
+  width:100%;
+
+  height:68px;
+
+  padding:10px 7px;
+
+  border-bottom:1px solid #edf0ee;
+
+}
+
+
+.skeleton-chat-avatar {
+
+  width:42px;
+
+  height:42px;
+
+  min-width:42px;
+
+  border-radius:50%;
+
+}
+
+
+.skeleton-chat-content {
+
+  flex:1;
+
+  min-width:0;
+
+}
+
+
+.skeleton-chat-name {
+
+  width:110px;
+
+  height:11px;
+
+  border-radius:8px;
+
+  margin-bottom:9px;
+
+}
+
+
+.skeleton-chat-message {
+
+  width:75%;
+
+  max-width:190px;
+
+  height:9px;
+
+  border-radius:8px;
+
+}
+
+
+.skeleton-chat-time {
+
+  width:35px;
+
+  height:8px;
+
+  border-radius:8px;
+
+}
+
+
+/* ========================================
+   MOBILE
+======================================== */
+
+@media (max-width:600px) {
+
+  .skeleton-user-card {
+
+    min-width:122px;
+
+    max-width:122px;
+
+    flex:0 0 122px;
+
+    height:154px;
+
+  }
+
+
+  .skeleton-avatar {
+
+    width:58px;
+
+    height:58px;
+
+  }
+
+
+  .skeleton-name {
+
+    width:72px;
+
+  }
+
+
+  .skeleton-chat-row {
+
+    padding-left:4px;
+
+    padding-right:4px;
+
+  }
+
+}
