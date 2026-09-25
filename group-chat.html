@@ -452,22 +452,77 @@
            CHAT PAGE
         ========================================================= */
 
-        .messages-area {
+.messages-area {
 
-            flex: 1;
+    flex: 1 1 auto;
 
-            overflow-y: auto;
-            overflow-x: hidden;
+    min-height: 0;
 
-            padding:
-                82px
-                10px
-                92px;
+    overflow-y: auto;
+    overflow-x: hidden;
 
-            scroll-behavior: smooth;
+    /*
+       Header = 68px
+       Extra bottom space = composer + Android/PWA safe area
+    */
+    padding:
+        82px
+        10px
+        calc(
+            150px +
+            env(safe-area-inset-bottom, 0px)
+        );
 
-            -webkit-overflow-scrolling: touch;
-        }
+    scroll-padding-bottom:
+        calc(
+            150px +
+            env(safe-area-inset-bottom, 0px)
+        );
+
+    scroll-behavior: smooth;
+
+    -webkit-overflow-scrolling: touch;
+
+    overscroll-behavior-y: contain;
+}
+
+        /* =========================================================
+   ANDROID APP / PWA LAST-MESSAGE VISIBILITY FIX
+========================================================= */
+
+.messages-area {
+    /*
+       Make sure the final message can always be
+       scrolled completely above the fixed composer.
+    */
+    padding-bottom:
+        calc(
+            150px +
+            env(safe-area-inset-bottom, 0px)
+        ) !important;
+}
+
+
+/*
+   Give the message list a little extra physical
+   space at the very bottom.
+*/
+.messages-inner::after {
+
+    content: "";
+
+    display: block;
+
+    width: 100%;
+
+    height:
+        calc(
+            35px +
+            env(safe-area-inset-bottom, 0px)
+        );
+
+    flex-shrink: 0;
+}
 
 
         .messages-inner {
