@@ -108,13 +108,20 @@
 
         .group-chat-page {
 
-            height: 100dvh;
+           width: 100%;
 
-            display: flex;
+           height: var(--connecta-group-app-height, 100vh);
 
-            flex-direction: column;
+           min-height: 0;
+
+           max-height: var(--connecta-group-app-height, 100vh);
+
+           display: flex;
+
+           flex-direction: column;
+
+           overflow: hidden;
         }
-
 
         /* =========================================================
            HEADER
@@ -454,19 +461,39 @@
 
         .messages-area {
 
-            flex: 1;
+    flex: 1 1 auto;
 
-            overflow-y: auto;
-            overflow-x: hidden;
+    min-height: 0;
 
-            padding:
-                82px
-                10px
-                92px;
+    height: auto;
 
-            scroll-behavior: smooth;
+    overflow-y: auto;
+    overflow-x: hidden;
 
-            -webkit-overflow-scrolling: touch;
+    /*
+     * The bottom padding must be larger than the fixed
+     * composer so the final message can scroll completely
+     * above it.
+     */
+      padding:
+        82px
+        10px
+        calc(
+            118px +
+            env(safe-area-inset-bottom)
+        );
+
+      scroll-behavior: smooth;
+
+       -webkit-overflow-scrolling: touch;
+
+        overscroll-behavior: contain;
+
+    /*
+     * Prevent Android PWA from applying unexpected
+     * scroll anchoring when the viewport changes.
+     */
+           overflow-anchor: auto;
         }
 
 
@@ -1260,22 +1287,46 @@
 
         .composer-wrap {
 
-            position: fixed;
+    position: fixed;
 
-            left: 0;
-            right: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 
-            bottom: 0;
+    z-index: 90;
 
-            z-index: 90;
+    /*
+     * Keep the composer completely inside the visible
+     * Android/PWA viewport.
+     */
+    padding:
+        7px
+        9px
+        max(
+            7px,
+            calc(
+                7px +
+                env(safe-area-inset-bottom)
+            )
+        );
 
-            padding:
-                7px
-                9px
-                calc(
-                    7px +
-                    env(safe-area-inset-bottom)
-                );
+      min-height: 56px;
+
+      background:
+         rgba(255,255,255,.97);
+
+        border-top:
+         1px solid
+           var(--border);
+
+          backdrop-filter:
+           blur(12px);
+
+      /*
+         * Never allow flex/layout calculations to shrink it.
+       */
+           flex-shrink: 0;
+        }
 
             background:
                 rgba(255,255,255,.97);
@@ -3484,7 +3535,112 @@
 <!-- =========================================================
      JAVASCRIPT
 ========================================================= -->
+<script>
+(function () {
 
+    const root = document.documentElement;
+
+    function updateGroupChatViewport() {
+
+        let height = window.innerHeight;
+
+        if (
+            window.visualViewport &&
+            window.visualViewport.height
+        ) {
+            height = window.visualViewport.height;
+        }
+
+        if (
+            !height ||
+            !Number.isFinite(height)
+        ) {
+            return;
+        }
+
+        root.style.setProperty(
+            "--connecta-group-app-height",
+            `${Math.round(height)}px`
+        );
+    }
+
+
+    updateGroupChatViewport();
+
+
+    window.addEventListener(
+        "resize",
+        updateGroupChatViewport,
+        {
+            passive: true
+        }
+    );
+
+
+    window.addEventListener(
+        "orientationchange",
+        function () {
+
+            setTimeout(
+                updateGroupChatViewport,
+                80
+            );
+
+            setTimeout(
+                updateGroupChatViewport,
+                300
+            );
+
+        },
+        {
+            passive: true
+        }
+    );
+
+
+    if (window.visualViewport) {
+
+        window.visualViewport.addEventListener(
+            "resize",
+            updateGroupChatViewport,
+            {
+                passive: true
+            }
+        );
+
+        window.visualViewport.addEventListener(
+            "scroll",
+            updateGroupChatViewport,
+            {
+                passive: true
+            }
+        );
+    }
+
+
+    /*
+     * Android installed PWAs can settle their viewport
+     * shortly after launch.
+     */
+    setTimeout(
+        updateGroupChatViewport,
+        100
+    );
+
+    setTimeout(
+        updateGroupChatViewport,
+        500
+    );
+
+    setTimeout(
+        updateGroupChatViewport,
+        1000
+    );
+
+})();
+</script>
+
+    
 <script
     type="module"
     src="js/group-chat.js"
