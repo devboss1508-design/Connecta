@@ -2,6 +2,8 @@
    CONNECTA DASHBOARD ENGINE
    File: frontend/js/dashboard.js
 
+   FAST / CACHE-FIRST VERSION
+
    Compatible with:
    - dashboard.html
    - dashboard.css
@@ -11,7 +13,8 @@
    - group-chat.js
 
    FEATURES
-   - Cache-first dashboard
+   - Ultra-fast cache-first startup
+   - Firebase Auth immediate session
    - Instant previous data
    - Skeleton instead of "Loading..."
    - Live users
@@ -25,18 +28,36 @@
    - Follow system
    - Profile cache
    - Dashboard cache
+   - Debounced cache writes
    - Presence heartbeat
    - Account restriction protection
+   - BFCache support
+========================================================= */
+
+
+/* =========================================================
+   FIREBASE
 ========================================================= */
 
 import {
+    auth,
     db
 } from "./firebase.js";
+
+
+/* =========================================================
+   GLOBAL AUTH
+========================================================= */
 
 import {
     getCurrentConnectaUser,
     logout
 } from "./globalAuth.js";
+
+
+/* =========================================================
+   FIRESTORE
+========================================================= */
 
 import {
     collection,
@@ -55,10 +76,11 @@ import {
 
 
 /* =========================================================
-   DOM
+   DOM HELPER
 ========================================================= */
 
-const $ = id => document.getElementById(id);
+const $ = id =>
+    document.getElementById(id);
 
 
 /* =========================================================
@@ -88,15 +110,23 @@ let presenceInterval = null;
 let groupProcessTimer = null;
 let groupProcessVersion = 0;
 
+let dashboardCacheTimer = null;
+
+let dashboardInitialized = false;
+
+
 /* =========================================================
    CACHE
 ========================================================= */
 
 const DASHBOARD_CACHE_PREFIX =
-    "connectaDashboardCache_v2_";
+    "connectaDashboardCache_v3_";
 
 const PROFILE_CACHE_KEY =
     "connectaProfileCache";
+
+const CACHE_SAVE_DELAY =
+    300;
 
 
 /* =========================================================
@@ -109,15 +139,16 @@ function installInstantDashboardStyles() {
         return;
     }
 
-    const style = document.createElement("style");
+    const style =
+        document.createElement("style");
 
-    style.id = "connectaDashboardInstantStyles";
+    style.id =
+        "connectaDashboardInstantStyles";
 
     style.textContent = `
 
         /* =====================================================
            CONNECTA SHIMMER
-           Matches chat.html skeleton animation
         ===================================================== */
 
         @keyframes connectaSkeleton {
@@ -139,10 +170,6 @@ function installInstantDashboardStyles() {
 
         }
 
-
-        /* =====================================================
-           COMMON SKELETON
-        ===================================================== */
 
         .connecta-skeleton {
 
@@ -532,8 +559,7 @@ function installInstantDashboardStyles() {
 
                 min-height: 64px;
 
-                padding:
-                    8px;
+                padding: 8px;
 
             }
 
@@ -553,8 +579,8 @@ function installInstantDashboardStyles() {
     `;
 
     document.head.appendChild(style);
-
 }
+
 
 /* =========================================================
    SKELETON
@@ -569,9 +595,7 @@ function showDashboardSkeleton() {
         $("chatList");
 
 
-    /* =====================================================
-       ONLINE USERS
-    ===================================================== */
+    /* ONLINE */
 
     if (onlineBox) {
 
@@ -597,7 +621,6 @@ function showDashboardSkeleton() {
                                 "
                             ></div>
 
-
                             <div
                                 class="
                                     skeleton-name
@@ -605,14 +628,12 @@ function showDashboardSkeleton() {
                                 "
                             ></div>
 
-
                             <div
                                 class="
                                     skeleton-status
                                     connecta-skeleton
                                 "
                             ></div>
-
 
                             <div
                                 class="skeleton-button"
@@ -635,9 +656,7 @@ function showDashboardSkeleton() {
     }
 
 
-    /* =====================================================
-       RECENT CHATS
-    ===================================================== */
+    /* CHATS */
 
     if (chatBox) {
 
@@ -650,7 +669,7 @@ function showDashboardSkeleton() {
 
                 ${Array.from(
                     { length: 4 },
-                    (_, index) => `
+                    () => `
 
                         <div
                             class="skeleton-chat-row"
@@ -663,7 +682,6 @@ function showDashboardSkeleton() {
                                 "
                             ></div>
 
-
                             <div
                                 class="skeleton-chat-content"
                             >
@@ -675,7 +693,6 @@ function showDashboardSkeleton() {
                                     "
                                 ></div>
 
-
                                 <div
                                     class="
                                         skeleton-chat-message
@@ -684,7 +701,6 @@ function showDashboardSkeleton() {
                                 ></div>
 
                             </div>
-
 
                             <div
                                 class="
@@ -750,14 +766,19 @@ function publicProfileData(user = {}) {
             user.isVerified === true,
 
         followersCount:
-            Number(user.followersCount || 0),
+            Number(
+                user.followersCount || 0
+            ),
 
         followingCount:
-            Number(user.followingCount || 0),
+            Number(
+                user.followingCount || 0
+            ),
 
         lastSeen:
             user.lastSeen || null
     };
+
 }
 
 
@@ -827,7 +848,8 @@ function saveProfileToCache(profile) {
 
     } catch {
 
-        // Cache is optional.
+        /* Cache is optional. */
+
     }
 
 }
@@ -896,16 +918,18 @@ function saveDashboardCache() {
 
 
         const safeGroups =
-            recentGroups.map(group => {
+            recentGroups.map(
+                group => {
 
-                const {
-                    readData,
-                    ...safeGroup
-                } = group;
+                    const {
+                        readData,
+                        ...safeGroup
+                    } = group;
 
-                return safeGroup;
+                    return safeGroup;
 
-            });
+                }
+            );
 
 
         const payload = {
@@ -950,6 +974,47 @@ function saveDashboardCache() {
         );
 
     }
+
+}
+
+
+/* =========================================================
+   DEBOUNCED CACHE SAVE
+========================================================= */
+
+function scheduleDashboardCacheSave() {
+
+    clearTimeout(
+        dashboardCacheTimer
+    );
+
+
+    dashboardCacheTimer =
+        setTimeout(
+            () => {
+
+                dashboardCacheTimer =
+                    null;
+
+                saveDashboardCache();
+
+            },
+            CACHE_SAVE_DELAY
+        );
+
+}
+
+
+function flushDashboardCacheSave() {
+
+    clearTimeout(
+        dashboardCacheTimer
+    );
+
+    dashboardCacheTimer =
+        null;
+
+    saveDashboardCache();
 
 }
 
@@ -1021,7 +1086,7 @@ function loadDashboardCache() {
         }
 
 
-        /* PRIVATE CHATS */
+        /* CHATS */
 
         if (
             Array.isArray(
@@ -1404,7 +1469,10 @@ function getAccountControl(profile) {
         return {
 
             blocked: true,
-            status: "unknown",
+
+            status:
+                "unknown",
+
             message:
                 "Your account could not be verified."
 
@@ -1427,7 +1495,9 @@ function getAccountControl(profile) {
         return {
 
             blocked: true,
-            status: "banned",
+
+            status:
+                "banned",
 
             message:
                 "Your CONNECTA account has been banned."
@@ -1442,7 +1512,9 @@ function getAccountControl(profile) {
         return {
 
             blocked: true,
-            status: "suspended",
+
+            status:
+                "suspended",
 
             message:
                 "Your CONNECTA account is currently suspended."
@@ -1455,8 +1527,12 @@ function getAccountControl(profile) {
     return {
 
         blocked: false,
-        status: "active",
-        message: ""
+
+        status:
+            "active",
+
+        message:
+            ""
 
     };
 
@@ -1610,6 +1686,7 @@ function renderAvatarElement(
             <img
                 src="${escapeHtml(photo)}"
                 alt="${escapeHtml(name)}"
+                decoding="async"
             >
 
         `;
@@ -1737,6 +1814,7 @@ function renderProfile() {
                 <img
                     src="${escapeHtml(photo)}"
                     alt="${escapeHtml(fullName)}"
+                    decoding="async"
                 >
 
             `;
@@ -1757,12 +1835,9 @@ function renderProfile() {
 
 }
 
+
 /* =========================================================
    RENDER ONLINE USERS
-   ORDER:
-   1. Current logged-in user
-   2. Other ONLINE users
-   3. OFFLINE users
 ========================================================= */
 
 function renderOnline() {
@@ -1770,36 +1845,34 @@ function renderOnline() {
     const box =
         $("onlineUsers");
 
+
     if (!box) {
         return;
     }
+
 
     box.setAttribute(
         "aria-busy",
         "false"
     );
 
-    /*
-     * The Firebase Auth UID is the primary source of truth.
-     */
+
     const currentUid =
         String(
             currentUser?.uid || ""
         );
 
-    /*
-     * Update ONLINE count.
-     *
-     * This counts only users whose isOnline is true.
-     */
+
     const onlineCount =
         $("onlineCount");
+
 
     const activeCount =
         onlineUsers.filter(
             user =>
                 user.isOnline === true
         ).length;
+
 
     if (onlineCount) {
 
@@ -1808,27 +1881,22 @@ function renderOnline() {
 
     }
 
-    /*
-     * Nothing to show.
-     */
+
     if (!onlineUsers.length) {
 
         box.innerHTML = `
+
             <div class="connecta-empty">
                 No users found.
             </div>
+
         `;
 
         return;
+
     }
 
-    /*
-     * =====================================================
-     * NORMALIZE USERS
-     * =====================================================
-     *
-     * Make absolutely sure every user has a UID.
-     */
+
     const normalizedUsers =
         onlineUsers
             .map(user => ({
@@ -1846,18 +1914,7 @@ function renderOnline() {
                     user.uid
             );
 
-    /*
-     * =====================================================
-     * SORT
-     * =====================================================
-     *
-     * 1. CURRENT USER FIRST
-     * 2. OTHER ONLINE USERS
-     * 3. OFFLINE USERS
-     *
-     * This means the current user ALWAYS stays first,
-     * regardless of name or online status.
-     */
+
     const sortedUsers =
         [...normalizedUsers].sort(
             (a, b) => {
@@ -1868,9 +1925,7 @@ function renderOnline() {
                 const bIsCurrent =
                     b.uid === currentUid;
 
-                /*
-                 * CURRENT USER FIRST
-                 */
+
                 if (
                     aIsCurrent &&
                     !bIsCurrent
@@ -1879,6 +1934,7 @@ function renderOnline() {
                     return -1;
 
                 }
+
 
                 if (
                     !aIsCurrent &&
@@ -1889,9 +1945,7 @@ function renderOnline() {
 
                 }
 
-                /*
-                 * OTHER ONLINE USERS BEFORE OFFLINE USERS
-                 */
+
                 if (
                     a.isOnline !==
                     b.isOnline
@@ -1903,10 +1957,7 @@ function renderOnline() {
 
                 }
 
-                /*
-                 * Same category:
-                 * alphabetical order.
-                 */
+
                 return getFullName(a)
                     .localeCompare(
                         getFullName(b)
@@ -1915,11 +1966,7 @@ function renderOnline() {
             }
         );
 
-    /*
-     * =====================================================
-     * RENDER CARDS
-     * =====================================================
-     */
+
     box.innerHTML =
         sortedUsers
             .map(user => {
@@ -1929,23 +1976,21 @@ function renderOnline() {
                         user.uid || ""
                     );
 
-                /*
-                 * CURRENT USER
-                 */
+
                 const isCurrentUser =
                     userUid === currentUid;
 
+
                 const name =
                     getFullName(user);
+
 
                 const photo =
                     user.photoURL ||
                     user.photoUrl ||
                     "";
 
-                /*
-                 * Following only applies to OTHER users.
-                 */
+
                 const isFollowing =
                     !isCurrentUser &&
                     Array.isArray(
@@ -1957,6 +2002,7 @@ function renderOnline() {
                             userUid
                         );
 
+
                 return `
 
                     <div
@@ -1966,9 +2012,9 @@ function renderOnline() {
                         )}"
                     >
 
-                        <div class="user-card-profile">
-
-                            <!-- PROFILE PHOTO -->
+                        <div
+                            class="user-card-profile"
+                        >
 
                             <div
                                 class="
@@ -1994,6 +2040,7 @@ function renderOnline() {
                                                     name
                                                 )}"
                                                 loading="lazy"
+                                                decoding="async"
                                             >
                                           `
 
@@ -2004,7 +2051,6 @@ function renderOnline() {
 
                             </div>
 
-                            <!-- NAME -->
 
                             <strong>
 
@@ -2016,7 +2062,6 @@ function renderOnline() {
 
                             </strong>
 
-                            <!-- STATUS -->
 
                             <small
                                 class="
@@ -2048,7 +2093,6 @@ function renderOnline() {
 
                             </small>
 
-                            <!-- ACTION -->
 
                             ${
                                 isCurrentUser
@@ -2103,16 +2147,11 @@ function renderOnline() {
             })
             .join("");
 
-    /*
-     * =====================================================
-     * FOLLOW BUTTONS
-     * =====================================================
-     *
-     * Give every Follow button its own click handler.
-     *
-     * This is more reliable than depending only on
-     * event delegation from the parent container.
-     */
+
+    /* =====================================================
+       FOLLOW BUTTONS
+    ===================================================== */
+
     box
         .querySelectorAll(
             "[data-follow-uid]"
@@ -2126,32 +2165,36 @@ function renderOnline() {
                     event.preventDefault();
                     event.stopPropagation();
 
+
                     const targetUid =
                         String(
                             button.dataset.followUid ||
                             ""
                         );
 
+
                     if (!targetUid) {
                         return;
                     }
 
-                    /*
-                     * Prevent double taps.
-                     */
+
                     if (
                         button.disabled
                     ) {
                         return;
                     }
 
+
                     button.disabled = true;
+
 
                     const oldText =
                         button.textContent;
 
+
                     button.textContent =
                         "Updating...";
+
 
                     try {
 
@@ -2181,14 +2224,11 @@ function renderOnline() {
 
         });
 
-    /*
-     * =====================================================
-     * USER CARD CLICK
-     * =====================================================
-     *
-     * Clicking anywhere on the card except the Follow
-     * button opens that user's profile.
-     */
+
+    /* =====================================================
+       CARD CLICK
+    ===================================================== */
+
     box
         .querySelectorAll(
             "[data-user-card]"
@@ -2199,10 +2239,6 @@ function renderOnline() {
                 "click",
                 event => {
 
-                    /*
-                     * Do not open the profile when the
-                     * Follow button was clicked.
-                     */
                     if (
                         event.target.closest(
                             "[data-follow-uid]"
@@ -2213,20 +2249,18 @@ function renderOnline() {
 
                     }
 
+
                     const uid =
                         String(
                             card.dataset.userCard ||
                             ""
                         );
 
+
                     if (!uid) {
                         return;
                     }
 
-                    console.log(
-                        "[CONNECTA] Opening user profile:",
-                        uid
-                    );
 
                     window.location.href =
                         `profile.html?uid=${encodeURIComponent(
@@ -2238,7 +2272,7 @@ function renderOnline() {
 
         });
 
-   }
+}
 
 
 /* =========================================================
@@ -2477,7 +2511,7 @@ async function toggleFollow(targetUid) {
 
         renderOnline();
 
-        saveDashboardCache();
+        scheduleDashboardCacheSave();
 
 
     } catch (error) {
@@ -2486,6 +2520,7 @@ async function toggleFollow(targetUid) {
             "Follow error:",
             error
         );
+
 
         showToast(
             error?.message ||
@@ -2692,12 +2727,6 @@ async function refreshUserProfile(uid) {
 
 /* =========================================================
    PRIVATE CHAT LIVE LISTENER
-   =========================================================
-   - Listens ONLY to chats involving the current user
-   - Updates immediately when a message is sent
-   - No page refresh required
-   - No composite index required
-   - Sorts chats locally by updatedAt
 ========================================================= */
 
 function listenToChats(uid) {
@@ -2706,8 +2735,6 @@ function listenToChats(uid) {
         return;
     }
 
-
-    /* STOP PREVIOUS LISTENER */
 
     if (stopChats) {
 
@@ -2725,22 +2752,6 @@ function listenToChats(uid) {
         );
 
 
-    /*
-     * IMPORTANT
-     *
-     * We intentionally do NOT use:
-     *
-     * orderBy("updatedAt", "desc")
-     *
-     * here.
-     *
-     * That combination with array-contains can require
-     * a composite Firestore index.
-     *
-     * Instead, Firestore listens to all chats belonging
-     * to this user and we sort them locally.
-     */
-
     const chatsQuery =
         query(
 
@@ -2757,24 +2768,12 @@ function listenToChats(uid) {
         );
 
 
-    console.log(
-        "[CONNECTA] Starting LIVE private chat listener:",
-        uid
-    );
-
-
     stopChats =
         onSnapshot(
 
             chatsQuery,
 
             async snapshot => {
-
-                console.log(
-                    "[CONNECTA] LIVE chat snapshot:",
-                    snapshot.docs.length
-                );
-
 
                 const result = [];
 
@@ -2787,10 +2786,6 @@ function listenToChats(uid) {
                     const data =
                         chatDoc.data();
 
-
-                    /*
-                     * FIND OTHER USER
-                     */
 
                     const participants =
                         Array.isArray(
@@ -2808,18 +2803,9 @@ function listenToChats(uid) {
 
 
                     if (!otherUid) {
-
                         continue;
-
                     }
 
-
-                    /*
-                     * FIND USER PROFILE
-                     *
-                     * First use users already loaded
-                     * by the dashboard.
-                     */
 
                     let profile =
                         onlineUsers.find(
@@ -2828,10 +2814,6 @@ function listenToChats(uid) {
                                 otherUid
                         );
 
-
-                    /*
-                     * Then try local profile cache.
-                     */
 
                     if (!profile) {
 
@@ -2842,13 +2824,6 @@ function listenToChats(uid) {
 
                     }
 
-
-                    /*
-                     * DO NOT WAIT FOR PROFILE
-                     *
-                     * The chat must appear immediately
-                     * even if the profile hasn't loaded.
-                     */
 
                     const otherName =
                         profile
@@ -2875,10 +2850,6 @@ function listenToChats(uid) {
                         data.otherUserVerified === true;
 
 
-                    /*
-                     * UNREAD COUNT
-                     */
-
                     const unread =
                         Number(
                             data.unreadCount?.[uid] ||
@@ -2887,28 +2858,16 @@ function listenToChats(uid) {
                         );
 
 
-                    /*
-                     * LAST SENDER
-                     */
-
                     const lastSenderId =
                         data.lastSenderId ||
                         data.lastMessageSenderId ||
                         "";
 
 
-                    /*
-                     * LAST MESSAGE
-                     */
-
                     const lastMessage =
                         data.lastMessage ||
                         "";
 
-
-                    /*
-                     * MESSAGE TYPE
-                     */
 
                     const lastMessageType =
                         data.lastMessageType ||
@@ -2930,10 +2889,6 @@ function listenToChats(uid) {
                     }
 
 
-                    /*
-                     * EMPTY / NEW CHAT
-                     */
-
                     if (
                         !preview &&
                         lastSenderId === uid
@@ -2945,10 +2900,6 @@ function listenToChats(uid) {
                     }
 
 
-                    /*
-                     * BUILD CHAT OBJECT
-                     */
-
                     result.push({
 
                         type:
@@ -2958,7 +2909,6 @@ function listenToChats(uid) {
                             chatDoc.id,
 
                         otherUid:
-
                             otherUid,
 
                         otherUserName:
@@ -2982,16 +2932,6 @@ function listenToChats(uid) {
                         unread:
                             unread,
 
-                        /*
-                         * IMPORTANT:
-                         *
-                         * chat.js updates updatedAt
-                         * whenever a new message is sent.
-                         *
-                         * This value is used to move the
-                         * conversation to the top.
-                         */
-
                         lastMessageAt:
                             data.updatedAt ||
                             data.lastMessageAt ||
@@ -3011,12 +2951,6 @@ function listenToChats(uid) {
 
                 }
 
-
-                /*
-                 * SORT LOCALLY
-                 *
-                 * Newest conversation first.
-                 */
 
                 result.sort(
                     (a, b) => {
@@ -3046,26 +2980,22 @@ function listenToChats(uid) {
                 );
 
 
-                /*
-                 * REPLACE LIVE CHAT DATA
-                 */
-
                 recentChats =
                     result;
 
 
                 /*
-                 * RENDER IMMEDIATELY
+                 * IMPORTANT:
+                 *
+                 * Render immediately.
+                 * Never wait for profile refreshes.
                  */
 
                 mergeRecentChats();
 
 
                 /*
-                 * REFRESH OTHER USER PROFILES
-                 *
-                 * This happens in the background.
-                 * It does NOT delay the chat preview.
+                 * Background profile refresh.
                  */
 
                 result.forEach(
@@ -3087,10 +3017,6 @@ function listenToChats(uid) {
                     error
                 );
 
-
-                /*
-                 * Keep cached chats visible.
-                 */
 
                 mergeRecentChats();
 
@@ -3130,10 +3056,6 @@ async function getGroupUnreadCount(
                 "groupMessages"
             );
 
-
-        /*
-         * Never opened.
-         */
 
         if (
             !readData?.lastReadAt
@@ -3234,10 +3156,6 @@ async function processGroups() {
         new Map();
 
 
-    /* =====================================================
-       COLLECT GROUPS FROM ALL MEMBERSHIP SOURCES
-    ===================================================== */
-
     for (
         const groupDoc
         of groupListeners.memberIds
@@ -3297,19 +3215,6 @@ async function processGroups() {
             groupMap.values()
         );
 
-
-    /* =====================================================
-       BUILD GROUPS IMMEDIATELY
-       
-       IMPORTANT:
-       Do NOT wait for unread-count queries before
-       rendering Recent Chats.
-       
-       This makes:
-       - newly joined groups appear immediately
-       - new group messages appear immediately
-       - group preview/time update immediately
-    ===================================================== */
 
     const enriched =
         groups
@@ -3440,10 +3345,6 @@ async function processGroups() {
                         group.updatedAt ||
                         null,
 
-                    /*
-                     * Keep the previous unread value while
-                     * the realtime group preview is rendered.
-                     */
                     unread:
                         Number(
                             recentGroups.find(
@@ -3468,10 +3369,6 @@ async function processGroups() {
             });
 
 
-    /* =====================================================
-       CANCEL STALE PROCESS
-    ===================================================== */
-
     if (
         version !==
         groupProcessVersion
@@ -3482,10 +3379,6 @@ async function processGroups() {
     }
 
 
-    /* =====================================================
-       RENDER IMMEDIATELY
-    ===================================================== */
-
     recentGroups =
         enriched;
 
@@ -3495,12 +3388,9 @@ async function processGroups() {
     mergeRecentChats();
 
 
-    /* =====================================================
-       LOAD READ / UNREAD DATA IN BACKGROUND
-       
-       This happens AFTER Recent Chats has already
-       rendered.
-    ===================================================== */
+    /*
+     * UNREAD DATA IN BACKGROUND
+     */
 
     const unreadTasks =
         enriched.map(
@@ -3580,13 +3470,6 @@ async function processGroups() {
         );
 
 
-    /*
-     * The user may have received another realtime
-     * group update while unread counts were loading.
-     *
-     * Never overwrite newer data.
-     */
-
     if (
         version !==
         groupProcessVersion
@@ -3644,6 +3527,7 @@ async function processGroups() {
     mergeRecentChats();
 
 }
+
 
 /* =========================================================
    QUEUE GROUP PROCESSING
@@ -3722,44 +3606,40 @@ function listenToGroups(uid) {
 
 
     const memberIdsQuery =
-    query(
-        groupsRef,
-        where(
-            "memberIds",
-            "array-contains",
-            uid
-        ),
-        limit(100)
-    );
+        query(
+            groupsRef,
+            where(
+                "memberIds",
+                "array-contains",
+                uid
+            ),
+            limit(100)
+        );
 
 
-const membersQuery =
-    query(
-        groupsRef,
-        where(
-            "members",
-            "array-contains",
-            uid
-        ),
-        limit(100)
-    );
+    const membersQuery =
+        query(
+            groupsRef,
+            where(
+                "members",
+                "array-contains",
+                uid
+            ),
+            limit(100)
+        );
 
 
-const ownerQuery =
-    query(
-        groupsRef,
-        where(
-            "ownerId",
-            "==",
-            uid
-        ),
-        limit(100)
-    );
+    const ownerQuery =
+        query(
+            groupsRef,
+            where(
+                "ownerId",
+                "==",
+                uid
+            ),
+            limit(100)
+        );
 
-
-    /*
-     * Initial data.
-     */
 
     Promise.allSettled([
 
@@ -3822,10 +3702,6 @@ const ownerQuery =
     });
 
 
-    /*
-     * memberIds
-     */
-
     groupUnsubscribers.push(
 
         onSnapshot(
@@ -3853,10 +3729,6 @@ const ownerQuery =
     );
 
 
-    /*
-     * members
-     */
-
     groupUnsubscribers.push(
 
         onSnapshot(
@@ -3883,10 +3755,6 @@ const ownerQuery =
 
     );
 
-
-    /*
-     * owner
-     */
 
     groupUnsubscribers.push(
 
@@ -4036,7 +3904,14 @@ function mergeRecentChats() {
     );
 
 
-    saveDashboardCache();
+    /*
+     * IMPORTANT:
+     *
+     * Do not write localStorage on every
+     * realtime Firestore event.
+     */
+
+    scheduleDashboardCacheSave();
 
 }
 
@@ -4062,12 +3937,14 @@ function getMessageStatus(chat) {
     ) {
 
         return `
+
             <span
                 class="chat-status-ticks read"
                 title="Read"
             >
                 ✓✓
             </span>
+
         `;
 
     }
@@ -4078,24 +3955,28 @@ function getMessageStatus(chat) {
     ) {
 
         return `
+
             <span
                 class="chat-status-ticks"
                 title="Delivered"
             >
                 ✓✓
             </span>
+
         `;
 
     }
 
 
     return `
+
         <span
             class="chat-status-ticks"
             title="Sent"
         >
             ✓
         </span>
+
     `;
 
 }
@@ -4186,6 +4067,7 @@ function renderChats(chats) {
                                     name
                                 )}"
                                 loading="lazy"
+                                decoding="async"
                             >
 
                           `
@@ -4224,9 +4106,7 @@ function renderChats(chats) {
                 }
 
 
-                if (
-                    !preview
-                ) {
+                if (!preview) {
 
                     preview =
                         isGroup
@@ -4235,10 +4115,6 @@ function renderChats(chats) {
 
                 }
 
-
-                /*
-                 * GROUP MESSAGE PREVIEW
-                 */
 
                 let previewMarkup =
                     escapeHtml(
@@ -4609,6 +4485,12 @@ function startPresence() {
         );
 
 
+    document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityPresence
+    );
+
+
     document.addEventListener(
         "visibilitychange",
         handleVisibilityPresence
@@ -4692,7 +4574,8 @@ function stopDashboardListeners() {
     );
 
 
-    presenceInterval = null;
+    presenceInterval =
+        null;
 
 
     document.removeEventListener(
@@ -4753,22 +4636,17 @@ function showToast(message) {
 
 function setupUI() {
 
-       /* =====================================================
+    /* =====================================================
        ONLINE USER CARD INTERACTIONS
-       - Follow button -> Follow / Unfollow
-       - User card -> Open profile
     ===================================================== */
 
     const onlineUsersBox =
         $("onlineUsers");
 
+
     onlineUsersBox?.addEventListener(
         "click",
         async event => {
-
-            /* ---------------------------------------------
-               FOLLOW BUTTON
-            --------------------------------------------- */
 
             const followButton =
                 event.target.closest(
@@ -4810,12 +4688,9 @@ function setupUI() {
 
 
                 return;
+
             }
 
-
-            /* ---------------------------------------------
-               USER CARD
-            --------------------------------------------- */
 
             const card =
                 event.target.closest(
@@ -4837,12 +4712,6 @@ function setupUI() {
             }
 
 
-            console.log(
-                "[CONNECTA] Opening profile:",
-                uid
-            );
-
-
             window.location.href =
                 `profile.html?uid=${encodeURIComponent(
                     uid
@@ -4851,7 +4720,10 @@ function setupUI() {
         }
     );
 
-    /* MENU */
+
+    /* =====================================================
+       MENU
+    ===================================================== */
 
     const menuBtn =
         $("menuBtn");
@@ -4923,7 +4795,9 @@ function setupUI() {
         });
 
 
-    /* PROFILE */
+    /* =====================================================
+       PROFILE
+    ===================================================== */
 
     $("profileBtn")?.addEventListener(
         "click",
@@ -4944,7 +4818,9 @@ function setupUI() {
     );
 
 
-    /* CONNECTION */
+    /* =====================================================
+       CONNECTION
+    ===================================================== */
 
     $("connectionBtn")?.addEventListener(
         "click",
@@ -4958,7 +4834,9 @@ function setupUI() {
     );
 
 
-    /* ONLINE SEARCH BUTTON */
+    /* =====================================================
+       ONLINE SEARCH
+    ===================================================== */
 
     $("onlineSearchBtn")?.addEventListener(
         "click",
@@ -4987,7 +4865,9 @@ function setupUI() {
     );
 
 
-    /* CHAT SEARCH BUTTON */
+    /* =====================================================
+       CHAT SEARCH
+    ===================================================== */
 
     $("chatSearchBtn")?.addEventListener(
         "click",
@@ -5016,7 +4896,9 @@ function setupUI() {
     );
 
 
-    /* ONLINE SEARCH */
+    /* =====================================================
+       ONLINE SEARCH
+    ===================================================== */
 
     $("onlineSearch")?.addEventListener(
         "input",
@@ -5079,7 +4961,9 @@ function setupUI() {
     );
 
 
-    /* CHAT SEARCH */
+    /* =====================================================
+       CHAT SEARCH
+    ===================================================== */
 
     $("chatSearch")?.addEventListener(
         "input",
@@ -5093,7 +4977,9 @@ function setupUI() {
     );
 
 
-    /* COMING SOON */
+    /* =====================================================
+       COMING SOON
+    ===================================================== */
 
     document
         .querySelectorAll(
@@ -5129,13 +5015,17 @@ function setupUI() {
         });
 
 
-    /* LOGOUT */
+    /* =====================================================
+       LOGOUT
+    ===================================================== */
 
     $("logoutBtn")?.addEventListener(
         "click",
         async () => {
 
             await setPresence(false);
+
+            flushDashboardCacheSave();
 
             stopDashboardListeners();
 
@@ -5180,27 +5070,22 @@ function listenToUsers() {
             snapshot => {
 
                 onlineUsers =
-    snapshot.docs.map(
-        userDoc => {
+                    snapshot.docs.map(
+                        userDoc => {
 
-            return {
-               
-                ...publicProfileData(
-                    userDoc.data()
-                ),
+                            return {
 
-                /*
-                 * Put the document UID LAST so that
-                 * publicProfileData() cannot overwrite it.
-                 */
+                                ...publicProfileData(
+                                    userDoc.data()
+                                ),
 
-                uid:
-                    userDoc.id
+                                uid:
+                                    userDoc.id
 
-            };
+                            };
 
-        }
-    );
+                        }
+                    );
 
 
                 /* OWN PROFILE */
@@ -5237,7 +5122,7 @@ function listenToUsers() {
                 renderOnline();
 
 
-                /* UPDATE PRIVATE CHAT NAMES */
+                /* PRIVATE CHAT NAMES */
 
                 recentChats =
                     recentChats.map(
@@ -5280,7 +5165,7 @@ function listenToUsers() {
                     );
 
 
-                /* UPDATE GROUP SENDERS */
+                /* GROUP SENDERS */
 
                 recentGroups =
                     recentGroups.map(
@@ -5330,6 +5215,21 @@ function listenToUsers() {
                 );
 
 
+                /*
+                 * Keep cached users if available.
+                 */
+
+                if (
+                    onlineUsers.length
+                ) {
+
+                    renderOnline();
+
+                    return;
+
+                }
+
+
                 const box =
                     $("onlineUsers");
 
@@ -5352,13 +5252,9 @@ function listenToUsers() {
 
 }
 
+
 /* =========================================================
    HYDRATE OWN PROFILE
-   =========================================================
-   New accounts can reach dashboard immediately after
-   registration. Firebase Auth already knows the user's
-   displayName, so use it immediately while Firestore
-   profile data is being confirmed in the background.
 ========================================================= */
 
 async function hydrateOwnProfile() {
@@ -5367,23 +5263,25 @@ async function hydrateOwnProfile() {
         return;
     }
 
+
     const uid =
         currentUser.uid;
+
 
     const authDisplayName =
         String(
             currentUser.displayName || ""
         ).trim();
 
-    const authPhotoURL =
-        currentUser.photoURL || "";
 
-    /*
-     * -----------------------------------------------------
-     * STEP 1
-     * Immediately use Firebase Auth information.
-     * -----------------------------------------------------
-     */
+    const authPhotoURL =
+        currentUser.photoURL ||
+        "";
+
+
+    /* =====================================================
+       IMMEDIATE AUTH DATA
+    ===================================================== */
 
     if (
         authDisplayName &&
@@ -5406,21 +5304,20 @@ async function hydrateOwnProfile() {
 
         };
 
+
         saveProfileToCache(
             currentProfile
         );
+
 
         renderProfile();
 
     }
 
 
-    /*
-     * -----------------------------------------------------
-     * STEP 2
-     * Get the real Firestore profile.
-     * -----------------------------------------------------
-     */
+    /* =====================================================
+       FIRESTORE PROFILE
+    ===================================================== */
 
     try {
 
@@ -5431,6 +5328,7 @@ async function hydrateOwnProfile() {
                 uid
             );
 
+
         const snapshot =
             await getDoc(
                 profileRef
@@ -5440,11 +5338,6 @@ async function hydrateOwnProfile() {
         if (
             !snapshot.exists()
         ) {
-
-            console.warn(
-                "[CONNECTA] Firestore profile does not exist yet:",
-                uid
-            );
 
             return;
 
@@ -5459,14 +5352,6 @@ async function hydrateOwnProfile() {
 
         };
 
-
-        /*
-         * -------------------------------------------------
-         * STEP 3
-         * Never allow an empty/"CONNECTA User" Firestore
-         * value to replace a valid Firebase Auth name.
-         * -------------------------------------------------
-         */
 
         const firestoreName =
             String(
@@ -5490,11 +5375,6 @@ async function hydrateOwnProfile() {
             firestoreName;
 
 
-        /*
-         * If Firestore has the placeholder, reconstruct
-         * the name from firstName + lastName.
-         */
-
         if (
             !finalDisplayName ||
             finalDisplayName === "CONNECTA User"
@@ -5514,11 +5394,6 @@ async function hydrateOwnProfile() {
 
         }
 
-
-        /*
-         * If Firestore still has no usable name,
-         * preserve Firebase Auth's real name.
-         */
 
         if (
             !finalDisplayName ||
@@ -5560,7 +5435,7 @@ async function hydrateOwnProfile() {
 
             balance:
                 Number(
-                    firestoreProfile.balance ?? 
+                    firestoreProfile.balance ??
                     currentProfile?.balance ??
                     0
                 ),
@@ -5581,36 +5456,17 @@ async function hydrateOwnProfile() {
         };
 
 
-        /*
-         * -------------------------------------------------
-         * STEP 4
-         * Save immediately for the next dashboard visit.
-         * -------------------------------------------------
-         */
-
         saveProfileToCache(
             currentProfile
         );
 
-        saveDashboardCache();
 
+        flushDashboardCacheSave();
 
-        /*
-         * -------------------------------------------------
-         * STEP 5
-         * Update dashboard immediately.
-         * -------------------------------------------------
-         */
 
         renderProfile();
 
         renderOnline();
-
-
-        console.log(
-            "[CONNECTA] Own profile hydrated:",
-            currentProfile.displayName
-        );
 
 
     } catch (error) {
@@ -5620,11 +5476,6 @@ async function hydrateOwnProfile() {
             error
         );
 
-        /*
-         * Firebase Auth name remains visible, so the
-         * dashboard does not need to show "Loading..."
-         * or break if Firestore takes longer.
-         */
 
         renderProfile();
 
@@ -5632,57 +5483,109 @@ async function hydrateOwnProfile() {
 
 }
 
+
 /* =========================================================
-   INITIALIZE DASHBOARD
-   =========================================================
-   Profile-first startup.
-
-   The dashboard never waits for Firestore before showing
-   the user's basic identity.
-
-   Priority:
-
-   1. Firebase Auth
-   2. Dashboard cache
-   3. Firestore profile
-   4. Live listeners
+   FAST INITIALIZE DASHBOARD
 ========================================================= */
 
 async function initializeDashboard() {
 
+    if (dashboardInitialized) {
+        return;
+    }
+
+
+    dashboardInitialized = true;
+
+
     try {
 
-        /*
-         * -------------------------------------------------
-         * SHOW SKELETON IMMEDIATELY
-         * -------------------------------------------------
-         *
-         * Do this BEFORE waiting for Firebase Auth.
-         * This prevents the raw HTML dashboard from being
-         * visible while authentication is resolving.
-         */
+        /* =================================================
+           1. SHOW SKELETON
+        ================================================= */
 
         showDashboardSkeleton();
 
 
+        /* =================================================
+           2. CHECK FIREBASE AUTH IMMEDIATELY
+           
+           Firebase Auth can already have the session
+           available synchronously.
+           
+           This is important for the installed PWA.
+        ================================================= */
+
+        const immediateAuthUser =
+            auth.currentUser;
+
+
         /*
-         * -------------------------------------------------
-         * AUTHENTICATION
-         * -------------------------------------------------
+         * Start the normal global session check
+         * at the same time.
          */
 
-        const session =
-            await getCurrentConnectaUser({
-               
-                redirect: true,
+        const sessionPromise =
+            getCurrentConnectaUser({
 
-                allowBlocked: true
+                redirect:
+                    true,
+
+                allowBlocked:
+                    true
 
             });
 
 
+        /* =================================================
+           3. IF AUTH SESSION IS ALREADY AVAILABLE,
+              SHOW CACHE BEFORE WAITING FOR GLOBAL AUTH
+        ================================================= */
+
+        if (
+            immediateAuthUser?.uid
+        ) {
+
+            currentUser =
+                immediateAuthUser;
+
+
+            const cached =
+                loadDashboardCache();
+
+
+            if (cached) {
+
+                renderProfile();
+
+                renderOnline();
+
+                if (
+                    recentChats.length ||
+                    recentGroups.length
+                ) {
+
+                    mergeRecentChats();
+
+                }
+
+            }
+
+        }
+
+
+        /* =================================================
+           4. WAIT FOR AUTHORITATIVE SESSION
+        ================================================= */
+
+        const session =
+            await sessionPromise;
+
+
         if (!session) {
+
             return;
+
         }
 
 
@@ -5690,14 +5593,9 @@ async function initializeDashboard() {
             session.authUser;
 
 
-        /*
-         * -------------------------------------------------
-         * FIREBASE AUTH PROFILE
-         * -------------------------------------------------
-         *
-         * Firebase Auth already knows displayName directly
-         * after registration.
-         */
+        /* =================================================
+           5. FIREBASE AUTH PROFILE
+        ================================================= */
 
         const authDisplayName =
             String(
@@ -5710,24 +5608,13 @@ async function initializeDashboard() {
             "";
 
 
-        /*
-         * -------------------------------------------------
-         * EXISTING SESSION PROFILE
-         * -------------------------------------------------
-         */
+        /* =================================================
+           6. SESSION PROFILE
+        ================================================= */
 
         const sessionProfile =
             session.profile || {};
 
-
-        /*
-         * -------------------------------------------------
-         * DETERMINE INITIAL NAME
-         * -------------------------------------------------
-         *
-         * Never start a new account with CONNECTA User when
-         * Firebase Auth already contains the real name.
-         */
 
         let initialName =
             String(
@@ -5745,14 +5632,6 @@ async function initializeDashboard() {
 
         }
 
-
-        /*
-         * -------------------------------------------------
-         * INITIAL PROFILE
-         * -------------------------------------------------
-         *
-         * This object is rendered immediately.
-         */
 
         currentProfile = {
 
@@ -5790,32 +5669,16 @@ async function initializeDashboard() {
         };
 
 
-        /*
-         * -------------------------------------------------
-         * CACHE
-         * -------------------------------------------------
-         *
-         * Load any previous dashboard data.
-         *
-         * Important:
-         * We only allow the cache to improve the profile,
-         * not replace a valid Firebase Auth name with
-         * "CONNECTA User".
-         */
+        /* =================================================
+           7. LOAD CACHE AGAIN USING AUTHORITATIVE UID
+        ================================================= */
 
-        const hasDashboardCache =
-          loadDashboardCache();
+        loadDashboardCache();
 
 
-        /*
-         * -------------------------------------------------
-         * RESTORE AUTH NAME AFTER CACHE
-         * -------------------------------------------------
-         *
-         * loadDashboardCache() may contain an old profile.
-         * Make sure a valid Auth name wins over the
-         * placeholder.
-         */
+        /* =================================================
+           8. NEVER LET OLD CACHE REPLACE REAL AUTH NAME
+        ================================================= */
 
         const cachedName =
             String(
@@ -5838,12 +5701,6 @@ async function initializeDashboard() {
         }
 
 
-        /*
-         * -------------------------------------------------
-         * RESTORE AUTH PHOTO
-         * -------------------------------------------------
-         */
-
         if (
             !currentProfile.photoURL &&
             authPhotoURL
@@ -5855,30 +5712,21 @@ async function initializeDashboard() {
         }
 
 
-        /*
-         * -------------------------------------------------
-         * INSTANT PROFILE RENDER
-         * -------------------------------------------------
-         *
-         * This happens before waiting for Firestore.
-         */
+        /* =================================================
+           9. INSTANT PROFILE RENDER
+        ================================================= */
 
         renderProfile();
 
-        /*
-         * Save the usable initial profile immediately.
-         */
 
         saveProfileToCache(
             currentProfile
         );
 
 
-        /*
-         * -------------------------------------------------
-         * ACCOUNT STATUS
-         * -------------------------------------------------
-         */
+        /* =================================================
+           10. ACCOUNT STATUS
+        ================================================= */
 
         const control =
             getAccountControl(
@@ -5897,53 +5745,41 @@ async function initializeDashboard() {
         }
 
 
-        /*
-         * -------------------------------------------------
-         * FIRESTORE PROFILE HYDRATION
-         * -------------------------------------------------
-         *
-         * This runs in the background.
-         *
-         * The dashboard is already visible.
-         */
+        /* =================================================
+           11. FIRESTORE PROFILE
+           
+           DO NOT WAIT FOR THIS.
+        ================================================= */
 
         hydrateOwnProfile();
 
 
-        /*
-         * -------------------------------------------------
-         * PRESENCE
-         * -------------------------------------------------
-         */
+        /* =================================================
+           12. PRESENCE
+        ================================================= */
 
         startPresence();
 
 
-        /*
-         * -------------------------------------------------
-         * LIVE USERS
-         * -------------------------------------------------
-         */
+        /* =================================================
+           13. LIVE USERS
+        ================================================= */
 
         listenToUsers();
 
 
-        /*
-         * -------------------------------------------------
-         * LIVE PRIVATE CHATS
-         * -------------------------------------------------
-         */
+        /* =================================================
+           14. LIVE PRIVATE CHATS
+        ================================================= */
 
         listenToChats(
             currentUser.uid
         );
 
 
-        /*
-         * -------------------------------------------------
-         * LIVE GROUPS
-         * -------------------------------------------------
-         */
+        /* =================================================
+           15. LIVE GROUPS
+        ================================================= */
 
         listenToGroups(
             currentUser.uid
@@ -5951,7 +5787,7 @@ async function initializeDashboard() {
 
 
         console.log(
-            "[CONNECTA] Dashboard started for:",
+            "[CONNECTA] Fast dashboard started:",
             currentProfile.displayName ||
             currentUser.displayName ||
             currentUser.uid
@@ -5965,12 +5801,6 @@ async function initializeDashboard() {
             error
         );
 
-
-        /*
-         * Do NOT replace the dashboard with a loading
-         * screen. The user can still see their basic
-         * Firebase Auth profile if it was available.
-         */
 
         if (
             currentUser?.displayName
@@ -6008,15 +5838,9 @@ async function initializeDashboard() {
 
 }
 
+
 /* =========================================================
    PAGE LIFECYCLE
-   =========================================================
-   Important:
-   When navigating Dashboard → Chat → Back,
-   the browser may restore Dashboard from BFCache.
-
-   pagehide stops the listeners before leaving.
-   pageshow starts them again when Dashboard returns.
 ========================================================= */
 
 window.addEventListener(
@@ -6040,6 +5864,9 @@ window.addEventListener(
         }
 
 
+        flushDashboardCacheSave();
+
+
         stopDashboardListeners();
 
     }
@@ -6047,23 +5874,12 @@ window.addEventListener(
 
 
 /* =========================================================
-   RESUME DASHBOARD AFTER BACK/FORWARD
+   RESUME DASHBOARD
 ========================================================= */
 
 window.addEventListener(
     "pageshow",
     event => {
-
-        console.log(
-            "[CONNECTA] Dashboard pageshow:",
-            event.persisted
-        );
-
-
-        /*
-         * If the browser restored this page from
-         * BFCache, restart everything.
-         */
 
         if (
             event.persisted
@@ -6085,10 +5901,8 @@ function resumeDashboardLive() {
 
     if (!currentUser?.uid) {
 
-        /*
-         * If the page was restored before authentication
-         * was available, initialize normally.
-         */
+        dashboardInitialized =
+            false;
 
         initializeDashboard();
 
@@ -6097,43 +5911,48 @@ function resumeDashboardLive() {
     }
 
 
-    console.log(
-        "[CONNECTA] Restarting dashboard live listeners..."
-    );
+    /*
+     * Render cache again immediately.
+     */
+
+    loadDashboardCache();
+
+    renderProfile();
+
+    renderOnline();
+
+
+    if (
+        recentChats.length ||
+        recentGroups.length
+    ) {
+
+        mergeRecentChats();
+
+    }
 
 
     /*
-     * Restart presence.
+     * Restart live systems.
      */
 
     startPresence();
 
 
-    /*
-     * Restart live users.
-     */
-
     listenToUsers();
 
-
-    /*
-     * Restart private chat listener.
-     */
 
     listenToChats(
         currentUser.uid
     );
 
 
-    /*
-     * Restart group listeners.
-     */
-
     listenToGroups(
         currentUser.uid
     );
 
 }
+
 
 /* =========================================================
    START
