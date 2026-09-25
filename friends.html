@@ -3,2132 +3,2248 @@
 
 <head>
 
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  >
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+>
 
-  <meta
-    name="theme-color"
-    content="#16A34A"
-  >
+<meta
+  name="theme-color"
+  content="#16A34A"
+>
 
-  <meta
-    name="description"
-    content="CONNECTA Global Chat — meet new people, make friends and start conversations."
-  >
+<meta
+  name="description"
+  content="CONNECTA Global Meet — meet people, build relationships, learn Swahili and connect across cultures."
+>
 
-  <title>Global Chat — CONNECTA</title>
+<title>Global Meet — CONNECTA</title>
 
-  <link
-    rel="stylesheet"
-    href="css/main.css"
-  >
 
-  <link
-    rel="stylesheet"
-    href="css/dashboard.css"
-  >
+<link
+  rel="stylesheet"
+  href="css/main.css"
+>
 
-  <style>
+<link
+  rel="stylesheet"
+  href="css/dashboard.css"
+>
 
-    /* =========================================================
-       CONNECTA GLOBAL CHAT
-    ========================================================= */
 
-    :root {
+<style>
 
-      --connecta-green: #22C55E;
-      --connecta-dark-green: #16A34A;
-      --connecta-deep-green: #15803D;
+/* =========================================================
+   CONNECTA GLOBAL MEET
+========================================================= */
 
-      --connecta-light: #F0FDF4;
-      --connecta-bg: #F5F8F6;
+:root {
 
-      --connecta-text: #17201A;
-      --connecta-muted: #6B7280;
+  --green: #22C55E;
+  --green-dark: #16A34A;
+  --green-deep: #15803D;
 
-      --connecta-border: #E5E7EB;
+  --green-soft: #F0FDF4;
+  --green-pale: #DCFCE7;
 
-      --connecta-white: #FFFFFF;
+  --bg: #F5F8F6;
 
-      --connecta-blue: #2196F3;
+  --white: #FFFFFF;
 
-      --shadow-sm:
-        0 4px 14px rgba(0, 0, 0, .05);
+  --text: #17201A;
+  --muted: #6B7280;
 
-      --shadow-md:
-        0 10px 30px rgba(0, 0, 0, .08);
+  --border: #E5E7EB;
 
-      --radius-sm: 12px;
-      --radius-md: 18px;
-      --radius-lg: 24px;
+  --danger: #EF4444;
 
-    }
+  --shadow:
+    0 8px 30px rgba(0,0,0,.06);
 
+  --radius:
+    22px;
 
-    * {
-      box-sizing: border-box;
-    }
+}
 
 
-    html {
-      scroll-behavior: smooth;
-    }
+/* =========================================================
+   RESET
+========================================================= */
 
+* {
+  box-sizing: border-box;
+}
 
-    body {
-      margin: 0;
-      background: var(--connecta-bg);
-      color: var(--connecta-text);
-    }
 
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
 
-    button,
-    input,
-    select {
-      font: inherit;
-    }
 
+button,
+input,
+select {
+  font: inherit;
+}
 
-    button {
-      -webkit-tap-highlight-color: transparent;
-    }
 
+button {
+  -webkit-tap-highlight-color: transparent;
+}
 
-    /* =========================================================
-       PAGE
-    ========================================================= */
 
-    .friends-page {
+/* =========================================================
+   PAGE
+========================================================= */
 
-      width: 100%;
+.friends-page {
 
-      max-width: 960px;
+  width: 100%;
 
-      margin: 0 auto;
+  max-width: 1180px;
 
-      padding:
-        16px
-        14px
-        110px;
+  margin: 0 auto;
 
-    }
+  padding:
+    14px
+    12px
+    110px;
 
+}
 
-    /* =========================================================
-       HERO
-    ========================================================= */
 
-    .global-hero {
+/* =========================================================
+   HERO
+========================================================= */
 
-      position: relative;
+.global-hero {
 
-      overflow: hidden;
+  position: relative;
 
-      padding: 24px 20px;
+  overflow: hidden;
 
-      margin-bottom: 16px;
+  margin-bottom: 14px;
 
-      border-radius: 24px;
+  padding:
+    23px
+    18px;
 
-      background:
-        linear-gradient(
-          135deg,
-          #16A34A 0%,
-          #22C55E 52%,
-          #4ADE80 100%
-        );
+  border-radius:
+    25px;
 
-      color: #fff;
+  background:
+    linear-gradient(
+      135deg,
+      #15803D,
+      #16A34A 50%,
+      #22C55E
+    );
 
-      box-shadow:
-        0 12px 35px rgba(22, 163, 74, .20);
+  color: white;
 
-    }
+  box-shadow:
+    0 12px 35px
+    rgba(22,163,74,.20);
 
+}
 
-    .global-hero::before {
 
-      content: "";
+.global-hero::before {
 
-      position: absolute;
+  content: "";
 
-      width: 190px;
-      height: 190px;
+  position: absolute;
 
-      border-radius: 50%;
+  width: 190px;
+  height: 190px;
 
-      right: -75px;
-      top: -85px;
+  right: -85px;
+  top: -90px;
 
-      background:
-        rgba(255,255,255,.12);
+  border-radius: 50%;
 
-    }
+  background:
+    rgba(255,255,255,.10);
 
+}
 
-    .global-hero::after {
 
-      content: "";
+.global-hero::after {
 
-      position: absolute;
+  content: "";
 
-      width: 110px;
-      height: 110px;
+  position: absolute;
 
-      border-radius: 50%;
+  width: 120px;
+  height: 120px;
 
-      right: 70px;
-      bottom: -65px;
+  right: 60px;
+  bottom: -90px;
 
-      background:
-        rgba(255,255,255,.08);
+  border-radius: 50%;
 
-    }
+  background:
+    rgba(255,255,255,.07);
 
+}
 
-    .hero-content {
 
-      position: relative;
+.hero-content {
 
-      z-index: 2;
+  position: relative;
 
-    }
+  z-index: 2;
 
+}
 
-    .hero-eyebrow {
 
-      display: inline-flex;
+.hero-eyebrow {
 
-      align-items: center;
+  display: inline-flex;
 
-      gap: 7px;
+  align-items: center;
 
-      padding:
-        6px
-        10px;
+  gap: 6px;
 
-      margin-bottom: 10px;
+  padding:
+    6px 10px;
 
-      border-radius: 999px;
+  border-radius:
+    999px;
 
-      background:
-        rgba(255,255,255,.16);
+  background:
+    rgba(255,255,255,.14);
 
-      border:
-        1px solid
-        rgba(255,255,255,.20);
+  border:
+    1px solid
+    rgba(255,255,255,.18);
 
-      font-size: 11px;
+  font-size: 10px;
 
-      font-weight: 800;
+  font-weight: 900;
 
-      letter-spacing: .08em;
+  letter-spacing: .08em;
 
-    }
+}
 
 
-    .hero-title {
+.hero-title {
 
-      margin: 0 0 8px;
+  margin:
+    12px 0 7px;
 
-      font-size: clamp(26px, 7vw, 38px);
+  font-size:
+    clamp(28px, 7vw, 40px);
 
-      line-height: 1.08;
+  line-height:
+    1.05;
 
-      font-weight: 900;
+  letter-spacing:
+    -.035em;
 
-      letter-spacing: -.03em;
+  font-weight:
+    950;
 
-    }
+}
 
 
-    .hero-description {
+.hero-description {
 
-      max-width: 650px;
+  max-width: 650px;
 
-      margin: 0;
+  margin: 0;
 
-      font-size: 14px;
+  color:
+    rgba(255,255,255,.91);
 
-      line-height: 1.6;
+  font-size: 13px;
 
-      color:
-        rgba(255,255,255,.90);
+  line-height: 1.6;
 
-    }
+}
 
 
-    .hero-note {
+.hero-features {
 
-      display: flex;
+  display: flex;
 
-      align-items: center;
+  flex-wrap: wrap;
 
-      gap: 8px;
+  gap: 7px;
 
-      margin-top: 16px;
+  margin-top: 15px;
 
-      font-size: 12px;
+}
 
-      font-weight: 700;
 
-      color:
-        rgba(255,255,255,.90);
+.hero-pill {
 
-    }
+  display: inline-flex;
 
+  align-items: center;
 
-    /* =========================================================
-       GLOBAL CHAT BADGE
-    ========================================================= */
+  gap: 5px;
 
-    .global-chat-badge {
+  padding:
+    7px 10px;
 
-      display: inline-flex;
+  border-radius:
+    999px;
 
-      align-items: center;
+  background:
+    rgba(255,255,255,.13);
 
-      gap: 7px;
+  color:
+    white;
 
-      margin-top: 16px;
+  font-size: 10px;
 
-      padding:
-        8px
-        12px;
+  font-weight: 800;
 
-      border-radius: 999px;
+}
 
-      background:
-        rgba(255,255,255,.95);
 
-      color:
-        var(--connecta-dark-green);
+.hero-price {
 
-      font-size: 12px;
+  display: inline-flex;
 
-      font-weight: 800;
+  align-items: center;
 
-      box-shadow:
-        0 5px 16px rgba(0,0,0,.08);
+  gap: 6px;
 
-    }
+  margin-top: 14px;
 
+  padding:
+    8px 12px;
 
-    /* =========================================================
-       FILTER CARD
-    ========================================================= */
+  border-radius:
+    999px;
 
-    .global-filter-card {
+  background:
+    white;
 
-      background:
-        var(--connecta-white);
+  color:
+    var(--green-dark);
 
-      border:
-        1px solid
-        var(--connecta-border);
+  font-size: 11px;
 
-      border-radius:
-        var(--radius-lg);
+  font-weight: 900;
 
-      padding: 16px;
+}
 
-      margin-bottom: 16px;
 
-      box-shadow:
-        var(--shadow-sm);
+/* =========================================================
+   FILTER PANEL
+========================================================= */
 
-    }
+.filters-card {
 
+  margin-bottom: 18px;
 
-    .filter-heading {
+  padding: 15px;
 
-      display: flex;
+  border:
+    1px solid
+    var(--border);
 
-      align-items: flex-start;
+  border-radius:
+    22px;
 
-      justify-content: space-between;
+  background:
+    white;
 
-      gap: 12px;
+  box-shadow:
+    var(--shadow);
 
-      margin-bottom: 14px;
+}
 
-    }
 
+.filters-heading {
 
-    .filter-heading h2 {
+  display: flex;
 
-      margin: 0;
+  justify-content:
+    space-between;
 
-      font-size: 17px;
+  align-items:
+    center;
 
-      font-weight: 900;
+  gap: 12px;
 
-    }
+  margin-bottom: 13px;
 
+}
 
-    .filter-heading p {
 
-      margin: 4px 0 0;
+.filters-title {
 
-      color:
-        var(--connecta-muted);
+  margin: 0;
 
-      font-size: 12px;
+  font-size: 17px;
 
-      line-height: 1.5;
+  font-weight: 900;
 
-    }
+}
 
 
-    .filter-icon {
+.filters-subtitle {
 
-      width: 42px;
-      height: 42px;
+  margin:
+    3px 0 0;
 
-      flex:
-        0 0 42px;
+  color:
+    var(--muted);
 
-      display: grid;
+  font-size: 11px;
 
-      place-items: center;
+}
 
-      border-radius: 14px;
 
-      background:
-        var(--connecta-light);
+.filter-icon {
 
-      font-size: 21px;
+  width: 40px;
+  height: 40px;
 
-    }
+  display: grid;
 
+  place-items: center;
 
-    /* =========================================================
-       GENDER FILTER
-    ========================================================= */
+  flex:
+    0 0 40px;
 
-    .filter-label {
+  border-radius:
+    13px;
 
-      display: block;
+  background:
+    var(--green-soft);
 
-      margin-bottom: 8px;
+  font-size: 19px;
 
-      font-size: 12px;
+}
 
-      font-weight: 800;
 
-      color:
-        var(--connecta-text);
+/* =========================================================
+   INTEREST FILTERS
+========================================================= */
 
-    }
+.filter-label {
 
+  display: block;
 
-    .gender-options {
+  margin-bottom: 7px;
 
-      display: grid;
+  font-size: 11px;
 
-      grid-template-columns:
-        repeat(3, 1fr);
+  font-weight: 900;
 
-      gap: 8px;
+}
 
-      margin-bottom: 15px;
 
-    }
+.interest-scroll {
 
+  display: flex;
 
-    .gender-btn {
+  gap: 7px;
 
-      min-height: 48px;
+  overflow-x: auto;
 
-      border:
-        1px solid
-        var(--connecta-border);
+  padding-bottom: 4px;
 
-      border-radius: 14px;
+  scrollbar-width: none;
 
-      background:
-        #fff;
+}
 
-      color:
-        var(--connecta-text);
 
-      font-size: 13px;
+.interest-scroll::-webkit-scrollbar {
+  display: none;
+}
 
-      font-weight: 800;
 
-      cursor: pointer;
+.interest-btn {
 
-      transition:
-        .18s ease;
+  flex:
+    0 0 auto;
 
-    }
+  min-height: 38px;
 
+  padding:
+    0 12px;
 
-    .gender-btn:hover {
+  border:
+    1px solid
+    var(--border);
 
-      border-color:
-        #86EFAC;
+  border-radius:
+    999px;
 
-    }
+  background:
+    white;
 
+  color:
+    #4B5563;
 
-    .gender-btn.active {
+  font-size: 10px;
 
-      background:
-        var(--connecta-light);
+  font-weight: 800;
 
-      border-color:
-        var(--connecta-green);
+  cursor: pointer;
 
-      color:
-        var(--connecta-dark-green);
+  white-space: nowrap;
 
-      box-shadow:
-        0 0 0 3px
-        rgba(34,197,94,.08);
+}
 
-    }
 
+.interest-btn.active {
 
-    /* =========================================================
-       SEARCH GRID
-    ========================================================= */
+  border-color:
+    var(--green);
 
-    .filter-grid {
+  background:
+    var(--green-soft);
 
-      display: grid;
+  color:
+    var(--green-dark);
 
-      grid-template-columns:
-        1fr;
+}
 
-      gap: 10px;
 
-    }
+/* =========================================================
+   GENDER
+========================================================= */
 
+.gender-row {
 
-    .field-group {
+  display: grid;
 
-      min-width: 0;
+  grid-template-columns:
+    repeat(3,1fr);
 
-    }
+  gap: 7px;
 
+  margin-top: 12px;
 
-    .field-input {
+}
 
-      width: 100%;
 
-      height: 48px;
+.gender-btn {
 
-      padding:
-        0 14px;
+  min-height: 43px;
 
-      border:
-        1px solid
-        var(--connecta-border);
+  border:
+    1px solid
+    var(--border);
 
-      border-radius: 14px;
+  border-radius:
+    13px;
 
-      outline: none;
+  background:
+    white;
 
-      background:
-        #FAFAFA;
+  color:
+    #4B5563;
 
-      color:
-        var(--connecta-text);
+  font-size: 11px;
 
-      font-size: 13px;
+  font-weight: 800;
 
-      transition:
-        .18s ease;
+  cursor: pointer;
 
-    }
+}
 
 
-    .field-input:focus {
+.gender-btn.active {
 
-      background:
-        #fff;
+  background:
+    var(--green-soft);
 
-      border-color:
-        var(--connecta-green);
+  border-color:
+    var(--green);
 
-      box-shadow:
-        0 0 0 3px
-        rgba(34,197,94,.08);
+  color:
+    var(--green-dark);
 
-    }
+}
 
 
-    .field-input::placeholder {
+/* =========================================================
+   COUNTRY + SEARCH
+========================================================= */
 
-      color:
-        #9CA3AF;
+.filters-grid {
 
-    }
+  display: grid;
 
+  grid-template-columns:
+    1fr;
 
-    /* =========================================================
-       SEARCH
-    ========================================================= */
+  gap: 9px;
 
-    .search-wrap {
+  margin-top: 11px;
 
-      position: relative;
+}
 
-      margin-top: 10px;
 
-    }
+.filter-field {
 
+  width: 100%;
 
-    .search-icon {
+  height: 45px;
 
-      position: absolute;
+  padding:
+    0 13px;
 
-      left: 14px;
+  border:
+    1px solid
+    var(--border);
 
-      top: 50%;
+  border-radius:
+    13px;
 
-      transform:
-        translateY(-50%);
+  background:
+    #FAFAFA;
 
-      font-size: 16px;
+  color:
+    var(--text);
 
-      pointer-events: none;
+  outline: none;
 
-    }
+  font-size: 11px;
 
+}
 
-    #friendSearch {
 
-      padding-left: 42px;
+.filter-field:focus {
 
-    }
+  background:
+    white;
 
+  border-color:
+    var(--green);
 
-    /* =========================================================
-       AVAILABLE HEADER
-    ========================================================= */
+  box-shadow:
+    0 0 0 3px
+    rgba(34,197,94,.08);
 
-    .available-header {
+}
 
-      display: flex;
 
-      align-items: flex-end;
+/* =========================================================
+   RESULTS HEADER
+========================================================= */
 
-      justify-content: space-between;
+.results-header {
 
-      gap: 12px;
+  display: flex;
 
-      margin:
-        22px 2px 12px;
+  justify-content:
+    space-between;
 
-    }
+  align-items:
+    flex-end;
 
+  gap: 10px;
 
-    .available-title {
+  margin:
+    20px 2px 11px;
 
-      margin: 0;
+}
 
-      font-size: 19px;
 
-      font-weight: 900;
+.results-title {
 
-      letter-spacing: -.02em;
+  margin: 0;
 
-    }
+  font-size: 19px;
 
+  font-weight: 950;
 
-    .available-subtitle {
+  letter-spacing:
+    -.02em;
 
-      margin: 4px 0 0;
+}
 
-      color:
-        var(--connecta-muted);
 
-      font-size: 12px;
+.results-description {
 
-    }
+  margin:
+    3px 0 0;
 
+  color:
+    var(--muted);
 
-    .available-count {
+  font-size: 10px;
 
-      flex:
-        0 0 auto;
+}
 
-      min-width: 34px;
 
-      height: 30px;
+.results-count {
 
-      padding:
-        0 10px;
+  display: inline-flex;
 
-      display: inline-flex;
+  align-items: center;
 
-      align-items: center;
+  justify-content: center;
 
-      justify-content: center;
+  min-width: 34px;
 
-      border-radius: 999px;
+  height: 29px;
 
-      background:
-        var(--connecta-light);
+  padding:
+    0 9px;
 
-      color:
-        var(--connecta-dark-green);
+  border-radius:
+    999px;
 
-      font-size: 12px;
+  background:
+    var(--green-soft);
 
-      font-weight: 900;
+  color:
+    var(--green-dark);
 
-    }
+  font-size: 11px;
 
+  font-weight: 900;
 
-    /* =========================================================
-       DISCOVERY LIST
-    ========================================================= */
+}
 
-    .section-card {
 
-      background:
-        var(--connecta-white);
+/* =========================================================
+   PROFILE GRID
+========================================================= */
 
-      border:
-        1px solid
-        var(--connecta-border);
+#discoverList {
 
-      border-radius:
-        var(--radius-lg);
+  display: grid;
 
-      padding: 10px;
+  grid-template-columns:
+    1fr;
 
-      box-shadow:
-        var(--shadow-sm);
+  gap: 13px;
 
-    }
+}
 
 
-    #discoverList {
+/* =========================================================
+   PROFILE CARD
+========================================================= */
 
-      display: grid;
+.global-profile-card {
 
-      grid-template-columns:
-        1fr;
+  overflow: hidden;
 
-      gap: 10px;
+  position: relative;
 
-    }
+  background:
+    white;
 
+  border:
+    1px solid
+    var(--border);
 
-    /* =========================================================
-       USER CARD
-    ========================================================= */
+  border-radius:
+    22px;
 
-    .user-card {
+  box-shadow:
+    0 7px 25px
+    rgba(0,0,0,.055);
 
-      position: relative;
+  transition:
+    transform .18s ease,
+    box-shadow .18s ease;
 
-      display: grid;
+}
 
-      grid-template-columns:
-        58px
-        minmax(0, 1fr)
-        auto;
 
-      align-items: center;
+.global-profile-card:hover {
 
-      gap: 11px;
+  transform:
+    translateY(-2px);
 
-      padding: 12px;
+  box-shadow:
+    0 13px 32px
+    rgba(0,0,0,.09);
 
-      border:
-        1px solid
-        #EDF0EE;
+}
 
-      border-radius: 18px;
 
-      background:
-        #fff;
+/* =========================================================
+   PROFILE PHOTO
+========================================================= */
 
-      transition:
-        transform .18s ease,
-        box-shadow .18s ease,
-        border-color .18s ease;
+.profile-photo-area {
 
-    }
+  position: relative;
 
+  height: 285px;
 
-    .user-card:hover {
+  overflow: hidden;
 
-      transform:
-        translateY(-1px);
+  background:
+    linear-gradient(
+      135deg,
+      #DCFCE7,
+      #BBF7D0
+    );
 
-      border-color:
-        #D1FAE5;
+}
 
-      box-shadow:
-        0 7px 20px
-        rgba(0,0,0,.06);
 
-    }
+.profile-photo {
 
+  width: 100%;
+  height: 100%;
 
-    .user-avatar {
+  display: block;
 
-      position: relative;
+  object-fit: cover;
 
-      width: 58px;
-      height: 58px;
+}
 
-      flex:
-        0 0 58px;
 
-      display: grid;
+.profile-photo-placeholder {
 
-      place-items: center;
+  width: 100%;
+  height: 100%;
 
-      overflow: hidden;
+  display: grid;
 
-      border-radius: 50%;
+  place-items: center;
 
-      background:
-        linear-gradient(
-          135deg,
-          #DCFCE7,
-          #BBF7D0
-        );
+  color:
+    var(--green-dark);
 
-      color:
-        var(--connecta-dark-green);
+  font-size: 55px;
 
-      font-size: 15px;
+  font-weight: 950;
 
-      font-weight: 900;
+}
 
-      border:
-        2px solid
-        #fff;
 
-      box-shadow:
-        0 0 0 2px
-        rgba(34,197,94,.15);
+/* =========================================================
+   PHOTO OVERLAYS
+========================================================= */
 
-    }
+.photo-gradient {
 
+  position: absolute;
 
-    .user-avatar img {
+  inset:
+    35% 0 0;
 
-      width: 100%;
-      height: 100%;
+  background:
+    linear-gradient(
+      to bottom,
+      transparent,
+      rgba(0,0,0,.58)
+    );
 
-      object-fit: cover;
+  pointer-events: none;
 
-      display: block;
+}
 
-    }
 
+.availability-badge {
 
-    .online-dot {
+  position: absolute;
 
-      position: absolute;
+  left: 11px;
+  top: 11px;
 
-      right: 1px;
-      bottom: 2px;
+  display: inline-flex;
 
-      width: 13px;
-      height: 13px;
+  align-items: center;
 
-      border-radius: 50%;
+  gap: 5px;
 
-      background:
-        #22C55E;
+  padding:
+    6px 9px;
 
-      border:
-        2px solid
-        #fff;
+  border-radius:
+    999px;
 
-      box-shadow:
-        0 1px 5px
-        rgba(0,0,0,.12);
+  background:
+    rgba(255,255,255,.95);
 
-    }
+  color:
+    var(--green-dark);
 
+  font-size: 9px;
 
-    .user-info {
+  font-weight: 900;
 
-      min-width: 0;
+  box-shadow:
+    0 5px 15px
+    rgba(0,0,0,.10);
 
-      cursor: pointer;
+}
 
-    }
 
+.online-indicator {
 
-    .user-name {
+  width: 7px;
+  height: 7px;
 
-      display: flex;
+  border-radius: 50%;
 
-      align-items: center;
+  background:
+    var(--green);
 
-      gap: 5px;
+}
 
-      min-width: 0;
 
-    }
+.offline-indicator {
 
+  background:
+    #9CA3AF;
 
-    .user-name-text {
+}
 
-      min-width: 0;
 
-      overflow: hidden;
+.photo-country {
 
-      text-overflow: ellipsis;
+  position: absolute;
 
-      white-space: nowrap;
+  left: 11px;
+  bottom: 11px;
 
-      font-size: 14px;
+  padding:
+    6px 9px;
 
-      font-weight: 900;
+  border-radius:
+    999px;
 
-    }
+  background:
+    rgba(0,0,0,.42);
 
+  color:
+    white;
 
-    .verified-badge {
+  backdrop-filter:
+    blur(5px);
 
-      flex:
-        0 0 auto;
+  font-size: 10px;
 
-      display: inline-flex;
+  font-weight: 800;
 
-      align-items: center;
+}
 
-      justify-content: center;
 
-      width: 17px;
-      height: 17px;
+.photo-verified {
 
-      border-radius: 50%;
+  position: absolute;
 
-      background:
-        var(--connecta-blue);
+  right: 11px;
+  bottom: 11px;
 
-      color: #fff;
+  width: 29px;
+  height: 29px;
 
-      font-size: 10px;
+  display: grid;
 
-      font-weight: 900;
+  place-items: center;
 
-    }
+  border-radius: 50%;
 
+  background:
+    #2196F3;
 
-    .username {
+  color:
+    white;
 
-      margin-top: 2px;
+  border:
+    2px solid
+    white;
 
-      overflow: hidden;
+  font-size: 12px;
 
-      text-overflow: ellipsis;
+  font-weight: 900;
 
-      white-space: nowrap;
+}
 
-      color:
-        var(--connecta-muted);
 
-      font-size: 11px;
+/* =========================================================
+   PROFILE CONTENT
+========================================================= */
 
-    }
+.profile-content {
 
+  padding:
+    14px;
 
-    .online-status {
+}
 
-      margin-top: 5px;
 
-      font-size: 10px;
+.profile-name-row {
 
-      font-weight: 700;
+  display: flex;
 
-    }
+  align-items: center;
 
+  gap: 5px;
 
-    .online-status.online {
+}
 
-      color:
-        var(--connecta-dark-green);
 
-    }
+.profile-name {
 
+  margin: 0;
 
-    .online-status.offline {
+  overflow: hidden;
 
-      color:
-        #9CA3AF;
+  text-overflow: ellipsis;
 
-    }
+  white-space: nowrap;
 
+  font-size: 17px;
 
-    /* =========================================================
-       GLOBAL CHAT PROFILE DETAILS
-    ========================================================= */
+  font-weight: 950;
 
-    .global-user-details {
+}
 
-      margin-top: 7px;
 
-      display: flex;
+.verified-badge {
 
-      flex-wrap: wrap;
+  width: 18px;
+  height: 18px;
 
-      gap: 5px;
+  display: inline-flex;
 
-    }
+  align-items: center;
 
+  justify-content: center;
 
-    .user-meta-chip {
+  flex:
+    0 0 18px;
 
-      display: inline-flex;
+  border-radius: 50%;
 
-      align-items: center;
+  background:
+    #2196F3;
 
-      gap: 4px;
+  color:
+    white;
 
-      max-width: 100%;
+  font-size: 9px;
 
-      padding:
-        4px 7px;
+  font-weight: 900;
 
-      border-radius: 999px;
+}
 
-      background:
-        #F9FAFB;
 
-      border:
-        1px solid
-        #EEF0F1;
+.profile-username {
 
-      color:
-        #6B7280;
+  margin-top: 3px;
 
-      font-size: 9px;
+  color:
+    var(--muted);
 
-      font-weight: 700;
+  font-size: 10px;
 
-    }
+}
 
 
-    .global-bio {
+.profile-bio {
 
-      margin-top: 6px;
+  display: -webkit-box;
 
-      display: -webkit-box;
+  -webkit-box-orient: vertical;
 
-      -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
 
-      -webkit-box-orient: vertical;
+  overflow: hidden;
 
-      overflow: hidden;
+  margin:
+    9px 0 11px;
 
-      color:
-        #4B5563;
+  color:
+    #4B5563;
 
-      font-size: 10px;
+  font-size: 11px;
 
-      line-height: 1.45;
+  line-height:
+    1.55;
 
-    }
+}
 
 
-    /* =========================================================
-       CARD ACTIONS
-    ========================================================= */
+/* =========================================================
+   INTEREST CHIPS
+========================================================= */
 
-    .user-actions {
+.profile-interests {
 
-      display: flex;
+  display: flex;
 
-      flex-direction: column;
+  flex-wrap: wrap;
 
-      align-items: stretch;
+  gap: 5px;
 
-      gap: 6px;
+  margin-bottom: 12px;
 
-    }
+}
 
 
-    .follow-btn,
-    .chat-btn {
+.profile-interest {
 
-      min-width: 78px;
+  padding:
+    5px 7px;
 
-      min-height: 35px;
+  border-radius:
+    999px;
 
-      padding:
-        0 10px;
+  background:
+    var(--green-soft);
 
-      border-radius: 11px;
+  color:
+    var(--green-dark);
 
-      cursor: pointer;
+  font-size: 8px;
 
-      font-size: 10px;
+  font-weight: 800;
 
-      font-weight: 900;
+}
 
-      transition:
-        .18s ease;
 
-    }
+/* =========================================================
+   LANGUAGES
+========================================================= */
 
+.profile-languages {
 
-    .follow-btn {
+  display: flex;
 
-      border:
-        1px solid
-        #BBF7D0;
+  align-items: center;
 
-      background:
-        #F0FDF4;
+  gap: 5px;
 
-      color:
-        var(--connecta-dark-green);
+  margin-bottom: 13px;
 
-    }
+  color:
+    #6B7280;
 
+  font-size: 9px;
 
-    .follow-btn:hover {
+  line-height:
+    1.4;
 
-      background:
-        #DCFCE7;
+}
 
-    }
 
+/* =========================================================
+   ACTIONS
+========================================================= */
 
-    .follow-btn.following {
+.profile-actions {
 
-      background:
-        #fff;
+  display: grid;
 
-      border-color:
-        var(--connecta-border);
+  grid-template-columns:
+    1fr 1.5fr;
 
-      color:
-        #6B7280;
+  gap: 7px;
 
-    }
+}
 
 
-    .chat-btn {
+.profile-action {
 
-      border:
-        1px solid
-        var(--connecta-dark-green);
+  min-height: 42px;
 
-      background:
-        var(--connecta-green);
+  border-radius:
+    13px;
 
-      color:
-        #fff;
+  cursor: pointer;
 
-      box-shadow:
-        0 5px 12px
-        rgba(34,197,94,.16);
+  font-size: 10px;
 
-    }
+  font-weight: 900;
 
+}
 
-    .chat-btn:hover {
 
-      background:
-        var(--connecta-dark-green);
+.follow-btn {
 
-    }
+  border:
+    1px solid
+    #BBF7D0;
 
+  background:
+    var(--green-soft);
 
-    .chat-btn:active,
-    .follow-btn:active {
+  color:
+    var(--green-dark);
 
-      transform:
-        scale(.97);
+}
 
-    }
 
+.follow-btn.following {
 
-    /* =========================================================
-       PAYMENT LABEL
-    ========================================================= */
+  background:
+    white;
 
-    .chat-fee-label {
+  border-color:
+    var(--border);
 
-      display: flex;
+  color:
+    #6B7280;
 
-      align-items: center;
+}
 
-      justify-content: center;
 
-      gap: 3px;
+.chat-btn {
 
-      color:
-        #6B7280;
+  border: 0;
 
-      font-size: 9px;
+  background:
+    var(--green);
 
-      font-weight: 700;
+  color:
+    white;
 
-    }
+  box-shadow:
+    0 6px 15px
+    rgba(34,197,94,.18);
 
+}
 
-    /* =========================================================
-       EMPTY STATE
-    ========================================================= */
 
-    .empty-state {
+.chat-btn:hover {
 
-      min-height: 190px;
+  background:
+    var(--green-dark);
 
-      display: flex;
+}
 
-      flex-direction: column;
 
-      align-items: center;
+/* =========================================================
+   PRICE
+========================================================= */
 
-      justify-content: center;
+.chat-price {
 
-      gap: 8px;
+  text-align:
+    center;
 
-      padding: 30px 18px;
+  margin-top: 6px;
 
-      text-align: center;
+  color:
+    #6B7280;
 
-      color:
-        var(--connecta-muted);
+  font-size: 8px;
 
-      font-size: 13px;
+  font-weight: 700;
 
-      line-height: 1.5;
+}
 
-    }
 
+/* =========================================================
+   EMPTY STATE
+========================================================= */
 
-    .empty-icon {
+.empty-state {
 
-      width: 54px;
-      height: 54px;
+  min-height:
+    260px;
 
-      display: grid;
+  display: flex;
 
-      place-items: center;
+  flex-direction:
+    column;
 
-      border-radius: 18px;
+  align-items:
+    center;
 
-      background:
-        var(--connecta-light);
+  justify-content:
+    center;
 
-      font-size: 25px;
+  padding:
+    30px 18px;
 
-    }
+  text-align:
+    center;
 
+  background:
+    white;
 
-    .empty-title {
+  border:
+    1px solid
+    var(--border);
 
-      margin-top: 3px;
+  border-radius:
+    22px;
 
-      color:
-        var(--connecta-text);
+}
 
-      font-size: 14px;
 
-      font-weight: 900;
+.empty-icon {
 
-    }
+  width: 62px;
+  height: 62px;
 
+  display: grid;
 
-    .empty-text {
+  place-items: center;
 
-      max-width: 360px;
+  margin-bottom: 10px;
 
-      color:
-        var(--connecta-muted);
+  border-radius:
+    20px;
 
-      font-size: 11px;
+  background:
+    var(--green-soft);
 
-    }
+  font-size: 28px;
 
+}
 
-    /* =========================================================
-       OLD TABS
-       Kept because the existing friends.js still references
-       them. They remain available below the Global Chat area.
-    ========================================================= */
 
-    .community-section {
+.empty-title {
 
-      margin-top: 22px;
+  font-size: 15px;
 
-    }
+  font-weight: 900;
 
+}
 
-    .community-toggle {
 
-      display: grid;
+.empty-text {
 
-      grid-template-columns:
-        repeat(3, 1fr);
+  max-width:
+    360px;
 
-      gap: 6px;
+  margin-top: 5px;
 
-      padding: 5px;
+  color:
+    var(--muted);
 
-      background:
-        #EAF3EC;
+  font-size: 11px;
 
-      border-radius: 14px;
+  line-height:
+    1.5;
 
-      margin-bottom: 12px;
+}
 
-    }
 
+/* =========================================================
+   SKELETON
+========================================================= */
 
-    .friend-tab {
+.global-skeleton-grid {
 
-      min-height: 40px;
+  display: grid;
 
-      border: 0;
+  grid-template-columns:
+    1fr;
 
-      border-radius: 10px;
+  gap: 13px;
 
-      background:
-        transparent;
+}
 
-      color:
-        #6B7280;
 
-      font-size: 11px;
+.profile-skeleton {
 
-      font-weight: 800;
+  overflow: hidden;
 
-      cursor: pointer;
+  border:
+    1px solid
+    var(--border);
 
-    }
+  border-radius:
+    22px;
 
+  background:
+    white;
 
-    .friend-tab.active {
+}
 
-      background:
-        #fff;
 
-      color:
-        var(--connecta-dark-green);
+.skeleton-photo {
 
-      box-shadow:
-        0 3px 10px
-        rgba(0,0,0,.05);
+  height: 285px;
 
-    }
+  background:
+    linear-gradient(
+      100deg,
+      #EEF2EF 20%,
+      #F8FAF9 40%,
+      #EEF2EF 60%
+    );
 
+  background-size:
+    200% 100%;
 
-    .community-section-card {
+  animation:
+    connectaShimmer
+    1.35s
+    infinite;
 
-      background:
-        #fff;
+}
 
-      border:
-        1px solid
-        var(--connecta-border);
 
-      border-radius:
-        20px;
+.skeleton-content {
 
-      padding: 10px;
+  padding: 14px;
 
-    }
+}
 
 
-    .community-section-header {
+.skeleton-line {
 
-      display: flex;
+  height: 10px;
 
-      align-items: center;
+  margin-bottom: 8px;
 
-      justify-content: space-between;
+  border-radius:
+    999px;
 
-      gap: 10px;
+  background:
+    linear-gradient(
+      100deg,
+      #EEF2EF 20%,
+      #F8FAF9 40%,
+      #EEF2EF 60%
+    );
 
-      padding:
-        6px 5px 10px;
+  background-size:
+    200% 100%;
 
-    }
+  animation:
+    connectaShimmer
+    1.35s
+    infinite;
 
+}
 
-    .community-section-header h3 {
 
-      margin: 0;
+.skeleton-line.large {
 
-      font-size: 15px;
+  width: 60%;
 
-      font-weight: 900;
+  height: 14px;
 
-    }
+}
 
 
-    .community-count {
+.skeleton-line.medium {
 
-      display: inline-flex;
+  width: 42%;
 
-      align-items: center;
+}
 
-      justify-content: center;
 
-      min-width: 30px;
+.skeleton-line.short {
 
-      height: 26px;
+  width: 80%;
 
-      padding:
-        0 8px;
+}
 
-      border-radius: 999px;
 
-      background:
-        var(--connecta-light);
+@keyframes connectaShimmer {
 
-      color:
-        var(--connecta-dark-green);
+  0% {
+    background-position:
+      200% 0;
+  }
 
-      font-size: 10px;
+  100% {
+    background-position:
+      -200% 0;
+  }
 
-      font-weight: 900;
+}
 
-    }
 
+/* =========================================================
+   COMMUNITY SECTION
+========================================================= */
 
-    #followingList,
-    #followersList {
+.community-section {
 
-      display: grid;
+  margin-top:
+    24px;
 
-      grid-template-columns:
-        1fr;
+}
 
-      gap: 8px;
 
-    }
+.community-toggle {
 
+  display: grid;
 
-    /* =========================================================
-       SUMMARY CARDS
-    ========================================================= */
+  grid-template-columns:
+    repeat(3,1fr);
 
-    .community-summary {
+  gap: 5px;
 
-      display: grid;
+  padding: 5px;
 
-      grid-template-columns:
-        repeat(2, 1fr);
+  margin-bottom: 11px;
 
-      gap: 9px;
+  border-radius:
+    15px;
 
-      margin-top: 12px;
+  background:
+    #EAF3EC;
 
-    }
+}
 
 
-    .summary-card {
+.friend-tab {
 
-      display: flex;
+  min-height: 39px;
 
-      align-items: center;
+  border: 0;
 
-      gap: 10px;
+  border-radius:
+    10px;
 
-      padding: 12px;
+  background:
+    transparent;
 
-      border:
-        1px solid
-        var(--connecta-border);
+  color:
+    #6B7280;
 
-      border-radius: 16px;
+  font-size: 10px;
 
-      background:
-        #fff;
+  font-weight: 900;
 
-    }
+}
 
 
-    .summary-icon {
+.friend-tab.active {
 
-      width: 38px;
-      height: 38px;
+  background:
+    white;
 
-      display: grid;
+  color:
+    var(--green-dark);
 
-      place-items: center;
+  box-shadow:
+    0 3px 10px
+    rgba(0,0,0,.05);
 
-      flex:
-        0 0 38px;
+}
 
-      border-radius: 12px;
 
-      background:
-        var(--connecta-light);
+.community-section-card {
 
-      font-size: 17px;
+  padding:
+    10px;
 
-    }
+  border:
+    1px solid
+    var(--border);
 
+  border-radius:
+    20px;
 
-    .summary-value {
+  background:
+    white;
 
-      font-size: 17px;
+}
 
-      font-weight: 900;
 
-      line-height: 1;
+.community-section-header {
 
-    }
+  display: flex;
 
+  align-items: center;
 
-    .summary-label {
+  justify-content:
+    space-between;
 
-      margin-top: 4px;
+  padding:
+    5px;
 
-      color:
-        var(--connecta-muted);
+}
 
-      font-size: 9px;
 
-      font-weight: 700;
+.community-section-header h3 {
 
-    }
+  margin: 0;
 
+  font-size: 14px;
 
-    /* =========================================================
-       PAYMENT MODAL
-    ========================================================= */
+  font-weight: 900;
 
-    .connecta-modal-overlay {
+}
 
-      position: fixed;
 
-      inset: 0;
+.community-count {
 
-      z-index: 9999;
+  min-width: 29px;
 
-      display: none;
+  height: 25px;
 
-      align-items: flex-end;
+  display: inline-flex;
 
-      justify-content: center;
+  align-items: center;
 
-      padding: 14px;
+  justify-content: center;
 
-      background:
-        rgba(15,23,42,.58);
+  padding:
+    0 7px;
 
-      backdrop-filter:
-        blur(5px);
+  border-radius:
+    999px;
 
-    }
+  background:
+    var(--green-soft);
 
+  color:
+    var(--green-dark);
 
-    .connecta-modal-overlay.show {
+  font-size: 9px;
 
-      display: flex;
+  font-weight: 900;
 
-    }
+}
 
 
-    .connecta-payment-modal {
+/* =========================================================
+   SUMMARY
+========================================================= */
 
-      width: 100%;
+.community-summary {
 
-      max-width: 440px;
+  display: grid;
 
-      background:
-        #fff;
+  grid-template-columns:
+    repeat(2,1fr);
 
-      border-radius:
-        25px;
+  gap: 9px;
 
-      padding: 20px;
+  margin-top:
+    11px;
 
-      box-shadow:
-        0 25px 70px
-        rgba(0,0,0,.20);
+}
 
-      animation:
-        modalUp .22s ease;
 
-    }
+.summary-card {
 
+  display: flex;
 
-    @keyframes modalUp {
+  align-items: center;
 
-      from {
+  gap: 9px;
 
-        opacity: 0;
+  padding:
+    11px;
 
-        transform:
-          translateY(20px);
+  border:
+    1px solid
+    var(--border);
 
-      }
+  border-radius:
+    15px;
 
-      to {
+  background:
+    white;
 
-        opacity: 1;
+}
 
-        transform:
-          translateY(0);
 
-      }
+.summary-icon {
 
-    }
+  width: 36px;
+  height: 36px;
 
+  display: grid;
 
-    .modal-handle {
+  place-items: center;
 
-      width: 40px;
-      height: 4px;
+  border-radius:
+    11px;
 
-      margin:
-        -5px auto 17px;
+  background:
+    var(--green-soft);
 
-      border-radius: 999px;
+}
 
-      background:
-        #D1D5DB;
 
-    }
+.summary-value {
 
+  font-size: 16px;
 
-    .payment-user {
+  font-weight: 900;
 
-      display: flex;
+}
 
-      align-items: center;
 
-      gap: 11px;
+.summary-label {
 
-      margin-bottom: 16px;
+  color:
+    var(--muted);
 
-    }
+  font-size: 8px;
 
+}
 
-    .payment-user-avatar {
 
-      width: 52px;
-      height: 52px;
+/* =========================================================
+   PAYMENT / SUPPORT MODAL
+========================================================= */
 
-      display: grid;
+.connecta-modal-overlay {
 
-      place-items: center;
+  position: fixed;
 
-      overflow: hidden;
+  inset: 0;
 
-      flex:
-        0 0 52px;
+  z-index: 9999;
 
-      border-radius: 50%;
+  display: none;
 
-      background:
-        #DCFCE7;
+  align-items:
+    flex-end;
 
-      color:
-        var(--connecta-dark-green);
+  justify-content:
+    center;
 
-      font-weight: 900;
+  padding:
+    12px;
 
-    }
+  background:
+    rgba(15,23,42,.58);
 
+  backdrop-filter:
+    blur(5px);
 
-    .payment-user-avatar img {
+}
 
-      width: 100%;
-      height: 100%;
 
-      object-fit: cover;
+.connecta-modal-overlay.show {
 
-    }
+  display: flex;
 
+}
 
-    .payment-user-name {
 
-      font-size: 15px;
+.connecta-modal {
 
-      font-weight: 900;
+  width: 100%;
 
-    }
+  max-width:
+    460px;
 
+  padding:
+    20px;
 
-    .payment-user-label {
+  border-radius:
+    25px;
 
-      margin-top: 3px;
+  background:
+    white;
 
-      color:
-        var(--connecta-muted);
+  box-shadow:
+    0 25px 70px
+    rgba(0,0,0,.20);
 
-      font-size: 11px;
+}
 
-    }
 
+.modal-handle {
 
-    .payment-title {
+  width: 40px;
+  height: 4px;
 
-      margin: 0 0 7px;
+  margin:
+    -4px auto 17px;
 
-      font-size: 20px;
+  border-radius:
+    999px;
 
-      font-weight: 900;
+  background:
+    #D1D5DB;
 
-    }
+}
 
 
-    .payment-description {
+.modal-title {
 
-      margin: 0;
+  margin: 0;
 
-      color:
-        var(--connecta-muted);
+  font-size: 20px;
 
-      font-size: 12px;
+  font-weight: 950;
 
-      line-height: 1.55;
+}
 
-    }
 
+.modal-description {
 
-    .payment-amount-box {
+  margin:
+    7px 0 15px;
 
-      display: flex;
+  color:
+    var(--muted);
 
-      align-items: center;
+  font-size: 11px;
 
-      justify-content: space-between;
+  line-height:
+    1.55;
 
-      margin:
-        16px 0;
+}
 
-      padding:
-        14px;
 
-      border-radius: 16px;
+.selected-profile {
 
-      background:
-        var(--connecta-light);
+  display: flex;
 
-      border:
-        1px solid
-        #DCFCE7;
+  align-items: center;
 
-    }
+  gap: 10px;
 
+  padding:
+    10px;
 
-    .payment-amount-label {
+  margin-bottom:
+    13px;
 
-      color:
-        #4B5563;
+  border:
+    1px solid
+    var(--border);
 
-      font-size: 11px;
+  border-radius:
+    15px;
 
-      font-weight: 700;
+}
 
-    }
 
+.selected-profile-photo {
 
-    .payment-amount {
+  width: 48px;
+  height: 48px;
 
-      color:
-        var(--connecta-dark-green);
+  overflow: hidden;
 
-      font-size: 22px;
+  display: grid;
 
-      font-weight: 900;
+  place-items: center;
 
-    }
+  border-radius:
+    50%;
 
+  background:
+    var(--green-soft);
 
-    .payment-phone-label {
+  color:
+    var(--green-dark);
 
-      display: block;
+  font-weight: 900;
 
-      margin-bottom: 7px;
+}
 
-      font-size: 11px;
 
-      font-weight: 800;
+.selected-profile-photo img {
 
-    }
+  width: 100%;
+  height: 100%;
 
+  object-fit: cover;
 
-    #chatPaymentPhone {
+}
 
-      width: 100%;
 
-      height: 49px;
+.selected-profile-name {
 
-      padding:
-        0 14px;
+  font-size: 13px;
 
-      border:
-        1px solid
-        var(--connecta-border);
+  font-weight: 900;
 
-      border-radius: 14px;
+}
 
-      outline: none;
 
-      background:
-        #FAFAFA;
+.selected-profile-country {
 
-    }
+  margin-top: 3px;
 
+  color:
+    var(--muted);
 
-    #chatPaymentPhone:focus {
+  font-size: 9px;
 
-      background: #fff;
+}
 
-      border-color:
-        var(--connecta-green);
 
-      box-shadow:
-        0 0 0 3px
-        rgba(34,197,94,.08);
+.payment-box {
 
-    }
+  display: flex;
 
+  justify-content:
+    space-between;
 
-    .payment-security-note {
+  align-items:
+    center;
 
-      display: flex;
+  padding:
+    13px;
 
-      gap: 7px;
+  margin-bottom:
+    13px;
 
-      margin-top: 10px;
+  border-radius:
+    15px;
 
-      color:
-        #6B7280;
+  background:
+    var(--green-soft);
 
-      font-size: 10px;
+}
 
-      line-height: 1.45;
 
-    }
+.payment-label {
 
+  color:
+    #4B5563;
 
-    .modal-actions {
+  font-size: 10px;
 
-      display: grid;
+  font-weight: 700;
 
-      grid-template-columns:
-        1fr 1.4fr;
+}
 
-      gap: 9px;
 
-      margin-top: 17px;
+.payment-amount {
 
-    }
+  color:
+    var(--green-dark);
 
+  font-size: 21px;
 
-    .modal-btn {
+  font-weight: 950;
 
-      min-height: 47px;
+}
 
-      border-radius: 14px;
 
-      cursor: pointer;
+.payment-info {
 
-      font-size: 12px;
+  padding:
+    10px;
 
-      font-weight: 900;
+  margin-bottom:
+    13px;
 
-    }
+  border-radius:
+    13px;
 
+  background:
+    #F9FAFB;
 
-    .modal-cancel {
+  color:
+    #6B7280;
 
-      border:
-        1px solid
-        var(--connecta-border);
+  font-size: 9px;
 
-      background:
-        #fff;
+  line-height:
+    1.5;
 
-      color:
-        #6B7280;
+}
 
-    }
 
+.modal-actions {
 
-    .modal-pay {
+  display: grid;
 
-      border: 0;
+  grid-template-columns:
+    1fr 1.4fr;
 
-      background:
-        var(--connecta-green);
+  gap: 8px;
 
-      color: #fff;
+}
 
-      box-shadow:
-        0 7px 16px
-        rgba(34,197,94,.18);
 
-    }
+.modal-btn {
 
+  min-height:
+    46px;
 
-    .modal-pay:hover {
+  border-radius:
+    13px;
 
-      background:
-        var(--connecta-dark-green);
+  font-size: 10px;
 
-    }
+  font-weight: 900;
 
+  cursor: pointer;
 
-    .modal-pay:disabled {
+}
 
-      opacity: .65;
 
-      cursor: not-allowed;
+.modal-cancel {
 
-    }
+  border:
+    1px solid
+    var(--border);
 
+  background:
+    white;
 
-    /* =========================================================
-       TOAST
-    ========================================================= */
+  color:
+    #6B7280;
 
-    #friendsToast {
+}
 
-      position: fixed;
 
-      left: 50%;
+.modal-pay {
 
-      bottom: 82px;
+  border: 0;
 
-      z-index: 10000;
+  background:
+    var(--green);
 
-      width:
-        max-content;
+  color:
+    white;
 
-      max-width:
-        calc(100% - 30px);
+}
 
-      padding:
-        11px 15px;
 
-      border-radius: 999px;
+/* =========================================================
+   SUPPORT SUCCESS
+========================================================= */
 
-      background:
-        #17201A;
+.support-success {
 
-      color:
-        #fff;
+  text-align:
+    center;
 
-      font-size: 11px;
+}
 
-      font-weight: 700;
 
-      box-shadow:
-        0 10px 30px
-        rgba(0,0,0,.18);
+.support-success-icon {
 
-      opacity: 0;
+  width: 65px;
+  height: 65px;
 
-      pointer-events: none;
+  display: grid;
 
-      transform:
-        translate(-50%, 10px);
+  place-items: center;
 
-      transition:
-        .2s ease;
+  margin:
+    0 auto 12px;
 
-    }
+  border-radius:
+    50%;
 
+  background:
+    var(--green-soft);
 
-    #friendsToast.show {
+  font-size: 30px;
 
-      opacity: 1;
+}
 
-      transform:
-        translate(-50%, 0);
 
-    }
+.support-success h3 {
 
+  margin:
+    0 0 7px;
 
-    /* =========================================================
-       MOBILE
-    ========================================================= */
+  font-size:
+    19px;
 
-    @media (max-width: 520px) {
+  font-weight:
+    950;
 
-      .friends-page {
+}
 
-        padding:
-          12px
-          10px
-          105px;
 
-      }
+.support-success p {
 
+  margin:
+    0 auto 15px;
 
-      .global-hero {
+  max-width:
+    360px;
 
-        padding: 21px 17px;
+  color:
+    var(--muted);
 
-        border-radius: 21px;
+  font-size:
+    11px;
 
-      }
+  line-height:
+    1.55;
 
+}
 
-      .hero-title {
 
-        font-size: 27px;
+.support-button {
 
-      }
+  width: 100%;
 
+  min-height:
+    46px;
 
-      .global-filter-card {
+  border: 0;
 
-        padding: 13px;
+  border-radius:
+    13px;
 
-        border-radius: 20px;
+  background:
+    var(--green);
 
-      }
+  color:
+    white;
 
+  font-size:
+    11px;
 
-      .user-card {
+  font-weight:
+    900;
 
-        grid-template-columns:
-          52px
-          minmax(0,1fr)
-          auto;
+}
 
-        gap: 9px;
 
-        padding: 10px;
+/* =========================================================
+   TOAST
+========================================================= */
 
-        border-radius: 16px;
+#friendsToast {
 
-      }
+  position: fixed;
 
+  left: 50%;
 
-      .user-avatar {
+  bottom: 82px;
 
-        width: 52px;
-        height: 52px;
+  z-index: 10001;
 
-        flex-basis: 52px;
+  max-width:
+    calc(100% - 28px);
 
-      }
+  padding:
+    11px 15px;
 
+  border-radius:
+    999px;
 
-      .follow-btn,
-      .chat-btn {
+  background:
+    #17201A;
 
-        min-width: 69px;
+  color:
+    white;
 
-        min-height: 32px;
+  font-size:
+    10px;
 
-        padding:
-          0 7px;
+  font-weight:
+    800;
 
-        font-size: 9px;
+  opacity: 0;
 
-      }
+  pointer-events: none;
 
+  transform:
+    translate(-50%, 10px);
 
-      .chat-fee-label {
+  transition:
+    .2s ease;
 
-        font-size: 8px;
+}
 
-      }
 
-    }
+#friendsToast.show {
 
+  opacity: 1;
 
-    /* =========================================================
-       TABLET / DESKTOP
-    ========================================================= */
+  transform:
+    translate(-50%,0);
 
-    @media (min-width: 650px) {
+}
 
-      .friends-page {
 
-        padding:
-          22px
-          18px
-          110px;
+/* =========================================================
+   RESPONSIVE
+========================================================= */
 
-      }
+@media (min-width: 620px) {
 
+  .friends-page {
 
-      .filter-grid {
+    padding:
+      20px
+      18px
+      110px;
 
-        grid-template-columns:
-          1fr 1fr;
+  }
 
-      }
 
+  .filters-grid {
 
-      .search-wrap {
+    grid-template-columns:
+      1fr 1fr;
 
-        margin-top: 12px;
+  }
 
-      }
 
+  #discoverList {
 
-      #discoverList {
+    grid-template-columns:
+      repeat(2,minmax(0,1fr));
 
-        grid-template-columns:
-          repeat(2, minmax(0,1fr));
+  }
 
-      }
+}
 
 
-      #followingList,
-      #followersList {
+@media (min-width: 900px) {
 
-        grid-template-columns:
-          repeat(2, minmax(0,1fr));
+  .friends-page {
 
-      }
+    max-width:
+      1180px;
 
+  }
 
-      .connecta-modal-overlay {
 
-        align-items: center;
+  #discoverList {
 
-      }
+    grid-template-columns:
+      repeat(3,minmax(0,1fr));
 
-    }
+  }
 
 
-    @media (min-width: 900px) {
+  .global-profile-card {
 
-      .friends-page {
+    border-radius:
+      24px;
 
-        max-width: 1080px;
+  }
 
-      }
 
+  .profile-photo-area {
 
-      #discoverList {
+    height:
+      320px;
 
-        grid-template-columns:
-          repeat(3, minmax(0,1fr));
+  }
 
-      }
+}
 
 
-      #followingList,
-      #followersList {
+@media (max-width: 400px) {
 
-        grid-template-columns:
-          repeat(3, minmax(0,1fr));
+  .profile-photo-area {
 
-      }
+    height:
+      250px;
 
-    }
+  }
 
-  </style>
+
+  .profile-actions {
+
+    grid-template-columns:
+      1fr 1.35fr;
+
+  }
+
+}
+
+</style>
 
 </head>
 
@@ -2136,678 +2252,785 @@
 <body class="app-page">
 
 
-  <!-- =======================================================
-       EXISTING CONNECTA HEADER
-  ======================================================== -->
+<!-- =======================================================
+     CONNECTA TOPBAR
+======================================================== -->
 
-  <header class="topbar">
+<header class="topbar">
+
+  <button
+    id="menuBtn"
+    class="icon-btn"
+    type="button"
+    aria-label="Open menu"
+  >
+    ☰
+  </button>
+
+
+  <div class="brand">
+
+    <div class="brand-mark">
+      C
+    </div>
+
+    <div class="brand-text">
+      CONNECTA
+    </div>
+
+  </div>
+
+
+  <div class="topbar-right">
+
+    <div class="balance-box">
+
+      <span class="balance-label">
+        Balance
+      </span>
+
+      <strong id="balanceAmount">
+        0.00
+      </strong>
+
+    </div>
+
 
     <button
-      id="menuBtn"
-      class="icon-btn"
+      id="connectionBtn"
+      class="connection-btn"
       type="button"
-      aria-label="Open menu"
     >
-      ☰
+      Get Connection
     </button>
 
 
-    <div class="brand">
+    <button
+      id="profileBtn"
+      class="profile-btn"
+      type="button"
+      aria-label="Open profile"
+    >
+      U
+    </button>
 
-      <div class="brand-mark">
-        C
-      </div>
+  </div>
 
-      <div class="brand-text">
-        CONNECTA
-      </div>
+</header>
 
+
+<!-- =======================================================
+     MENU
+======================================================== -->
+
+<div
+  id="menuOverlay"
+  class="menu-overlay"
+></div>
+
+
+<aside
+  id="sideMenu"
+  class="side-menu"
+  aria-hidden="true"
+>
+
+  <div class="side-menu-profile">
+
+    <div
+      id="menuAvatar"
+      class="menu-avatar"
+    >
+      U
     </div>
 
 
-    <div class="topbar-right">
+    <div class="menu-user-info">
 
-      <div class="balance-box">
+      <strong id="menuName">
+        CONNECTA User
+      </strong>
 
-        <span class="balance-label">
-          Balance
-        </span>
-
-        <strong id="balanceAmount">
-          0.00
-        </strong>
-
-      </div>
-
-
-      <button
-        id="connectionBtn"
-        class="connection-btn"
-        type="button"
-      >
-        Get Connection
-      </button>
-
-
-      <button
-        id="profileBtn"
-        class="profile-btn"
-        type="button"
-        aria-label="Open profile"
-      >
-        U
-      </button>
-
-    </div>
-
-  </header>
-
-
-
-  <!-- =======================================================
-       SIDE MENU
-  ======================================================== -->
-
-  <div
-    id="menuOverlay"
-    class="menu-overlay"
-  ></div>
-
-
-  <aside
-    id="sideMenu"
-    class="side-menu"
-    aria-hidden="true"
-  >
-
-    <div class="side-menu-profile">
-
-      <div
-        id="menuAvatar"
-        class="menu-avatar"
-      >
-        U
-      </div>
-
-
-      <div class="menu-user-info">
-
-        <strong id="menuName">
-          CONNECTA User
-        </strong>
-
-        <span id="menuUsername">
-          @username
-        </span>
-
-      </div>
-
-    </div>
-
-
-    <nav class="side-nav">
-
-      <a href="dashboard.html">
-        💬
-        <span>Chats</span>
-      </a>
-
-
-      <a href="groups.html">
-        👥
-        <span>Groups</span>
-      </a>
-
-
-      <a href="stories.html">
-        ⭕
-        <span>Stories</span>
-      </a>
-
-
-      <a
-        href="friends.html"
-        class="active"
-      >
-        🌍
-        <span>Global Chat</span>
-      </a>
-
-
-      <a href="online.html">
-        🟢
-        <span>Online Users</span>
-      </a>
-
-
-      <a href="verification.html">
-        ✓
-        <span>Verification</span>
-      </a>
-
-
-      <a href="earn.html">
-        💰
-        <span>Refer &amp; Earn</span>
-      </a>
-
-
-      <a href="settings.html">
-        ⚙️
-        <span>Settings</span>
-      </a>
-
-
-      <button
-        id="logoutBtn"
-        type="button"
-        class="side-nav-logout"
-      >
-        🚪
-        <span>Logout</span>
-      </button>
-
-    </nav>
-
-  </aside>
-
-
-
-  <!-- =======================================================
-       MAIN
-  ======================================================== -->
-
-  <main class="friends-page">
-
-
-    <!-- =====================================================
-         HERO
-    ====================================================== -->
-
-    <section class="global-hero">
-
-      <div class="hero-content">
-
-        <div class="hero-eyebrow">
-          🌍 CONNECTA GLOBAL CHAT
-        </div>
-
-
-        <h1 class="hero-title">
-          Meet &amp; Chat
-        </h1>
-
-
-        <p class="hero-description">
-          Discover people who are available to chat,
-          choose who you want to meet, and start a new
-          conversation on CONNECTA.
-        </p>
-
-
-        <div class="global-chat-badge">
-          💬 Find someone new to talk to
-        </div>
-
-
-        <div class="hero-note">
-          🔒 You only pay when you choose to unlock a conversation.
-        </div>
-
-      </div>
-
-    </section>
-
-
-
-    <!-- =====================================================
-         FILTERS
-    ====================================================== -->
-
-    <section class="global-filter-card">
-
-      <div class="filter-heading">
-
-        <div>
-
-          <h2>
-            Who do you want to meet?
-          </h2>
-
-          <p>
-            Choose your preferred chat partner.
-          </p>
-
-        </div>
-
-
-        <div class="filter-icon">
-          🌍
-        </div>
-
-      </div>
-
-
-      <label class="filter-label">
-        Gender
-      </label>
-
-
-      <div
-        class="gender-options"
-        id="genderOptions"
-      >
-
-        <button
-          type="button"
-          class="gender-btn active"
-          data-gender="everyone"
-        >
-          👥 Everyone
-        </button>
-
-
-        <button
-          type="button"
-          class="gender-btn"
-          data-gender="male"
-        >
-          👨 Male
-        </button>
-
-
-        <button
-          type="button"
-          class="gender-btn"
-          data-gender="female"
-        >
-          👩 Female
-        </button>
-
-      </div>
-
-
-
-      <div class="filter-grid">
-
-        <div class="field-group">
-
-          <label
-            class="filter-label"
-            for="countryFilter"
-          >
-            Country
-          </label>
-
-          <select
-            id="countryFilter"
-            class="field-input"
-          >
-
-            <option value="all">
-              🌍 Any country
-            </option>
-
-            <option value="kenya">
-              🇰🇪 Kenya
-            </option>
-
-            <option value="uganda">
-              🇺🇬 Uganda
-            </option>
-
-            <option value="tanzania">
-              🇹🇿 Tanzania
-            </option>
-
-            <option value="nigeria">
-              🇳🇬 Nigeria
-            </option>
-
-            <option value="ghana">
-              🇬🇭 Ghana
-            </option>
-
-            <option value="south-africa">
-              🇿🇦 South Africa
-            </option>
-
-            <option value="united-states">
-              🇺🇸 United States
-            </option>
-
-            <option value="united-kingdom">
-              🇬🇧 United Kingdom
-            </option>
-
-            <option value="canada">
-              🇨🇦 Canada
-            </option>
-
-            <option value="australia">
-              🇦🇺 Australia
-            </option>
-
-            <option value="germany">
-              🇩🇪 Germany
-            </option>
-
-            <option value="france">
-              🇫🇷 France
-            </option>
-
-            <option value="other">
-              🌐 Other
-            </option>
-
-          </select>
-
-        </div>
-
-
-        <div class="field-group">
-
-          <label
-            class="filter-label"
-            for="friendSearch"
-          >
-            Search
-          </label>
-
-
-          <div class="search-wrap">
-
-            <span class="search-icon">
-              🔎
-            </span>
-
-            <input
-              id="friendSearch"
-              class="field-input"
-              type="search"
-              autocomplete="off"
-              placeholder="Search name or username..."
-            >
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </section>
-
-
-
-    <!-- =====================================================
-         AVAILABLE PEOPLE
-    ====================================================== -->
-
-    <div class="available-header">
-
-      <div>
-
-        <h2 class="available-title">
-          People Available for Chat
-        </h2>
-
-        <p class="available-subtitle">
-          Users who have chosen to meet new people.
-        </p>
-
-      </div>
-
-
-      <span
-        id="discoverCount"
-        class="available-count"
-      >
-        0
+      <span id="menuUsername">
+        @username
       </span>
 
     </div>
 
+  </div>
 
-    <section class="section-card">
 
-      <div id="discoverList">
+  <nav class="side-nav">
 
-        <div class="empty-state">
+    <a href="dashboard.html">
+      💬
+      <span>Chats</span>
+    </a>
 
-          <div class="empty-icon">
-            🌍
-          </div>
 
-          <div class="empty-title">
-            Finding people...
-          </div>
+    <a href="groups.html">
+      👥
+      <span>Groups</span>
+    </a>
 
-          <div class="empty-text">
-            We're looking for CONNECTA users who are
-            available for Global Chat.
-          </div>
 
-        </div>
+    <a href="stories.html">
+      ⭕
+      <span>Stories</span>
+    </a>
+
+
+    <a
+      href="friends.html"
+      class="active"
+    >
+      🌍
+      <span>Global Meet</span>
+    </a>
+
+
+    <a href="online.html">
+      🟢
+      <span>Online Users</span>
+    </a>
+
+
+    <a href="verification.html">
+      ✓
+      <span>Verification</span>
+    </a>
+
+
+    <a href="earn.html">
+      💰
+      <span>Refer &amp; Earn</span>
+    </a>
+
+
+    <a href="settings.html">
+      ⚙️
+      <span>Settings</span>
+    </a>
+
+
+    <button
+      id="logoutBtn"
+      type="button"
+      class="side-nav-logout"
+    >
+      🚪
+      <span>Logout</span>
+    </button>
+
+  </nav>
+
+</aside>
+
+
+<!-- =======================================================
+     MAIN
+======================================================== -->
+
+<main class="friends-page">
+
+
+  <!-- =====================================================
+       HERO
+  ====================================================== -->
+
+  <section class="global-hero">
+
+    <div class="hero-content">
+
+      <div class="hero-eyebrow">
+        🌍 CONNECTA GLOBAL MEET
+      </div>
+
+
+      <h1 class="hero-title">
+        Meet Someone New
+      </h1>
+
+
+      <p class="hero-description">
+
+        Discover people from different countries who are
+        looking for friendship, relationships, cultural
+        exchange and African language learning.
+
+      </p>
+
+
+      <div class="hero-features">
+
+        <span class="hero-pill">
+          ❤️ Relationship
+        </span>
+
+        <span class="hero-pill">
+          💬 Friendship
+        </span>
+
+        <span class="hero-pill">
+          🗣️ Learn Swahili
+        </span>
+
+        <span class="hero-pill">
+          🌍 Culture
+        </span>
 
       </div>
 
-    </section>
+
+      <div class="hero-price">
+        💬 Connect from KSh 20
+      </div>
+
+    </div>
+
+  </section>
 
 
+  <!-- =====================================================
+       FILTERS
+  ====================================================== -->
 
-    <!-- =====================================================
-         FOLLOWING / FOLLOWERS
-         Kept for compatibility with existing friends.js.
-    ====================================================== -->
+  <section class="filters-card">
 
-    <section class="community-section">
+    <div class="filters-heading">
 
-      <div class="community-toggle">
+      <div>
 
-        <button
-          type="button"
-          class="friend-tab active"
-          data-tab="discover"
-        >
-          🌍 Discover
-        </button>
+        <h2 class="filters-title">
+          Find Your Match
+        </h2>
 
-
-        <button
-          type="button"
-          class="friend-tab"
-          data-tab="following"
-        >
-          Following
-        </button>
-
-
-        <button
-          type="button"
-          class="friend-tab"
-          data-tab="followers"
-        >
-          Followers
-        </button>
+        <p class="filters-subtitle">
+          Choose the type of person you'd like to meet.
+        </p>
 
       </div>
 
 
-
-      <!-- FOLLOWING -->
-
-      <section
-        id="followingSection"
-        class="community-section-card"
-        hidden
-      >
-
-        <div class="community-section-header">
-
-          <h3>
-            People You Follow
-          </h3>
-
-          <span
-            id="followingListCount"
-            class="community-count"
-          >
-            0
-          </span>
-
-        </div>
-
-
-        <div id="followingList"></div>
-
-      </section>
-
-
-
-      <!-- FOLLOWERS -->
-
-      <section
-        id="followersSection"
-        class="community-section-card"
-        hidden
-      >
-
-        <div class="community-section-header">
-
-          <h3>
-            Your Followers
-          </h3>
-
-          <span
-            id="followersListCount"
-            class="community-count"
-          >
-            0
-          </span>
-
-        </div>
-
-
-        <div id="followersList"></div>
-
-      </section>
-
-
-
-      <!-- DISCOVER COMPATIBILITY -->
-
-      <section
-        id="discoverSection"
-        class="community-section-card"
-        hidden
-      >
-
-        <div class="community-section-header">
-
-          <h3>
-            Global Chat
-          </h3>
-
-          <span
-            id="discoverCount"
-            class="community-count"
-          >
-            0
-          </span>
-
-        </div>
-
-
-        <div id="discoverList"></div>
-
-      </section>
-
-
-      <!-- SUMMARY -->
-
-      <div class="community-summary">
-
-        <div class="summary-card">
-
-          <div class="summary-icon">
-            ➡️
-          </div>
-
-          <div>
-
-            <div
-              id="followingCount"
-              class="summary-value"
-            >
-              0
-            </div>
-
-            <div class="summary-label">
-              Following
-            </div>
-
-          </div>
-
-        </div>
-
-
-        <div class="summary-card">
-
-          <div class="summary-icon">
-            👥
-          </div>
-
-          <div>
-
-            <div
-              id="followersCount"
-              class="summary-value"
-            >
-              0
-            </div>
-
-            <div class="summary-label">
-              Followers
-            </div>
-
-          </div>
-
-        </div>
-
+      <div class="filter-icon">
+        🔎
       </div>
 
-    </section>
-
-  </main>
+    </div>
 
 
+    <label class="filter-label">
+      I'm interested in
+    </label>
 
-  <!-- =======================================================
-       PAYMENT MODAL
-  ======================================================== -->
-
-  <div
-    id="chatPaymentOverlay"
-    class="connecta-modal-overlay"
-    aria-hidden="true"
-  >
 
     <div
-      id="chatPaymentModal"
-      class="connecta-payment-modal"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="chatPaymentTitle"
+      class="interest-scroll"
+      id="interestOptions"
     >
 
-      <div class="modal-handle"></div>
+      <button
+        type="button"
+        class="interest-btn active"
+        data-interest="all"
+      >
+        ✨ Everyone
+      </button>
 
 
-      <div class="payment-user">
+      <button
+        type="button"
+        class="interest-btn"
+        data-interest="relationship"
+      >
+        ❤️ Relationship
+      </button>
+
+
+      <button
+        type="button"
+        class="interest-btn"
+        data-interest="friendship"
+      >
+        💬 Friendship
+      </button>
+
+
+      <button
+        type="button"
+        class="interest-btn"
+        data-interest="swahili"
+      >
+        🗣️ Learn Swahili
+      </button>
+
+
+      <button
+        type="button"
+        class="interest-btn"
+        data-interest="african-languages"
+      >
+        🌍 African Languages
+      </button>
+
+
+      <button
+        type="button"
+        class="interest-btn"
+        data-interest="culture"
+      >
+        🤝 Culture
+      </button>
+
+    </div>
+
+
+    <label
+      class="filter-label"
+      style="margin-top:13px;"
+    >
+      Preferred gender
+    </label>
+
+
+    <div
+      class="gender-row"
+      id="genderOptions"
+    >
+
+      <button
+        type="button"
+        class="gender-btn active"
+        data-gender="everyone"
+      >
+        👥 Everyone
+      </button>
+
+
+      <button
+        type="button"
+        class="gender-btn"
+        data-gender="male"
+      >
+        👨 Male
+      </button>
+
+
+      <button
+        type="button"
+        class="gender-btn"
+        data-gender="female"
+      >
+        👩 Female
+      </button>
+
+    </div>
+
+
+    <div class="filters-grid">
+
+      <select
+        id="countryFilter"
+        class="filter-field"
+      >
+
+        <option value="all">
+          🌍 Any Country
+        </option>
+
+        <option value="kenya">
+          🇰🇪 Kenya
+        </option>
+
+        <option value="uganda">
+          🇺🇬 Uganda
+        </option>
+
+        <option value="tanzania">
+          🇹🇿 Tanzania
+        </option>
+
+        <option value="nigeria">
+          🇳🇬 Nigeria
+        </option>
+
+        <option value="ghana">
+          🇬🇭 Ghana
+        </option>
+
+        <option value="south-africa">
+          🇿🇦 South Africa
+        </option>
+
+        <option value="united-states">
+          🇺🇸 United States
+        </option>
+
+        <option value="united-kingdom">
+          🇬🇧 United Kingdom
+        </option>
+
+        <option value="canada">
+          🇨🇦 Canada
+        </option>
+
+        <option value="australia">
+          🇦🇺 Australia
+        </option>
+
+        <option value="germany">
+          🇩🇪 Germany
+        </option>
+
+        <option value="france">
+          🇫🇷 France
+        </option>
+
+        <option value="other">
+          🌐 Other
+        </option>
+
+      </select>
+
+
+      <input
+        id="friendSearch"
+        class="filter-field"
+        type="search"
+        autocomplete="off"
+        placeholder="🔎 Search by name, country..."
+      >
+
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       RESULTS
+  ====================================================== -->
+
+  <div class="results-header">
+
+    <div>
+
+      <h2 class="results-title">
+        People Looking to Connect
+      </h2>
+
+      <p class="results-description">
+        Choose a profile that interests you.
+      </p>
+
+    </div>
+
+
+    <span
+      id="discoverCount"
+      class="results-count"
+    >
+      0
+    </span>
+
+  </div>
+
+
+  <!-- =====================================================
+       INSTANT SKELETON
+  ====================================================== -->
+
+  <div
+    id="globalMeetSkeleton"
+    class="global-skeleton-grid"
+  >
+
+    <article class="profile-skeleton">
+
+      <div class="skeleton-photo"></div>
+
+      <div class="skeleton-content">
+
+        <div class="skeleton-line large"></div>
+
+        <div class="skeleton-line medium"></div>
+
+        <div class="skeleton-line short"></div>
+
+        <div class="skeleton-line short"></div>
+
+      </div>
+
+    </article>
+
+
+    <article class="profile-skeleton">
+
+      <div class="skeleton-photo"></div>
+
+      <div class="skeleton-content">
+
+        <div class="skeleton-line large"></div>
+
+        <div class="skeleton-line medium"></div>
+
+        <div class="skeleton-line short"></div>
+
+        <div class="skeleton-line short"></div>
+
+      </div>
+
+    </article>
+
+
+    <article class="profile-skeleton">
+
+      <div class="skeleton-photo"></div>
+
+      <div class="skeleton-content">
+
+        <div class="skeleton-line large"></div>
+
+        <div class="skeleton-line medium"></div>
+
+        <div class="skeleton-line short"></div>
+
+        <div class="skeleton-line short"></div>
+
+      </div>
+
+    </article>
+
+  </div>
+
+
+  <!-- =====================================================
+       REAL PROFILES
+  ====================================================== -->
+
+  <section
+    id="discoverList"
+    style="display:none;"
+  ></section>
+
+
+  <!-- =====================================================
+       OLD COMMUNITY TABS
+       Kept so existing friends.js does not immediately
+       break while we transition to the new design.
+  ====================================================== -->
+
+  <section
+    class="community-section"
+    style="display:none;"
+  >
+
+    <div class="community-toggle">
+
+      <button
+        type="button"
+        class="friend-tab active"
+        data-tab="discover"
+      >
+        Discover
+      </button>
+
+
+      <button
+        type="button"
+        class="friend-tab"
+        data-tab="following"
+      >
+        Following
+      </button>
+
+
+      <button
+        type="button"
+        class="friend-tab"
+        data-tab="followers"
+      >
+        Followers
+      </button>
+
+    </div>
+
+
+    <section
+      id="discoverSection"
+      class="community-section-card"
+      hidden
+    >
+
+      <div class="community-section-header">
+
+        <h3>
+          Discover
+        </h3>
+
+        <span
+          id="discoverCountOld"
+          class="community-count"
+        >
+          0
+        </span>
+
+      </div>
+
+    </section>
+
+
+    <section
+      id="followingSection"
+      class="community-section-card"
+      hidden
+    >
+
+      <div class="community-section-header">
+
+        <h3>
+          Following
+        </h3>
+
+        <span
+          id="followingListCount"
+          class="community-count"
+        >
+          0
+        </span>
+
+      </div>
+
+
+      <div id="followingList"></div>
+
+    </section>
+
+
+    <section
+      id="followersSection"
+      class="community-section-card"
+      hidden
+    >
+
+      <div class="community-section-header">
+
+        <h3>
+          Followers
+        </h3>
+
+        <span
+          id="followersListCount"
+          class="community-count"
+        >
+          0
+        </span>
+
+      </div>
+
+
+      <div id="followersList"></div>
+
+    </section>
+
+
+    <div class="community-summary">
+
+      <div class="summary-card">
+
+        <div class="summary-icon">
+          ➡️
+        </div>
+
+        <div>
+
+          <div
+            id="followingCount"
+            class="summary-value"
+          >
+            0
+          </div>
+
+          <div class="summary-label">
+            Following
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="summary-card">
+
+        <div class="summary-icon">
+          👥
+        </div>
+
+        <div>
+
+          <div
+            id="followersCount"
+            class="summary-value"
+          >
+            0
+          </div>
+
+          <div class="summary-label">
+            Followers
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</main>
+
+
+<!-- =======================================================
+     PAYMENT / CONNECTION MODAL
+======================================================== -->
+
+<div
+  id="chatPaymentOverlay"
+  class="connecta-modal-overlay"
+  aria-hidden="true"
+>
+
+  <div
+    id="chatPaymentModal"
+    class="connecta-modal"
+    role="dialog"
+    aria-modal="true"
+  >
+
+    <div class="modal-handle"></div>
+
+
+    <div id="paymentForm">
+
+      <h2 class="modal-title">
+        Connect With This Person
+      </h2>
+
+
+      <p class="modal-description">
+
+        You've selected this profile. Pay the connection
+        fee and then contact CONNECTA Support with your
+        payment reference so our team can manually arrange
+        the connection.
+
+      </p>
+
+
+      <div class="selected-profile">
 
         <div
           id="chatPaymentAvatar"
-          class="payment-user-avatar"
+          class="selected-profile-photo"
         >
           U
         </div>
@@ -2817,13 +3040,17 @@
 
           <div
             id="chatPaymentUserName"
-            class="payment-user-name"
+            class="selected-profile-name"
           >
             CONNECTA User
           </div>
 
-          <div class="payment-user-label">
-            Global Chat
+
+          <div
+            id="chatPaymentCountry"
+            class="selected-profile-country"
+          >
+            🌍 Global Meet
           </div>
 
         </div>
@@ -2831,29 +3058,12 @@
       </div>
 
 
-      <h2
-        id="chatPaymentTitle"
-        class="payment-title"
-      >
-        Unlock Conversation
-      </h2>
+      <div class="payment-box">
 
-
-      <p class="payment-description">
-
-        Pay the conversation fee to unlock your
-        conversation request. Payment unlocks the
-        ability to start the conversation; the other
-        person may accept, ignore or block the request.
-
-      </p>
-
-
-      <div class="payment-amount-box">
-
-        <span class="payment-amount-label">
-          Conversation fee
+        <span class="payment-label">
+          Connection fee
         </span>
+
 
         <strong
           id="chatPaymentAmount"
@@ -2865,32 +3075,13 @@
       </div>
 
 
-      <label
-        for="chatPaymentPhone"
-        class="payment-phone-label"
-      >
-        M-PESA phone number
-      </label>
+      <div class="payment-info">
 
-
-      <input
-        id="chatPaymentPhone"
-        type="tel"
-        inputmode="numeric"
-        autocomplete="tel"
-        placeholder="e.g. 0712345678"
-      >
-
-
-      <div class="payment-security-note">
-
-        <span>🔒</span>
-
-        <span>
-          Your payment is processed through CONNECTA's
-          secure payment system. The conversation is only
-          unlocked after payment is verified.
-        </span>
+        🔒 Your payment is recorded by CONNECTA.
+        After successful payment, contact CONNECTA
+        Support and provide your transaction/reference
+        number. Our team will handle the connection
+        manually.
 
       </div>
 
@@ -2911,206 +3102,257 @@
           type="button"
           class="modal-btn modal-pay"
         >
-          Pay &amp; Start Chat
+          Pay KSh 20
         </button>
 
       </div>
 
     </div>
 
+
+    <div
+      id="paymentSuccess"
+      class="support-success"
+      style="display:none;"
+    >
+
+      <div class="support-success-icon">
+        ✅
+      </div>
+
+
+      <h3>
+        Payment Received
+      </h3>
+
+
+      <p>
+
+        Your connection request has been recorded.
+        Please contact CONNECTA Support and provide
+        your payment reference so our team can connect
+        you with the selected profile.
+
+      </p>
+
+
+      <button
+        id="contactSupportBtn"
+        type="button"
+        class="support-button"
+      >
+        💬 Contact CONNECTA Support
+      </button>
+
+    </div>
+
   </div>
 
+</div>
 
 
-  <!-- =======================================================
-       BOTTOM NAVIGATION
-  ======================================================== -->
+<!-- =======================================================
+     BOTTOM NAVIGATION
+======================================================== -->
 
-  <nav class="bottom-nav">
+<nav class="bottom-nav">
 
-    <a href="dashboard.html">
-      <span>💬</span>
-      <small>Chats</small>
-    </a>
+  <a href="dashboard.html">
 
+    <span>💬</span>
 
-    <a href="groups.html">
-      <span>👥</span>
-      <small>Groups</small>
-    </a>
+    <small>
+      Chats
+    </small>
 
-
-    <a href="stories.html">
-      <span>⭕</span>
-      <small>Stories</small>
-    </a>
+  </a>
 
 
-    <a
-      href="friends.html"
-      class="active"
-    >
-      <span>🌍</span>
-      <small>Global</small>
-    </a>
+  <a href="groups.html">
+
+    <span>👥</span>
+
+    <small>
+      Groups
+    </small>
+
+  </a>
 
 
-    <a href="earn.html">
-      <span>💰</span>
-      <small>Earn</small>
-    </a>
+  <a href="stories.html">
 
-  </nav>
+    <span>⭕</span>
 
+    <small>
+      Stories
+    </small>
 
-
-  <!-- =======================================================
-       TOAST
-  ======================================================== -->
-
-  <div
-    id="friendsToast"
-    role="status"
-    aria-live="polite"
-  ></div>
+  </a>
 
 
+  <a
+    href="friends.html"
+    class="active"
+  >
 
-  <!-- =======================================================
-       SCRIPT
-  ======================================================== -->
+    <span>🌍</span>
 
-  <script
-    type="module"
-    src="js/friends.js"
-  ></script>
+    <small>
+      Global
+    </small>
 
-
-  <!-- =======================================================
-       SMALL UI HELPERS
-       These only control the new HTML UI. Firebase/payment
-       functionality will be handled by friends.js/backend.
-  ======================================================== -->
-
-  <script>
-
-    document.addEventListener(
-      "DOMContentLoaded",
-      () => {
-
-        /*
-         * Gender selection.
-         */
-
-        const genderButtons =
-          document.querySelectorAll(
-            ".gender-btn"
-          );
+  </a>
 
 
-        genderButtons.forEach(
-          button => {
+  <a href="earn.html">
 
-            button.addEventListener(
-              "click",
-              () => {
+    <span>💰</span>
 
-                genderButtons.forEach(
-                  item => {
+    <small>
+      Earn
+    </small>
 
-                    item.classList.remove(
-                      "active"
-                    );
+  </a>
 
-                  }
-                );
+</nav>
 
 
-                button.classList.add(
+<!-- =======================================================
+     TOAST
+======================================================== -->
+
+<div
+  id="friendsToast"
+  role="status"
+  aria-live="polite"
+></div>
+
+
+<!-- =======================================================
+     SCRIPT
+======================================================== -->
+
+<script
+  type="module"
+  src="js/friends.js"
+></script>
+
+
+<script>
+
+/*
+ * =========================================================
+ * INSTANT VISUAL STARTUP
+ *
+ * This does NOT authenticate the user again.
+ * Firebase authentication is already maintained by the
+ * CONNECTA session.
+ * =========================================================
+ */
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    const skeleton =
+      document.getElementById(
+        "globalMeetSkeleton"
+      );
+
+    const profileList =
+      document.getElementById(
+        "discoverList"
+      );
+
+
+    /*
+     * Interest buttons are visual filters.
+     * friends.js will handle the actual filtering.
+     */
+
+    const interestButtons =
+      document.querySelectorAll(
+        ".interest-btn"
+      );
+
+
+    interestButtons.forEach(
+      button => {
+
+        button.addEventListener(
+          "click",
+          () => {
+
+            interestButtons.forEach(
+              item => {
+
+                item.classList.remove(
                   "active"
                 );
 
               }
             );
 
+
+            button.classList.add(
+              "active"
+            );
+
           }
         );
-
-
-        /*
-         * Payment modal close.
-         * The actual open/payment logic will be
-         * connected in friends.js.
-         */
-
-        const overlay =
-          document.getElementById(
-            "chatPaymentOverlay"
-          );
-
-
-        const cancel =
-          document.getElementById(
-            "chatPaymentCancel"
-          );
-
-
-        if (cancel) {
-
-          cancel.addEventListener(
-            "click",
-            () => {
-
-              if (overlay) {
-
-                overlay.classList.remove(
-                  "show"
-                );
-
-                overlay.setAttribute(
-                  "aria-hidden",
-                  "true"
-                );
-
-              }
-
-            }
-          );
-
-        }
-
-
-        if (overlay) {
-
-          overlay.addEventListener(
-            "click",
-            event => {
-
-              if (
-                event.target ===
-                overlay
-              ) {
-
-                overlay.classList.remove(
-                  "show"
-                );
-
-                overlay.setAttribute(
-                  "aria-hidden",
-                  "true"
-                );
-
-              }
-
-            }
-          );
-
-        }
 
       }
     );
 
-  </script>
+
+    /*
+     * Keep the skeleton visible until friends.js
+     * starts rendering actual profiles.
+     *
+     * A small observer removes it as soon as the
+     * profile list receives content.
+     */
+
+    if (
+      skeleton &&
+      profileList
+    ) {
+
+      const observer =
+        new MutationObserver(
+          () => {
+
+            if (
+              profileList.children.length
+            ) {
+
+              skeleton.style.display =
+                "none";
+
+              profileList.style.display =
+                "grid";
+
+              observer.disconnect();
+
+            }
+
+          }
+        );
+
+
+      observer.observe(
+        profileList,
+        {
+          childList: true
+        }
+      );
+
+    }
+
+  }
+);
+
+</script>
 
 
 </body>
