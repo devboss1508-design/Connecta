@@ -7,7 +7,7 @@
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     >
 
     <meta
@@ -46,6 +46,13 @@
 
             --header-height: 72px;
             --composer-height: 76px;
+
+            /*
+             * IMPORTANT:
+             * The value is updated by the viewport script below.
+             * This fixes Android installed-PWA viewport differences.
+             */
+            --connecta-app-height: 100vh;
         }
 
 
@@ -66,8 +73,12 @@
             width: 100%;
             height: 100%;
 
+            min-height: 100%;
+
             margin: 0;
             padding: 0;
+
+            overflow: hidden;
         }
 
 
@@ -95,6 +106,13 @@
 
             -webkit-tap-highlight-color:
                 transparent;
+
+            /*
+             * Prevent Android browser/PWA from introducing
+             * unexpected scrolling on the document itself.
+             */
+            overscroll-behavior:
+                none;
         }
 
 
@@ -120,13 +138,31 @@
         .chat-app {
 
             width: 100%;
-            height: 100dvh;
 
-            display: flex;
+            /*
+             * IMPORTANT:
+             * Do not rely only on 100dvh.
+             *
+             * The JS viewport helper sets the real visible
+             * height for installed Android PWA mode.
+             */
+            height:
+                var(--connecta-app-height);
 
-            flex-direction: column;
+            min-height:
+                0;
 
-            overflow: hidden;
+            max-height:
+                var(--connecta-app-height);
+
+            display:
+                flex;
+
+            flex-direction:
+                column;
+
+            overflow:
+                hidden;
 
             background:
                 var(--page-bg);
@@ -147,9 +183,14 @@
             min-height:
                 var(--header-height);
 
-            display: flex;
+            flex:
+                0 0 var(--header-height);
 
-            align-items: center;
+            display:
+                flex;
+
+            align-items:
+                center;
 
             padding:
                 0 8px;
@@ -171,7 +212,8 @@
             position:
                 relative;
 
-            z-index: 20;
+            z-index:
+                20;
         }
 
 
@@ -568,10 +610,6 @@
 
         /* =====================================================
            INSTANT CHAT SKELETON
-           
-           IMPORTANT:
-           This replaces "Loading conversation..."
-           with lightweight app-style placeholders.
         ===================================================== */
 
         .chat-instant-skeleton {
@@ -758,9 +796,6 @@
 
         /* =====================================================
            HEADER SKELETON
-           
-           Appears instantly before chat.js has loaded
-           the actual person/group.
         ===================================================== */
 
         .chat-header-skeleton {
@@ -876,13 +911,20 @@
 
         .messages-container {
 
-            flex: 1;
+            flex:
+                1 1 auto;
 
-            min-height: 0;
+            min-height:
+                0;
 
-            overflow-y: auto;
+            height:
+                auto;
 
-            overflow-x: hidden;
+            overflow-y:
+                auto;
+
+            overflow-x:
+                hidden;
 
             padding:
                 10px
@@ -901,6 +943,9 @@
 
             -webkit-overflow-scrolling:
                 touch;
+
+            overscroll-behavior:
+                contain;
 
             scroll-behavior:
                 smooth;
@@ -1075,10 +1120,6 @@
         }
 
 
-        /* =====================================================
-           INCOMING
-        ===================================================== */
-
         .incoming .message-bubble,
         .theirs .message-bubble {
 
@@ -1095,10 +1136,6 @@
                 4px;
         }
 
-
-        /* =====================================================
-           OUTGOING
-        ===================================================== */
 
         .outgoing .message-bubble,
         .mine .message-bubble {
@@ -1648,14 +1685,22 @@
             width:
                 100%;
 
+            /*
+             * IMPORTANT:
+             * Never allow the composer to shrink when the
+             * available PWA viewport is smaller.
+             */
+            flex:
+                0 0 auto;
+
             min-height:
                 var(--composer-height);
 
             padding:
                 8px
                 9px
-                calc(
-                    8px +
+                max(
+                    8px,
                     env(safe-area-inset-bottom)
                 );
 
@@ -1683,6 +1728,13 @@
 
             z-index:
                 20;
+
+            /*
+             * Prevent the composer from becoming wider than
+             * the actual PWA viewport.
+             */
+            max-width:
+                100%;
         }
 
 
@@ -1700,6 +1752,9 @@
 
             min-width:
                 50px;
+
+            flex:
+                0 0 50px;
 
             border-radius:
                 9px;
@@ -1748,7 +1803,7 @@
         .input-wrapper {
 
             flex:
-                1;
+                1 1 auto;
 
             min-width:
                 0;
@@ -1897,6 +1952,9 @@
             min-width:
                 50px;
 
+            flex:
+                0 0 50px;
+
             border-radius:
                 9px;
 
@@ -1957,7 +2015,7 @@
 
 
         /* =====================================================
-           MOBILE
+           SMALL MOBILE
         ===================================================== */
 
         @media (max-width: 380px) {
@@ -2030,6 +2088,9 @@
 
                 min-width:
                     46px;
+
+                flex-basis:
+                    46px;
             }
 
 
@@ -2076,6 +2137,64 @@
 
                 max-width:
                     65% !important;
+            }
+
+        }
+
+
+        /* =====================================================
+           VERY SHORT SCREENS
+           
+           Helps devices where the visible height becomes
+           temporarily smaller when the keyboard is opening.
+        ===================================================== */
+
+        @media (max-height: 600px) {
+
+            .chat-header {
+
+                height:
+                    64px;
+
+                min-height:
+                    64px;
+
+                flex-basis:
+                    64px;
+            }
+
+
+            .message-composer {
+
+                min-height:
+                    68px;
+
+                padding-top:
+                    6px;
+            }
+
+
+            .attach-button,
+            .send-button {
+
+                width:
+                    44px;
+
+                height:
+                    44px;
+
+                min-width:
+                    44px;
+
+                flex-basis:
+                    44px;
+            }
+
+
+            .message-input {
+
+                min-height:
+                    44px;
             }
 
         }
@@ -2142,12 +2261,6 @@
                     class="chat-avatar"
                 >
 
-                    <!--
-                        Neutral instant placeholder.
-                        chat.js will replace this with
-                        the real avatar.
-                    -->
-
                     <div
                         style="
                             width:22px;
@@ -2177,11 +2290,6 @@
                     class="chat-user-name-row"
                     id="chatUserNameRow"
                 >
-
-                    <!--
-                        No "Loading..." text.
-                        Skeleton is replaced by chat.js.
-                    -->
 
                     <span
                         id="chatUserNameSkeleton"
@@ -2265,15 +2373,6 @@
         aria-live="polite"
     >
 
-        <!--
-            Instant skeleton.
-
-            This appears immediately while chat.js checks
-            local/cache data and attaches the Firebase listener.
-
-            It contains NO "Loading conversation..." text.
-        -->
-
         <div
             id="chatInstantSkeleton"
             class="chat-instant-skeleton"
@@ -2349,7 +2448,6 @@
         autocomplete="off"
     >
 
-
         <!-- PHOTO UPLOAD STATUS -->
 
         <div
@@ -2408,9 +2506,7 @@
         </div>
 
 
-        <!-- =================================================
-             ATTACHMENT
-        ================================================= -->
+        <!-- ATTACHMENT -->
 
         <button
             id="attachButton"
@@ -2465,9 +2561,7 @@
         >
 
 
-        <!-- =================================================
-             INPUT
-        ================================================= -->
+        <!-- INPUT -->
 
         <div
             class="input-wrapper"
@@ -2492,9 +2586,7 @@
         </div>
 
 
-        <!-- =================================================
-             SEND
-        ================================================= -->
+        <!-- SEND -->
 
         <button
             id="sendButton"
@@ -2534,12 +2626,139 @@
 
 
 <!-- =========================================================
+     ANDROID / PWA VIEWPORT FIX
+     
+     IMPORTANT:
+     Installed Android PWAs can report a different viewport
+     from the normal Chrome browser.
+
+     We use visualViewport when available and update the
+     CONNECTA app height whenever the visible viewport changes.
+========================================================= -->
+
+<script>
+
+(function () {
+
+    const root = document.documentElement;
+
+    function updateConnectaViewport() {
+
+        let height =
+            window.innerHeight;
+
+        if (
+            window.visualViewport &&
+            window.visualViewport.height
+        ) {
+
+            height =
+                window.visualViewport.height;
+        }
+
+        /*
+         * Protect against invalid values.
+         */
+        if (
+            !height ||
+            !Number.isFinite(height)
+        ) {
+
+            return;
+        }
+
+        root.style.setProperty(
+            "--connecta-app-height",
+            `${Math.round(height)}px`
+        );
+    }
+
+
+    updateConnectaViewport();
+
+
+    window.addEventListener(
+        "resize",
+        updateConnectaViewport,
+        {
+            passive: true
+        }
+    );
+
+
+    window.addEventListener(
+        "orientationchange",
+        () => {
+
+            setTimeout(
+                updateConnectaViewport,
+                80
+            );
+
+            setTimeout(
+                updateConnectaViewport,
+                300
+            );
+
+        },
+        {
+            passive: true
+        }
+    );
+
+
+    if (window.visualViewport) {
+
+        window.visualViewport.addEventListener(
+            "resize",
+            updateConnectaViewport,
+            {
+                passive: true
+            }
+        );
+
+        window.visualViewport.addEventListener(
+            "scroll",
+            updateConnectaViewport,
+            {
+                passive: true
+            }
+        );
+
+    }
+
+
+    /*
+     * Android PWA can settle its viewport shortly after
+     * the page has loaded, so run a few additional checks.
+     */
+    setTimeout(
+        updateConnectaViewport,
+        100
+    );
+
+    setTimeout(
+        updateConnectaViewport,
+        500
+    );
+
+    setTimeout(
+        updateConnectaViewport,
+        1000
+    );
+
+})();
+
+</script>
+
+
+<!-- =========================================================
      CONNECTA CHAT JAVASCRIPT
 ========================================================= -->
 
 <script
     type="module"
-    src="js/chat.js"
+    src="js/chat.js?v=20260925-2"
 ></script>
 
 
