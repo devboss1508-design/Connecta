@@ -55,10 +55,6 @@ import {
 } from "./globalAuth.js";
 
 
-import {
-    initConnectaNotifications
-} from "./connectaNotifications.js";
-
 /* =========================================================
    FIRESTORE
 ========================================================= */
@@ -5595,15 +5591,6 @@ async function initializeDashboard() {
 
         currentUser =
             session.authUser;
-
-       /* =================================================
-   MESSAGE NOTIFICATIONS
-   ================================================= */
-
-initConnectaNotifications(
-    currentUser.uid
-);
-
 
         /* =================================================
            5. FIREBASE AUTH PROFILE
