@@ -1,9 +1,71 @@
 /* =========================================================
-   CONNECTA PWA SERVICE WORKER
-   FAST CACHE-FIRST VERSION
+   CONNECTA PWA + FIREBASE FCM SERVICE WORKER
+   Version 4
 ========================================================= */
 
-const CACHE_NAME = "connecta-pwa-v3";
+
+/* =========================================================
+   FIREBASE CLOUD MESSAGING
+========================================================= */
+
+/*
+ * We use the Firebase COMPAT SDK here because this service
+ * worker is loaded directly by the browser and is not bundled.
+ *
+ * Firebase officially supports this approach for service
+ * workers that use importScripts().
+ */
+
+importScripts(
+    "https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"
+);
+
+importScripts(
+    "https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js"
+);
+
+
+/* =========================================================
+   FIREBASE CONFIG
+========================================================= */
+
+firebase.initializeApp({
+
+    apiKey:
+        "AIzaSyCRDtEYvigPofLBA2qK7z",
+
+    authDomain:
+        "zantona-73561.firebaseapp.com",
+
+    projectId:
+        "zantona-73561",
+
+    storageBucket:
+        "zantona-73561.firebasestorage.app",
+
+    messagingSenderId:
+        "559643129887",
+
+    appId:
+        "1:559643129887:web:7ebc77550361397b0c3d2a"
+
+});
+
+
+/* =========================================================
+   FIREBASE MESSAGING
+========================================================= */
+
+const messaging =
+    firebase.messaging();
+
+
+/* =========================================================
+   CONNECTA PWA CACHE
+========================================================= */
+
+const CACHE_NAME =
+    "connecta-pwa-v4";
 
 
 /* =========================================================
@@ -26,14 +88,324 @@ const APP_SHELL = [
    STATIC FILE TYPES
 ========================================================= */
 
-const STATIC_DESTINATIONS = new Set([
+const STATIC_DESTINATIONS =
+    new Set([
 
-    "script",
-    "style",
-    "image",
-    "font"
+        "script",
+        "style",
+        "image",
+        "font"
 
-]);
+    ]);
+
+
+/* =========================================================
+   FCM BACKGROUND MESSAGE
+========================================================= */
+
+/*
+ * This runs when CONNECTA is not in the foreground.
+ *
+ * Our backend will later send data such as:
+ *
+ * {
+ *   type: "private_message",
+ *   senderName: "Dr. John Knec",
+ *   message: "Hello",
+ *   chatId: "..."
+ * }
+ *
+ * or:
+ *
+ * {
+ *   type: "group_message",
+ *   groupName: "KCSE 2026 REVISION PAPERS",
+ *   senderName: "Dr. John Knec",
+ *   message: "New paper available",
+ *   groupId: "..."
+ * }
+ */
+
+messaging.onBackgroundMessage(
+    payload => {
+
+        console.log(
+            "[CONNECTA FCM] Background message:",
+            payload
+        );
+
+
+        const data =
+            payload.data || {};
+
+
+        /*
+         * Sender
+         */
+
+        const senderName =
+            data.senderName ||
+            data.senderDisplayName ||
+            "CONNECTA User";
+
+
+        /*
+         * Message
+         */
+
+        const messageText =
+            data.message ||
+            data.text ||
+            "You have a new message.";
+
+
+        /*
+         * Notification type
+         */
+
+        const notificationType =
+            data.type ||
+            "private_message";
+
+
+        /*
+         * Group
+         */
+
+        const groupName =
+            data.groupName ||
+            "CONNECTA Group";
+
+
+        /*
+         * Title
+         */
+
+        let title =
+            "💬 " + senderName;
+
+
+        if (
+            notificationType ===
+            "group_message"
+        ) {
+
+            title =
+                "👥 " + groupName;
+
+        }
+
+
+        /*
+         * Notification options
+         */
+
+        const notificationOptions = {
+
+            body:
+                notificationType ===
+                "group_message"
+
+                    ? `${senderName}: ${messageText}`
+
+                    : messageText,
+
+            icon:
+                "/connecta-icon-192.png",
+
+            badge:
+                "/connecta-icon-192.png",
+
+            tag:
+                data.messageId ||
+                data.chatId ||
+                data.groupId ||
+                "connecta-message",
+
+            renotify:
+                true,
+
+            data: {
+
+                type:
+                    notificationType,
+
+                chatId:
+                    data.chatId || "",
+
+                groupId:
+                    data.groupId || "",
+
+                senderId:
+                    data.senderId || "",
+
+                url:
+                    data.url || ""
+
+            }
+
+        };
+
+
+        /*
+         * Display notification.
+         */
+
+        return self.registration.showNotification(
+
+            title,
+
+            notificationOptions
+
+        );
+
+    }
+);
+
+
+/* =========================================================
+   NOTIFICATION CLICK
+========================================================= */
+
+/*
+ * Firebase recommends handling notificationclick so we
+ * control exactly where the user goes after tapping.
+ */
+
+self.addEventListener(
+    "notificationclick",
+    event => {
+
+        event.notification.close();
+
+
+        const data =
+            event.notification.data || {};
+
+
+        let targetUrl =
+            "/dashboard.html";
+
+
+        /*
+         * Private chat
+         */
+
+        if (
+            data.type ===
+            "private_message" &&
+            data.chatId
+        ) {
+
+            targetUrl =
+                `/chat.html?chatId=${encodeURIComponent(
+                    data.chatId
+                )}`;
+
+        }
+
+
+        /*
+         * Group chat
+         */
+
+        else if (
+            data.type ===
+            "group_message" &&
+            data.groupId
+        ) {
+
+            targetUrl =
+                `/group-chat.html?groupId=${encodeURIComponent(
+                    data.groupId
+                )}`;
+
+        }
+
+
+        /*
+         * Explicit URL supplied by backend
+         */
+
+        else if (
+            data.url
+        ) {
+
+            targetUrl =
+                data.url;
+
+        }
+
+
+        event.waitUntil(
+
+            clients
+                .matchAll({
+
+                    type:
+                        "window",
+
+                    includeUncontrolled:
+                        true
+
+                })
+
+                .then(
+                    windowClients => {
+
+                        /*
+                         * Look for an existing CONNECTA
+                         * window.
+                         */
+
+                        for (
+                            const client
+                            of windowClients
+                        ) {
+
+                            if (
+                                "focus"
+                                in client
+                            ) {
+
+                                return client
+                                    .navigate(
+                                        targetUrl
+                                    )
+                                    .then(
+                                        () =>
+                                            client.focus()
+                                    );
+
+                            }
+
+                        }
+
+
+                        /*
+                         * No CONNECTA window exists.
+                         *
+                         * Open a new one.
+                         */
+
+                        if (
+                            clients.openWindow
+                        ) {
+
+                            return clients.openWindow(
+                                targetUrl
+                            );
+
+                        }
+
+                    }
+
+                )
+
+        );
+
+    }
+);
 
 
 /* =========================================================
@@ -47,31 +419,28 @@ self.addEventListener(
         event.waitUntil(
 
             caches
-                .open(CACHE_NAME)
-                .then(async cache => {
+                .open(
+                    CACHE_NAME
+                )
 
-                    /*
-                     * Don't allow one missing file to
-                     * break the entire service worker.
-                     */
+                .then(
+                    async cache => {
 
-                    await Promise.allSettled(
+                        await Promise.allSettled(
 
-                        APP_SHELL.map(
-                            url =>
-                                cache.add(url)
-                        )
+                            APP_SHELL.map(
+                                url =>
+                                    cache.add(url)
+                            )
 
-                    );
+                        );
 
-                })
+                    }
+
+                )
 
         );
 
-
-        /*
-         * Activate immediately.
-         */
 
         self.skipWaiting();
 
@@ -91,31 +460,39 @@ self.addEventListener(
 
             caches
                 .keys()
-                .then(cacheNames => {
 
-                    return Promise.all(
+                .then(
+                    cacheNames => {
 
-                        cacheNames
+                        return Promise.all(
 
-                            .filter(
-                                name =>
-                                    name.startsWith(
-                                        "connecta-pwa-"
-                                    ) &&
-                                    name !== CACHE_NAME
-                            )
+                            cacheNames
 
-                            .map(
-                                name =>
-                                    caches.delete(name)
-                            )
+                                .filter(
+                                    name =>
+                                        name.startsWith(
+                                            "connecta-pwa-"
+                                        ) &&
+                                        name !==
+                                            CACHE_NAME
+                                )
 
-                    );
+                                .map(
+                                    name =>
+                                        caches.delete(
+                                            name
+                                        )
+                                )
 
-                })
+                        );
 
-                .then(() =>
-                    self.clients.claim()
+                    }
+
+                )
+
+                .then(
+                    () =>
+                        self.clients.claim()
                 )
 
         );
@@ -128,13 +505,9 @@ self.addEventListener(
    HELPERS
 ========================================================= */
 
-
-/*
- * Only handle requests belonging to
- * the CONNECTA website itself.
- */
-
-function isSameOrigin(request) {
+function isSameOrigin(
+    request
+) {
 
     try {
 
@@ -154,12 +527,9 @@ function isSameOrigin(request) {
 }
 
 
-/*
- * Don't allow API/Firebase/payment requests
- * to enter the PWA cache.
- */
-
-function isExcludedRequest(request) {
+function isExcludedRequest(
+    request
+) {
 
     const url =
         new URL(
@@ -175,18 +545,16 @@ function isExcludedRequest(request) {
         url.hostname.toLowerCase();
 
 
-    /* API */
-
     if (
-        pathname.startsWith("/api/")
+        pathname.startsWith(
+            "/api/"
+        )
     ) {
 
         return true;
 
     }
 
-
-    /* Firebase / Google services */
 
     if (
         hostname.includes(
@@ -211,8 +579,6 @@ function isExcludedRequest(request) {
     }
 
 
-    /* OptimaPay */
-
     if (
         hostname.includes(
             "optimapay"
@@ -229,24 +595,20 @@ function isExcludedRequest(request) {
 }
 
 
-/*
- * Check whether a response can safely
- * be stored in Cache Storage.
- */
-
-function isCacheableResponse(response) {
+function isCacheableResponse(
+    response
+) {
 
     if (!response) {
+
         return false;
+
     }
 
 
-    /*
-     * Only successful responses.
-     */
-
     if (
-        response.status !== 200
+        response.status !==
+        200
     ) {
 
         return false;
@@ -254,13 +616,9 @@ function isCacheableResponse(response) {
     }
 
 
-    /*
-     * Opaque responses are not cached
-     * by this service worker.
-     */
-
     if (
-        response.type === "opaque"
+        response.type ===
+        "opaque"
     ) {
 
         return false;
@@ -338,10 +696,6 @@ async function fetchAndCache(
         )
     ) {
 
-        /*
-         * Cache in background.
-         */
-
         updateCache(
             request,
             response
@@ -357,14 +711,6 @@ async function fetchAndCache(
 
 /* =========================================================
    NAVIGATION
-=========================================================
-
-   HTML pages:
-
-   1. Try network first
-   2. Update cache
-   3. If offline, use cached page
-   4. Finally use cached index.html
 ========================================================= */
 
 async function handleNavigation(
@@ -385,20 +731,11 @@ async function handleNavigation(
             )
         ) {
 
-            /*
-             * Save the latest HTML.
-             */
-
             updateCache(
                 request,
                 response
             );
 
-
-            /*
-             * Also update index.html when
-             * this is the root page.
-             */
 
             return response;
 
@@ -417,10 +754,6 @@ async function handleNavigation(
             );
 
 
-        /*
-         * First try the exact requested page.
-         */
-
         const exactMatch =
             await cache.match(
                 request
@@ -433,10 +766,6 @@ async function handleNavigation(
 
         }
 
-
-        /*
-         * Then try index.html.
-         */
 
         const indexMatch =
             await cache.match(
@@ -451,10 +780,6 @@ async function handleNavigation(
         }
 
 
-        /*
-         * Last fallback.
-         */
-
         return new Response(
 
             `
@@ -464,9 +789,7 @@ async function handleNavigation(
 
             <head>
 
-                <meta
-                    charset="UTF-8"
-                >
+                <meta charset="UTF-8">
 
                 <meta
                     name="viewport"
@@ -533,10 +856,15 @@ async function handleNavigation(
             `,
 
             {
-                status: 503,
+
+                status:
+                    503,
+
                 headers: {
+
                     "Content-Type":
                         "text/html;charset=UTF-8"
+
                 }
 
             }
@@ -550,15 +878,6 @@ async function handleNavigation(
 
 /* =========================================================
    STATIC ASSETS
-=========================================================
-
-   JS / CSS / images / fonts:
-
-   1. Check cache FIRST
-   2. Return immediately if found
-   3. Refresh cache in background
-   4. If not cached, fetch network
-   5. Save response
 ========================================================= */
 
 async function handleStaticAsset(
@@ -579,15 +898,6 @@ async function handleStaticAsset(
 
     if (cached) {
 
-        /*
-         * IMPORTANT:
-         *
-         * Return cached file immediately.
-         *
-         * This is what makes the PWA feel
-         * much faster on repeat launches.
-         */
-
         fetchAndCache(
             request
         ).catch(
@@ -599,10 +909,6 @@ async function handleStaticAsset(
 
     }
 
-
-    /*
-     * Not cached yet.
-     */
 
     try {
 
@@ -630,14 +936,10 @@ async function handleStaticAsset(
 
     } catch {
 
-        /*
-         * No cached version and no network.
-         */
-
         return new Response(
             "",
             {
-                status: 503
+                status:503
             }
         );
 
@@ -667,10 +969,6 @@ async function handleOtherRequest(
 
 
     if (cached) {
-
-        /*
-         * Use cache immediately.
-         */
 
         fetchAndCache(
             request
@@ -713,7 +1011,7 @@ async function handleOtherRequest(
         return new Response(
             "",
             {
-                status: 503
+                status:503
             }
         );
 
@@ -734,23 +1032,15 @@ self.addEventListener(
             event.request;
 
 
-        /*
-         * Only GET requests.
-         */
-
         if (
-            request.method !== "GET"
+            request.method !==
+            "GET"
         ) {
 
             return;
 
         }
 
-
-        /*
-         * Don't interfere with
-         * external requests.
-         */
 
         if (
             !isSameOrigin(
@@ -762,11 +1052,6 @@ self.addEventListener(
 
         }
 
-
-        /*
-         * Never cache APIs or payment
-         * requests.
-         */
 
         if (
             isExcludedRequest(
@@ -785,10 +1070,6 @@ self.addEventListener(
             );
 
 
-        /*
-         * Navigation / HTML page.
-         */
-
         if (
             request.mode ===
             "navigate"
@@ -804,10 +1085,6 @@ self.addEventListener(
 
         }
 
-
-        /*
-         * Static assets.
-         */
 
         if (
             STATIC_DESTINATIONS.has(
@@ -826,11 +1103,6 @@ self.addEventListener(
         }
 
 
-        /*
-         * Manifest, favicon and other
-         * same-origin GET resources.
-         */
-
         if (
             url.pathname ===
             "/manifest.webmanifest"
@@ -846,10 +1118,6 @@ self.addEventListener(
 
         }
 
-
-        /*
-         * Everything else.
-         */
 
         event.respondWith(
             handleOtherRequest(
