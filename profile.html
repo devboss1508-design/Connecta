@@ -1460,216 +1460,390 @@
 
   <script>
 
-    (function () {
+  /*
+   * =====================================================
+   * CONNECTA — INSTANT PROFILE BOOTSTRAP
+   * =====================================================
+   *
+   * Runs immediately from localStorage.
+   *
+   * It NEVER replaces the real Firebase profile.
+   * profile.js takes over after Firebase Auth starts.
+   */
 
-      try {
+  (function () {
 
-        const params =
-          new URLSearchParams(
-            window.location.search
-          );
+    try {
 
-
-        const requestedUid =
-          params.get("uid");
-
-
-        const ownCacheRaw =
-          localStorage.getItem(
-            "connectaOwnProfileCache_v2"
-          );
-
-
-        let profile = null;
+      const params =
+        new URLSearchParams(
+          window.location.search
+        );
 
 
-        /*
-         * If there is a requested UID, first try the
-         * public profile cache.
-         */
+      /*
+       * Support all profile URL formats:
+       *
+       * profile.html?uid=XXXX
+       * profile.html?userId=XXXX
+       * profile.html?id=XXXX
+       */
 
-        if (requestedUid) {
-
-          const publicCacheRaw =
-            localStorage.getItem(
-              "connectaPublicProfileCache_v2_" +
-              requestedUid
-            );
-
-
-          if (publicCacheRaw) {
-
-            profile =
-              JSON.parse(
-                publicCacheRaw
-              );
-
-          }
-
-        }
+      const requestedUid =
+        (
+          params.get("uid") ||
+          params.get("userId") ||
+          params.get("id") ||
+          ""
+        ).trim();
 
 
-        /*
-         * If no requested UID exists, this is normally
-         * the logged-in user's own profile.
-         */
+      let profile = null;
 
-        if (
-          !profile &&
-          ownCacheRaw
+
+      /*
+       * =================================================
+       * OTHER USER PROFILE
+       * =================================================
+       */
+
+      if (requestedUid) {
+
+        const publicCacheKeys = [
+
+          `connectaPublicProfileCache_v2_${requestedUid}`,
+
+          `connectaPublicProfileCache_v3_${requestedUid}`
+
+        ];
+
+
+        for (
+          const cacheKey
+          of publicCacheKeys
         ) {
 
-          const ownCache =
-            JSON.parse(
-              ownCacheRaw
+          const raw =
+            localStorage.getItem(
+              cacheKey
             );
 
 
-          if (
-            ownCache &&
-            ownCache.uid
-          ) {
+          if (!raw) {
+            continue;
+          }
 
-            profile =
-              ownCache;
+
+          try {
+
+            const cached =
+              JSON.parse(raw);
+
+
+            if (
+              cached &&
+              cached.uid === requestedUid
+            ) {
+
+              profile =
+                cached;
+
+              break;
+            }
+
+          } catch (error) {
+
+            console.warn(
+              "Invalid public profile cache:",
+              cacheKey
+            );
+
           }
 
         }
 
-
-        /*
-         * Nothing cached yet.
-         *
-         * We still leave a clean instant profile shell
-         * rather than showing "Loading profile..."
-         */
-
-        if (!profile) {
-          return;
-        }
+      }
 
 
-        const name =
-          profile.displayName ||
-          (
-            `${profile.firstName || ""} ` +
-            `${profile.lastName || ""}`
-          ).trim() ||
-          profile.username ||
-          "CONNECTA User";
+      /*
+       * =================================================
+       * OWN PROFILE
+       * =================================================
+       *
+       * Only use own cache when there is NO requested UID.
+       */
+
+      if (!requestedUid) {
+
+        const ownCacheKeys = [
+
+          "connectaOwnProfileCache_v2",
+
+          "connectaOwnProfileCache_v3",
+
+          "connectaProfileCache",
+
+          "connectaProfileCache_v2",
+
+          "connectaCurrentUserProfile_v1"
+
+        ];
 
 
-        const username =
-          profile.username
-            ? "@" +
-              String(
-                profile.username
-              ).replace(
-                /^@/,
-                ""
-              )
-            : "";
+        for (
+          const cacheKey
+          of ownCacheKeys
+        ) {
+
+          const raw =
+            localStorage.getItem(
+              cacheKey
+            );
 
 
-        const photo =
-          profile.photoURL ||
-          profile.photoUrl ||
-          "";
+          if (!raw) {
+            continue;
+          }
 
 
-        const avatar =
-          document.getElementById(
-            "instantProfileAvatarInner"
-          );
+          try {
+
+            const cached =
+              JSON.parse(raw);
 
 
-        const nameElement =
-          document.getElementById(
-            "instantProfileName"
-          );
+            if (
+              cached &&
+              cached.uid
+            ) {
 
+              profile =
+                cached;
 
-        const usernameElement =
-          document.getElementById(
-            "instantProfileUsername"
-          );
+              break;
+            }
 
+          } catch (error) {
 
-        const statusElement =
-          document.getElementById(
-            "instantProfileStatus"
-          );
+            console.warn(
+              "Invalid own profile cache:",
+              cacheKey
+            );
 
-
-        if (avatar) {
-
-          if (photo) {
-
-            avatar.innerHTML = `
-
-              <img
-                src="${String(photo)
-                  .replace(/"/g, "&quot;")}"
-                alt=""
-              >
-
-            `;
-
-          } else {
-
-            const parts =
-              String(name)
-                .trim()
-                .split(/\s+/)
-                .filter(Boolean);
-
-
-            const initials =
-              parts.length === 1
-
-                ? parts[0]
-                    .slice(0, 2)
-                    .toUpperCase()
-
-                : (
-                    (parts[0]?.[0] || "") +
-                    (parts[parts.length - 1]?.[0] || "")
-                  ).toUpperCase();
-
-
-            avatar.textContent =
-              initials ||
-              "U";
           }
 
         }
 
+      }
 
-        if (nameElement) {
 
-          nameElement.textContent =
-            name;
+      /*
+       * =================================================
+       * NOTHING CACHED
+       * =================================================
+       *
+       * Leave the clean instant shell visible.
+       *
+       * DO NOT show an error.
+       */
+
+      if (!profile) {
+        return;
+      }
+
+
+      /*
+       * =================================================
+       * PROFILE NAME
+       * =================================================
+       */
+
+      const name =
+        profile.displayName ||
+
+        (
+          `${profile.firstName || ""} ` +
+          `${profile.lastName || ""}`
+        ).trim() ||
+
+        profile.username ||
+
+        "CONNECTA User";
+
+
+      /*
+       * =================================================
+       * USERNAME
+       * =================================================
+       */
+
+      const username =
+        profile.username
+
+          ? "@" +
+            String(
+              profile.username
+            ).replace(
+              /^@/,
+              ""
+            )
+
+          : "";
+
+
+      /*
+       * =================================================
+       * PHOTO
+       * =================================================
+       */
+
+      const photo =
+        profile.photoURL ||
+        profile.photoUrl ||
+        "";
+
+
+      /*
+       * =================================================
+       * DOM
+       * =================================================
+       */
+
+      const avatar =
+        document.getElementById(
+          "instantProfileAvatarInner"
+        );
+
+
+      const nameElement =
+        document.getElementById(
+          "instantProfileName"
+        );
+
+
+      const usernameElement =
+        document.getElementById(
+          "instantProfileUsername"
+        );
+
+
+      const statusElement =
+        document.getElementById(
+          "instantProfileStatus"
+        );
+
+
+      /*
+       * =================================================
+       * AVATAR
+       * =================================================
+       */
+
+      if (avatar) {
+
+        if (photo) {
+
+          const image =
+            document.createElement(
+              "img"
+            );
+
+
+          image.src =
+            photo;
+
+
+          image.alt =
+            "";
+
+
+          image.decoding =
+            "async";
+
+
+          avatar.replaceChildren(
+            image
+          );
+
+        } else {
+
+          const parts =
+            String(name)
+              .trim()
+              .split(/\s+/)
+              .filter(Boolean);
+
+
+          const initials =
+            parts.length === 1
+
+              ? parts[0]
+                  .slice(0, 2)
+                  .toUpperCase()
+
+              : (
+                  (parts[0]?.[0] || "") +
+                  (
+                    parts[
+                      parts.length - 1
+                    ]?.[0] || ""
+                  )
+                ).toUpperCase();
+
+
+          avatar.textContent =
+            initials ||
+            "U";
 
         }
 
-
-        if (usernameElement) {
-
-          usernameElement.textContent =
-            username;
-
-        }
+      }
 
 
-        if (statusElement) {
+      /*
+       * =================================================
+       * NAME
+       * =================================================
+       */
 
-          const online =
-            requestedUid
-              ? profile.isOnline === true
-              : true;
+      if (nameElement) {
+
+        nameElement.textContent =
+          name;
+
+      }
 
 
-          statusElement.innerHTML = online
+      /*
+       * =================================================
+       * USERNAME
+       * =================================================
+       */
+
+      if (usernameElement) {
+
+        usernameElement.textContent =
+          username;
+
+      }
+
+
+      /*
+       * =================================================
+       * STATUS
+       * =================================================
+       */
+
+      if (statusElement) {
+
+        const online =
+          requestedUid
+            ? profile.isOnline === true
+            : true;
+
+
+        statusElement.innerHTML =
+          online
 
             ? `
                 <span
@@ -1689,24 +1863,24 @@
                 Offline
               `;
 
-        }
-
-
-      } catch (error) {
-
-        /*
-         * Cache problems must NEVER stop
-         * profile.js from running.
-         */
-
-        console.warn(
-          "Instant profile cache bootstrap:",
-          error
-        );
-
       }
 
-    })();
+
+    } catch (error) {
+
+      /*
+       * Cache errors must NEVER prevent
+       * profile.js from running.
+       */
+
+      console.warn(
+        "CONNECTA instant profile bootstrap:",
+        error
+      );
+
+    }
+
+  })();
 
   </script>
 
