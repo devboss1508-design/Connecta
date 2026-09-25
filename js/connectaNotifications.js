@@ -37,6 +37,7 @@ import {
 import {
     collection,
     doc,
+    getDoc,
     getDocs,
     onSnapshot,
     query,
@@ -458,23 +459,225 @@ function getMessageKey(
    SENDER NAME
 ========================================================= */
 
-function getSenderName(
+async function getSenderName(
     message
 ) {
 
-    return (
+    /*
+     * First use the sender information already
+     * stored inside the message.
+     */
+
+    const directName =
 
         message.senderName ||
 
         message.senderDisplayName ||
 
-        message.displayName ||
+        message.displayName;
 
-        message.senderFirstName ||
 
-        "CONNECTA User"
+    if (directName) {
 
-    );
+        return String(
+            directName
+        ).trim();
+
+    }
+
+
+    /*
+     * If the message contains first and last names,
+     * build the full name.
+     */
+
+    const firstName =
+        String(
+            message.senderFirstName || ""
+        ).trim();
+
+
+    const lastName =
+        String(
+            message.senderLastName || ""
+        ).trim();
+
+
+    const fullName =
+        `${firstName} ${lastName}`
+            .trim();
+
+
+    if (fullName) {
+
+        return fullName;
+
+    }
+
+
+    /*
+     * If the message does not contain the sender's
+     * name, use the sender UID to find the profile.
+     */
+
+    const senderId =
+        message.senderId ||
+        message.senderUid ||
+        message.uid;
+
+
+    if (senderId) {
+
+        try {
+
+            /*
+             * First try the public profile.
+             */
+
+            const publicProfileRef =
+                doc(
+                    db,
+                    "publicProfiles",
+                    senderId
+                );
+
+
+            const publicProfileSnapshot =
+                await getDoc(
+                    publicProfileRef
+                );
+
+
+            if (
+                publicProfileSnapshot.exists()
+            ) {
+
+                const profile =
+                    publicProfileSnapshot.data();
+
+
+                const profileName =
+
+                    profile.displayName ||
+
+                    profile.name ||
+
+                    profile.fullName;
+
+
+                if (profileName) {
+
+                    return String(
+                        profileName
+                    ).trim();
+
+                }
+
+            }
+
+
+        } catch (error) {
+
+            console.warn(
+                "[CONNECTA NOTIFICATIONS] Public profile lookup failed:",
+                error
+            );
+
+        }
+
+
+        /*
+         * Fallback to the existing users collection.
+         *
+         * This allows the notification to still show
+         * the real name if publicProfiles has not yet
+         * been created for this user.
+         */
+
+        try {
+
+            const userRef =
+                doc(
+                    db,
+                    "users",
+                    senderId
+                );
+
+
+            const userSnapshot =
+                await getDoc(
+                    userRef
+                );
+
+
+            if (
+                userSnapshot.exists()
+            ) {
+
+                const user =
+                    userSnapshot.data();
+
+
+                const userName =
+
+                    user.displayName ||
+
+                    user.name ||
+
+                    user.fullName;
+
+
+                if (userName) {
+
+                    return String(
+                        userName
+                    ).trim();
+
+                }
+
+
+                const userFirstName =
+                    String(
+                        user.firstName || ""
+                    ).trim();
+
+
+                const userLastName =
+                    String(
+                        user.lastName || ""
+                    ).trim();
+
+
+                const combinedName =
+                    `${userFirstName} ${userLastName}`
+                        .trim();
+
+
+                if (combinedName) {
+
+                    return combinedName;
+
+                }
+
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "[CONNECTA NOTIFICATIONS] User profile lookup failed:",
+                error
+            );
+
+        }
+
+    }
+
+
+    /*
+     * Final fallback.
+     */
+
+    return "CONNECTA User";
 
 }
 
@@ -740,10 +943,10 @@ function installNotificationStyles() {
    SHOW IN-APP NOTIFICATION
 ========================================================= */
 
-function showInAppNotification(
+async function showInAppNotification(
     message
 ) {
-
+   
     const container =
         ensureNotificationContainer();
 
@@ -754,9 +957,9 @@ function showInAppNotification(
 
 
     const senderName =
-        getSenderName(
-            message
-        );
+    await getSenderName(
+        message
+     );
 
 
     const preview =
@@ -1069,7 +1272,7 @@ function showInAppNotification(
    BROWSER NOTIFICATION
 ========================================================= */
 
-function showBrowserNotification(
+async function showBrowserNotification(
     message
 ) {
 
@@ -1113,10 +1316,9 @@ function showBrowserNotification(
 
 
     const senderName =
-        getSenderName(
-            message
-        );
-
+    await getSenderName(
+        message
+     );
 
     const groupName =
         getGroupName(
