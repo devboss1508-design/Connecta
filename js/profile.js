@@ -2,14 +2,13 @@
    CONNECTA — PROFILE
    File: frontend/js/profile.js
 
-   PERFORMANCE UPDATED VERSION
+   FEATURES
    ---------------------------------------------------------
    • Instant profile display
    • Cache-first rendering
    • Firebase Auth fallback
    • Background Firestore refresh
    • Realtime profile updates
-   • App/PWA foreground refresh
    • Own/private profile
    • Other/public profile
    • Follow / Unfollow
@@ -20,10 +19,7 @@
    • M-PESA verification
    • Referral information
    • No "Loading profile..." screen
-   • NO publicProfiles dependency
-   • NO Global Meet dependency
 ========================================================= */
-
 
 import {
     auth,
@@ -31,12 +27,10 @@ import {
     storage
 } from "./firebase.js";
 
-
 import {
     onAuthStateChanged,
     updateProfile
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
-
 
 import {
     doc,
@@ -46,7 +40,6 @@ import {
     serverTimestamp,
     runTransaction
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
-
 
 import {
     ref,
@@ -61,7 +54,6 @@ import {
 
 const API_BASE_URL =
     "https://connecta-backend-com.onrender.com";
-
 
 const VERIFICATION_AMOUNT =
     999;
@@ -85,19 +77,6 @@ let isFollowing = false;
 
 let currentUserFollowing = [];
 
-let initializedProfileUid = null;
-
-let profileInitializationInProgress = false;
-
-
-/*
- * Prevents repeated foreground refreshes from firing
- * too frequently when Android/PWA sends multiple
- * visibility events.
- */
-let lastForegroundRefresh =
-    0;
-
 
 /* =========================================================
    CACHE
@@ -106,21 +85,8 @@ let lastForegroundRefresh =
 const OWN_PROFILE_CACHE_KEY =
     "connectaOwnProfileCache_v2";
 
-
 const PUBLIC_PROFILE_CACHE_KEY =
     "connectaPublicProfileCache_v2";
-
-
-/*
- * Cache is considered fresh for this period.
- *
- * IMPORTANT:
- * A stale cache is still displayed immediately.
- * Freshness only controls whether we request an
- * additional background refresh.
- */
-const PROFILE_CACHE_FRESH_MS =
-    2 * 60 * 1000;
 
 
 /* =========================================================
@@ -162,7 +128,6 @@ function installInstantProfileStyles() {
                 .18s
                 ease-out;
         }
-
 
         @keyframes connectaProfileAppear {
 
@@ -381,8 +346,12 @@ function getProfileUid() {
             window.location.search
         );
 
-
-    return params.get("uid");
+    return (
+        params.get("uid") ||
+        params.get("userId") ||
+        params.get("id") ||
+        ""
+    ).trim() || null;
 }
 
 
@@ -441,34 +410,15 @@ function isOwnProfile(
 
 
 /* =========================================================
-   CACHE AGE
-========================================================= */
-
-function isCacheFresh(
-    profile
-) {
-
-    if (
-        !profile ||
-        !profile.cachedAt
-    ) {
-
-        return false;
-    }
-
-
-    return (
-        Date.now() -
-        Number(profile.cachedAt)
-    ) < PROFILE_CACHE_FRESH_MS;
-}
-
-
-/* =========================================================
    OWN PROFILE CACHE
 ========================================================= */
 
 function getOwnProfileCache() {
+
+    if (!currentUser) {
+        return null;
+    }
+
 
     try {
 
@@ -487,17 +437,8 @@ function getOwnProfileCache() {
             JSON.parse(raw);
 
 
-        if (!cache) {
-            return null;
-        }
-
-
-        /*
-         * If Firebase Auth is already restored,
-         * make sure the cache belongs to this user.
-         */
         if (
-            currentUser &&
+            !cache ||
             cache.uid !== currentUser.uid
         ) {
 
@@ -530,15 +471,7 @@ function saveOwnProfileCache(
 
     if (
         !profile ||
-        !profile.uid
-    ) {
-
-        return;
-    }
-
-
-    if (
-        currentUser &&
+        !currentUser ||
         profile.uid !== currentUser.uid
     ) {
 
@@ -567,7 +500,7 @@ function saveOwnProfileCache(
 
             email:
                 profile.email ||
-                currentUser?.email ||
+                currentUser.email ||
                 "",
 
             phone:
@@ -694,20 +627,7 @@ function getPublicProfileCache(
         }
 
 
-        const cache =
-            JSON.parse(raw);
-
-
-        if (
-            !cache ||
-            cache.uid !== uid
-        ) {
-
-            return null;
-        }
-
-
-        return cache;
+        return JSON.parse(raw);
 
     } catch (error) {
 
@@ -2930,29 +2850,74 @@ async function loadProfile(
             );
 
 
-        const snapshot =
-            await getDoc(
-                profileRef
-            );
+        console.log(
+    "[CONNECTA PROFILE] Firestore path:",
+    `users/${uid}`
+);
+
+console.log(
+    "[CONNECTA PROFILE] Exists:",
+    snapshot.exists()
+);
+
+console.log(
+    "[CONNECTA PROFILE] Current Firebase UID:",
+    currentUser?.uid
+);
+
+console.log(
+    "[CONNECTA PROFILE] Requested UID:",
+    getProfileUid()
+);
 
 
-        if (
-            !snapshot.exists()
-        ) {
+        if (!snapshot.exists()) {
 
-            /*
-             * Do not destroy an already visible
-             * cached/instant profile.
-             */
+    console.warn(
+        "[CONNECTA PROFILE] Profile document does not exist:",
+        `users/${uid}`
+    );
 
-            if (!viewedUser) {
+    /*
+     * IMPORTANT:
+     * Never destroy an already-rendered
+     * instant/cache profile.
+     */
 
-                renderProfileUnavailable();
-            }
+    if (
+        !viewedUser ||
+        viewedUser.uid !== uid
+    ) {
 
+        const container =
+            $("profileContainer");
 
-            return;
+        if (container) {
+
+            container.innerHTML = `
+
+                <div class="connecta-profile-fallback">
+
+                    <div class="connecta-profile-fallback-avatar">
+                        ?
+                    </div>
+
+                    <strong>
+                        Profile unavailable
+                    </strong>
+
+                    <p>
+                        This CONNECTA profile could not be found.
+                    </p>
+
+                </div>
+
+            `;
         }
+    }
+
+    return;
+ }
 
 
         const profile = {
@@ -3038,46 +3003,13 @@ async function loadProfile(
 
 
         /*
-         * Cached profile remains visible.
+         * IMPORTANT:
+         *
+         * Do not destroy cached/instant
+         * profile because of a temporary
+         * network problem.
          */
     }
-}
-
-
-/* =========================================================
-   PROFILE UNAVAILABLE
-========================================================= */
-
-function renderProfileUnavailable() {
-
-    const container =
-        $("profileContainer");
-
-
-    if (!container) {
-        return;
-    }
-
-
-    container.innerHTML = `
-
-        <div class="connecta-profile-fallback">
-
-            <div class="connecta-profile-fallback-avatar">
-                ?
-            </div>
-
-            <strong>
-                Profile unavailable
-            </strong>
-
-            <p>
-                This CONNECTA profile could not be found.
-            </p>
-
-        </div>
-
-    `;
 }
 
 
@@ -3212,199 +3144,6 @@ function listenToProfile(
             }
 
         );
-}
-
-
-/* =========================================================
-   FOREGROUND PROFILE REFRESH
-   ---------------------------------------------------------
-   Used when the user returns to CONNECTA from:
-   • Android app/PWA
-   • another browser tab
-   • another application
-   • screen lock
-========================================================= */
-
-async function refreshProfileOnForeground() {
-
-    if (
-        !currentUser?.uid
-    ) {
-
-        return;
-    }
-
-
-    const now =
-        Date.now();
-
-
-    /*
-     * Prevent repeated Android visibility events
-     * from causing multiple Firestore reads.
-     */
-    if (
-        now -
-        lastForegroundRefresh <
-        5000
-    ) {
-
-        return;
-    }
-
-
-    lastForegroundRefresh =
-        now;
-
-
-    const profileUid =
-        getProfileUid() ||
-        currentUser.uid;
-
-
-    /*
-     * Reattach realtime listener if necessary.
-     */
-    if (
-        !stopProfileListener ||
-        initializedProfileUid !== profileUid
-    ) {
-
-        listenToProfile(
-            profileUid
-        );
-    }
-
-
-    /*
-     * Refresh profile in background.
-     */
-    await loadProfile(
-        profileUid
-    );
-
-
-    /*
-     * If viewing own profile, update presence.
-     */
-    if (
-        profileUid === currentUser.uid
-    ) {
-
-        markCurrentUserOnline()
-            .catch(
-                error => {
-
-                    console.warn(
-                        "Foreground presence update failed:",
-                        error
-                    );
-
-                }
-            );
-    }
-
-
-    /*
-     * Refresh following state in background.
-     */
-    loadCurrentUserFollowing()
-        .catch(
-            error => {
-
-                console.warn(
-                    "Foreground following refresh failed:",
-                    error
-                );
-
-            }
-        );
-}
-
-
-/* =========================================================
-   PAGE VISIBILITY / PWA EVENTS
-========================================================= */
-
-function setupForegroundRefresh() {
-
-    document.addEventListener(
-        "visibilitychange",
-        () => {
-
-            if (
-                document.visibilityState ===
-                "visible"
-            ) {
-
-                refreshProfileOnForeground()
-                    .catch(
-                        error => {
-
-                            console.warn(
-                                "Visibility profile refresh failed:",
-                                error
-                            );
-
-                        }
-                    );
-            }
-
-        }
-    );
-
-
-    window.addEventListener(
-        "pageshow",
-        () => {
-
-            refreshProfileOnForeground()
-                .catch(
-                    error => {
-
-                        console.warn(
-                            "Pageshow profile refresh failed:",
-                            error
-                        );
-
-                    }
-                );
-
-        }
-    );
-
-
-    window.addEventListener(
-        "focus",
-        () => {
-
-            /*
-             * Only refresh when the document
-             * is actually visible.
-             */
-            if (
-                document.visibilityState !==
-                "visible"
-            ) {
-
-                return;
-            }
-
-
-            refreshProfileOnForeground()
-                .catch(
-                    error => {
-
-                        console.warn(
-                            "Focus profile refresh failed:",
-                            error
-                        );
-
-                    }
-                );
-
-        }
-    );
 }
 
 
@@ -3603,9 +3342,10 @@ function setVerificationMessage(
         `verification-message ${type}`.trim();
 }
 
-
 /* =========================================================
    RESET VERIFICATION STATE
+   Used when payment fails, expires, is cancelled,
+   or confirmation times out.
 ========================================================= */
 
 async function resetVerificationState(
@@ -3652,6 +3392,10 @@ async function resetVerificationState(
         );
 
 
+        /* =============================================
+           UPDATE CURRENT PROFILE
+        ============================================= */
+
         if (viewedUser) {
 
             Object.assign(
@@ -3660,6 +3404,10 @@ async function resetVerificationState(
             );
         }
 
+
+        /* =============================================
+           UPDATE LOCAL CACHE
+        ============================================= */
 
         const cached =
             getOwnProfileCache();
@@ -3684,6 +3432,10 @@ async function resetVerificationState(
         }
 
 
+        /* =============================================
+           REFRESH PROFILE UI
+        ============================================= */
+
         if (viewedUser) {
 
             renderProfile(
@@ -3707,6 +3459,12 @@ async function resetVerificationState(
             error
         );
 
+
+        /*
+         * Even if Firestore reset fails,
+         * restore the local UI so the user
+         * can try again.
+         */
 
         if (viewedUser) {
 
@@ -3782,6 +3540,11 @@ async function startVerification() {
         return;
     }
 
+
+    /*
+     * Stop an old polling session before
+     * starting another verification attempt.
+     */
 
     if (verificationPollTimer) {
 
@@ -3891,6 +3654,13 @@ async function startVerification() {
 
         if (!reference) {
 
+            /*
+             * Payment was supposedly initiated,
+             * but no reference came back.
+             *
+             * Do NOT leave the account pending.
+             */
+
             await resetVerificationState(
                 "No verification payment reference returned"
             );
@@ -3914,6 +3684,12 @@ async function startVerification() {
             error
         );
 
+
+        /*
+         * IMPORTANT:
+         * Reset Firestore pending state so the
+         * profile does not remain stuck.
+         */
 
         await resetVerificationState(
             "Verification initiation failed"
@@ -4004,6 +3780,10 @@ function startVerificationPolling(
                     }
 
 
+                    /*
+                     * Payment has not completed yet.
+                     */
+
                     if (
                         attempts >=
                         maxAttempts
@@ -4021,6 +3801,13 @@ function startVerificationPolling(
                         verificationPolling =
                             false;
 
+
+                        /*
+                         * IMPORTANT:
+                         * No response after the maximum
+                         * polling period means we must
+                         * release the pending state.
+                         */
 
                         await resetVerificationState(
                             "Verification payment confirmation timed out"
@@ -4056,6 +3843,13 @@ function startVerificationPolling(
                         error
                     );
 
+
+                    /*
+                     * Do not immediately cancel because
+                     * one status request failed.
+                     *
+                     * Keep polling until maxAttempts.
+                     */
 
                     if (
                         attempts >=
@@ -4107,7 +3901,7 @@ function startVerificationPolling(
             3000
         );
 }
-
+    
 
 /* =========================================================
    CHECK VERIFICATION STATUS
@@ -4252,6 +4046,11 @@ async function checkVerificationStatus(
             ).toLowerCase()
         )
     ) {
+
+        /*
+         * CRITICAL:
+         * Remove payment_pending from Firestore.
+         */
 
         await resetVerificationState(
             `Verification payment ${data.status || "failed"}`
@@ -4400,31 +4199,11 @@ async function initializeProfile(
     user
 ) {
 
-    /*
-     * Prevent duplicate initialization caused by
-     * Firebase Auth restoration events.
-     */
-    if (
-        profileInitializationInProgress
-    ) {
-
-        return;
-    }
-
-
-    profileInitializationInProgress =
-        true;
-
-
     currentUser =
         user;
 
 
     if (!user) {
-
-        profileInitializationInProgress =
-            false;
-
 
         location.replace(
             "login.html"
@@ -4443,10 +4222,6 @@ async function initializeProfile(
         user.uid;
 
 
-    initializedProfileUid =
-        profileUid;
-
-
     /* =====================================================
        STEP 1
        SHOW LOCAL PROFILE IMMEDIATELY
@@ -4457,10 +4232,9 @@ async function initializeProfile(
 
 
     /*
-     * Existing cached profile is always preferred.
-     *
-     * Even if stale, it is displayed immediately.
+     * First try Firestore profile cache.
      */
+
     displayedInstantProfile =
         loadCachedProfile(
             profileUid
@@ -4468,9 +4242,14 @@ async function initializeProfile(
 
 
     /*
-     * If this is our own profile and no cache exists,
-     * Firebase Auth provides an immediate fallback.
+     * If this is OUR profile and there is
+     * no Firestore cache, build a profile
+     * immediately from Firebase Authentication.
+     *
+     * This is what prevents the blank
+     * "Loading profile..." experience.
      */
+
     if (
         !displayedInstantProfile &&
         profileUid === user.uid
@@ -4500,12 +4279,11 @@ async function initializeProfile(
 
 
     /*
-     * Other user with no cache.
-     *
-     * Show the same neutral fallback as before.
-     * Firestore will replace it as soon as the profile
-     * arrives.
+     * For another user's profile, if there
+     * is no cache, render a neutral profile
+     * immediately instead of "Loading..."
      */
+
     if (
         !displayedInstantProfile &&
         profileUid !== user.uid
@@ -4554,37 +4332,7 @@ async function initializeProfile(
 
     /* =====================================================
        STEP 2
-       START REALTIME LISTENER
-    ===================================================== */
-
-    listenToProfile(
-        profileUid
-    );
-
-
-    /* =====================================================
-       STEP 3
-       BACKGROUND FIRESTORE REFRESH
-    ===================================================== */
-
-    loadProfile(
-        profileUid
-    )
-        .catch(
-            error => {
-
-                console.warn(
-                    "Profile background refresh failed:",
-                    error
-                );
-
-            }
-        );
-
-
-    /* =====================================================
-       STEP 4
-       PRESENCE IN BACKGROUND
+       PRESENCE RUNS IN BACKGROUND
     ===================================================== */
 
     if (
@@ -4606,8 +4354,8 @@ async function initializeProfile(
 
 
     /* =====================================================
-       STEP 5
-       FOLLOWING IN BACKGROUND
+       STEP 3
+       LOAD FOLLOWING IN BACKGROUND
     ===================================================== */
 
     loadCurrentUserFollowing()
@@ -4623,8 +4371,34 @@ async function initializeProfile(
         );
 
 
-    profileInitializationInProgress =
-        false;
+    /* =====================================================
+       STEP 4
+       REALTIME FIRESTORE LISTENER
+    ===================================================== */
+
+    listenToProfile(
+        profileUid
+    );
+
+
+    /* =====================================================
+       STEP 5
+       BACKGROUND FIRESTORE REFRESH
+    ===================================================== */
+
+    loadProfile(
+        profileUid
+    )
+        .catch(
+            error => {
+
+                console.warn(
+                    "Profile background refresh failed:",
+                    error
+                );
+
+            }
+        );
 }
 
 
@@ -4638,42 +4412,17 @@ setupBackButton();
 
 setupVerificationEvents();
 
-setupForegroundRefresh();
-
 
 /*
- * Firebase Auth restores the existing session.
+ * Firebase Auth restores the session.
  *
- * There is deliberately:
- *
- * • NO artificial delay
- * • NO "Loading profile..." screen
- * • NO publicProfiles dependency
- * • NO Global Meet dependency
+ * There is deliberately NO artificial delay
+ * and NO "Loading profile..." state.
  */
 
 onAuthStateChanged(
     auth,
-    user => {
-
-        initializeProfile(
-            user
-        )
-            .catch(
-                error => {
-
-                    profileInitializationInProgress =
-                        false;
-
-                    console.error(
-                        "Profile initialization failed:",
-                        error
-                    );
-
-                }
-            );
-
-    }
+    initializeProfile
 );
 
 
