@@ -341,30 +341,25 @@
     </a>
 
     <a href="profile.html">
-      ✓
-      <span>Verification</span>
-    </a>
+  ✓ <span>Verification</span>
+</a>
 
-    <a href="earn.html">
-      🎁
-      <span>Earn Online</span>
-    </a>
+<a href="earn.html">
+  🎁 <span>Earn Online</span>
+</a>
 
-    <a
-      href="#"
-      data-coming="Settings"
-    >
-      ⚙
-      <span>Settings</span>
-    </a>
+<!-- PWA INSTALL -->
+<a href="#" id="sideInstallConnecta">
+  📱 <span>Install CONNECTA App</span>
+</a>
 
-    <button
-      id="logoutBtn"
-      class="logout-link"
-    >
-      ↪
-      <span>Logout</span>
-    </button>
+<a href="#" data-coming="Settings">
+  ⚙ <span>Settings</span>
+</a>
+
+<button id="logoutBtn" class="logout-link">
+  ↪ <span>Logout</span>
+</button>
 
   </aside>
 
@@ -748,6 +743,9 @@
     const installButton =
       document.getElementById("installConnectaBtn");
 
+    const sideInstallConnecta =
+      document.getElementById("sideInstallConnecta");
+
     const installLaterButton =
       document.getElementById("installConnectaLater");
 
@@ -878,6 +876,60 @@
       );
 
     }
+
+    if (sideInstallConnecta) {
+
+  sideInstallConnecta.addEventListener(
+    "click",
+    async (event) => {
+
+      event.preventDefault();
+
+      if (!deferredInstallPrompt) {
+
+        if (isConnectaInstalled()) {
+          console.log("CONNECTA is already installed.");
+          return;
+        }
+
+        alert(
+          "CONNECTA installation is not available right now. " +
+          "Please try again in a moment or use Chrome's menu " +
+          "and choose Install app."
+        );
+
+        return;
+      }
+
+      try {
+
+        await deferredInstallPrompt.prompt();
+
+        const choice =
+          await deferredInstallPrompt.userChoice;
+
+        console.log(
+          "CONNECTA installation result:",
+          choice.outcome
+        );
+
+      } catch (error) {
+
+        console.error(
+          "CONNECTA side-menu installation error:",
+          error
+        );
+
+      }
+
+      deferredInstallPrompt = null;
+
+      hideConnectaInstallPrompt();
+
+    }
+  );
+
+}
 
 
     /*
