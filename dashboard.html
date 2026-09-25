@@ -2,98 +2,937 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#22C55E">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  >
+
+  <!-- CONNECTA PWA -->
+  <link
+    rel="manifest"
+    href="/manifest.webmanifest"
+  >
+
+  <meta
+    name="theme-color"
+    content="#22C55E"
+  >
+
+  <meta
+    name="mobile-web-app-capable"
+    content="yes"
+  >
+
+  <meta
+    name="apple-mobile-web-app-capable"
+    content="yes"
+  >
+
+  <meta
+    name="apple-mobile-web-app-status-bar-style"
+    content="default"
+  >
+
+  <meta
+    name="apple-mobile-web-app-title"
+    content="CONNECTA"
+  >
+
+  <link
+    rel="icon"
+    type="image/png"
+    sizes="192x192"
+    href="/connecta-icon-192.png"
+  >
+
   <title>Chats — CONNECTA</title>
-  <link rel="stylesheet" href="css/main.css">
-  <link rel="stylesheet" href="css/dashboard.css">
+
+  <link
+    rel="stylesheet"
+    href="css/main.css"
+  >
+
+  <link
+    rel="stylesheet"
+    href="css/dashboard.css"
+  >
+
+  <style>
+    /* =========================================
+       CONNECTA INSTALL APP PROMPT
+    ========================================= */
+
+    .connecta-install-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    }
+
+    .connecta-install-overlay.show {
+      display: flex;
+    }
+
+    .connecta-install-card {
+      width: 100%;
+      max-width: 430px;
+      background: #ffffff;
+      border-radius: 26px;
+      padding: 24px 20px 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+      animation: connectaInstallUp 0.28s ease-out;
+    }
+
+    @keyframes connectaInstallUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .connecta-install-top {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .connecta-install-icon {
+      width: 62px;
+      height: 62px;
+      flex: 0 0 62px;
+      border-radius: 17px;
+      object-fit: cover;
+      box-shadow: 0 5px 15px rgba(32, 197, 90, 0.22);
+    }
+
+    .connecta-install-title {
+      margin: 0;
+      color: #18212b;
+      font-size: 21px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .connecta-install-subtitle {
+      margin: 5px 0 0;
+      color: #68727c;
+      font-size: 14px;
+    }
+
+    .connecta-install-text {
+      margin: 0 0 18px;
+      color: #4c5963;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .connecta-install-benefits {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .connecta-install-benefit {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 13px;
+      background: #f2fbf5;
+      border-radius: 13px;
+      color: #245b39;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .connecta-install-benefit-icon {
+      width: 27px;
+      height: 27px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 27px;
+      border-radius: 50%;
+      background: #d8f7e3;
+    }
+
+    .connecta-install-actions {
+      display: grid;
+      gap: 10px;
+    }
+
+    .connecta-install-button {
+      width: 100%;
+      min-height: 50px;
+      border: 0;
+      border-radius: 15px;
+      background: #20c55a;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 7px 18px rgba(32, 197, 90, 0.24);
+    }
+
+    .connecta-install-button:active {
+      transform: scale(0.98);
+    }
+
+    .connecta-install-later {
+      width: 100%;
+      min-height: 46px;
+      border: 0;
+      border-radius: 14px;
+      background: #f3f5f6;
+      color: #59636c;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .connecta-install-note {
+      margin: 13px 0 0;
+      text-align: center;
+      color: #8a949c;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    @media (min-width: 700px) {
+      .connecta-install-overlay {
+        align-items: center;
+      }
+    }
+  </style>
 </head>
+
 <body class="app-page">
 
+  <!-- =========================================
+       APP HEADER
+  ========================================= -->
+
   <header class="app-header">
-    <button class="icon-btn" id="menuBtn" aria-label="Open menu">☰</button>
-    <a class="header-brand" href="dashboard.html">CONNECTA</a>
+
+    <button
+      class="icon-btn"
+      id="menuBtn"
+      aria-label="Open menu"
+    >
+      ☰
+    </button>
+
+    <a
+      class="header-brand"
+      href="dashboard.html"
+    >
+      CONNECTA
+    </a>
 
     <div class="header-right">
-      <div class="balance" id="balancePill">KSh. <span id="balanceAmount">0.00</span></div>
-      <button class="connection-btn" id="connectionBtn">Get Connection</button>
-      <button class="profile-btn" id="profileBtn" aria-label="Open profile">U</button>
+
+      <div
+        class="balance"
+        id="balancePill"
+      >
+        KSh.
+        <span id="balanceAmount">0.00</span>
+      </div>
+
+      <button
+        class="connection-btn"
+        id="connectionBtn"
+      >
+        Get Connection
+      </button>
+
+      <button
+        class="profile-btn"
+        id="profileBtn"
+        aria-label="Open profile"
+      >
+        U
+      </button>
+
     </div>
+
   </header>
 
-  <aside class="side-menu" id="sideMenu" aria-hidden="true">
-    <div class="menu-brand"><span class="brand-mark">C</span> CONNECTA</div>
-    <div class="menu-user">
-      <div class="avatar" id="menuAvatar">U</div>
-      <div><strong id="menuName">CONNECTA User</strong><small id="menuUsername">@username</small></div>
+
+  <!-- =========================================
+       SIDE MENU
+  ========================================= -->
+
+  <aside
+    class="side-menu"
+    id="sideMenu"
+    aria-hidden="true"
+  >
+
+    <div class="menu-brand">
+      <span class="brand-mark">C</span>
+      CONNECTA
     </div>
-    <a class="active" href="dashboard.html">💬 <span>Chats</span></a>
-    <a href="groups.html">👥 <span>Groups</span></a>
-    <a href="#" data-coming="Stories">◉ <span>Stories</span></a>
-    <a href="friends.html">👤 <span>Friends</span></a>
-    <a href="#" data-coming="Online Users">🟢 <span>Online Users</span></a>
-    <a href="profile.html">✓ <span>Verification</span></a>
-    <a href="earn.html">🎁 <span>Earn Online</span></a>
-    <a href="#" data-coming="Settings">⚙ <span>Settings</span></a>
-    <button id="logoutBtn" class="logout-link">↪ <span>Logout</span></button>
+
+    <div class="menu-user">
+
+      <div
+        class="avatar"
+        id="menuAvatar"
+      >
+        U
+      </div>
+
+      <div>
+        <strong id="menuName">
+          CONNECTA User
+        </strong>
+
+        <small id="menuUsername">
+          @username
+        </small>
+      </div>
+
+    </div>
+
+    <a
+      class="active"
+      href="dashboard.html"
+    >
+      💬
+      <span>Chats</span>
+    </a>
+
+    <a href="groups.html">
+      👥
+      <span>Groups</span>
+    </a>
+
+    <a
+      href="#"
+      data-coming="Stories"
+    >
+      ◉
+      <span>Stories</span>
+    </a>
+
+    <a href="friends.html">
+      👤
+      <span>Friends</span>
+    </a>
+
+    <a
+      href="#"
+      data-coming="Online Users"
+    >
+      🟢
+      <span>Online Users</span>
+    </a>
+
+    <a href="profile.html">
+      ✓
+      <span>Verification</span>
+    </a>
+
+    <a href="earn.html">
+      🎁
+      <span>Earn Online</span>
+    </a>
+
+    <a
+      href="#"
+      data-coming="Settings"
+    >
+      ⚙
+      <span>Settings</span>
+    </a>
+
+    <button
+      id="logoutBtn"
+      class="logout-link"
+    >
+      ↪
+      <span>Logout</span>
+    </button>
+
   </aside>
-  <div class="menu-overlay" id="menuOverlay"></div>
+
+  <div
+    class="menu-overlay"
+    id="menuOverlay"
+  ></div>
+
+
+  <!-- =========================================
+       DASHBOARD
+  ========================================= -->
 
   <main class="dashboard">
 
     <section class="welcome-strip">
+
       <div>
-        <span class="eyebrow">CONNECTA</span>
-        <h1>Welcome back, <span id="welcomeName">there</span> 👋</h1>
-        <p>See who's online and continue your conversations.</p>
+
+        <span class="eyebrow">
+          CONNECTA
+        </span>
+
+        <h1>
+          Welcome back,
+          <span id="welcomeName">there</span>
+          👋
+        </h1>
+
+        <p>
+          See who's online and continue your conversations.
+        </p>
+
       </div>
-      <div class="welcome-avatar avatar avatar-green" id="welcomeAvatar">U</div>
+
+      <div
+        class="welcome-avatar avatar avatar-green"
+        id="welcomeAvatar"
+      >
+        U
+      </div>
+
     </section>
+
+
+    <!-- =========================================
+         ONLINE USERS
+    ========================================= -->
 
     <section class="online-section card">
+
       <div class="section-heading-row">
+
         <div>
-          <h2>Online Users <span id="onlineCount">(0)</span></h2>
-          <p class="section-subtitle">People currently active on CONNECTA</p>
+
+          <h2>
+            Online Users
+            <span id="onlineCount">(0)</span>
+          </h2>
+
+          <p class="section-subtitle">
+            People currently active on CONNECTA
+          </p>
+
         </div>
-        <button class="search-btn" id="onlineSearchBtn" aria-label="Search online users">⌕</button>
+
+        <button
+          class="search-btn"
+          id="onlineSearchBtn"
+          aria-label="Search online users"
+        >
+          ⌕
+        </button>
+
       </div>
 
-      <div class="online-search-wrap" id="onlineSearchWrap">
-        <input id="onlineSearch" type="search" placeholder="Search users..." autocomplete="off">
+
+      <div
+        class="online-search-wrap"
+        id="onlineSearchWrap"
+      >
+        <input
+          id="onlineSearch"
+          type="search"
+          placeholder="Search users..."
+          autocomplete="off"
+        >
       </div>
 
-      <div class="online-users" id="onlineUsers"></div>
+
+      <div
+        class="online-users"
+        id="onlineUsers"
+      ></div>
+
     </section>
 
+
+    <!-- =========================================
+         RECENT CHATS
+    ========================================= -->
+
     <section class="recent-section card">
+
       <div class="section-heading-row">
+
         <div>
-          <h2>Recent Chats</h2>
-          <p class="section-subtitle">Your latest conversations</p>
+
+          <h2>
+            Recent Chats
+          </h2>
+
+          <p class="section-subtitle">
+            Your latest conversations
+          </p>
+
         </div>
-        <button class="search-btn" id="chatSearchBtn" aria-label="Search chats">⌕</button>
+
+        <button
+          class="search-btn"
+          id="chatSearchBtn"
+          aria-label="Search chats"
+        >
+          ⌕
+        </button>
+
       </div>
 
-      <div class="chat-search-wrap" id="chatSearchWrap">
-        <input id="chatSearch" type="search" placeholder="Search chats..." autocomplete="off">
+
+      <div
+        class="chat-search-wrap"
+        id="chatSearchWrap"
+      >
+        <input
+          id="chatSearch"
+          type="search"
+          placeholder="Search chats..."
+          autocomplete="off"
+        >
       </div>
 
-      <div class="chat-list" id="chatList"></div>
+
+      <div
+        class="chat-list"
+        id="chatList"
+      ></div>
+
     </section>
 
   </main>
 
-  <nav class="bottom-nav" aria-label="Main navigation">
-    <a class="active" href="dashboard.html"><span>💬</span><small>Chats</small></a>
-    <a href="groups.html"><span>👥</span><small>Groups</small><b id="groupBadge" hidden>0</b></a>
-    <a href="#" data-coming="Stories"><span>◉</span><small>Stories</small></a>
-    <a href="friends.html"><span>👤</span><small>Friends</small></a>
-    <a href="earn.html"><span>🎁</span><small>Earn Online</small></a>
+
+  <!-- =========================================
+       BOTTOM NAVIGATION
+  ========================================= -->
+
+  <nav
+    class="bottom-nav"
+    aria-label="Main navigation"
+  >
+
+    <a
+      class="active"
+      href="dashboard.html"
+    >
+      <span>💬</span>
+      <small>Chats</small>
+    </a>
+
+    <a href="groups.html">
+      <span>👥</span>
+      <small>Groups</small>
+      <b
+        id="groupBadge"
+        hidden
+      >
+        0
+      </b>
+    </a>
+
+    <a
+      href="#"
+      data-coming="Stories"
+    >
+      <span>◉</span>
+      <small>Stories</small>
+    </a>
+
+    <a href="friends.html">
+      <span>👤</span>
+      <small>Friends</small>
+    </a>
+
+    <a href="earn.html">
+      <span>🎁</span>
+      <small>Earn Online</small>
+    </a>
+
   </nav>
 
-  <div class="toast" id="toast" role="status"></div>
+
+  <!-- =========================================
+       TOAST
+  ========================================= -->
+
+  <div
+    class="toast"
+    id="toast"
+    role="status"
+  ></div>
+
+
+  <!-- =========================================
+       CONNECTA INSTALL PROMPT
+  ========================================= -->
+
+  <div
+    class="connecta-install-overlay"
+    id="connectaInstallOverlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="connectaInstallTitle"
+  >
+
+    <div class="connecta-install-card">
+
+      <div class="connecta-install-top">
+
+        <img
+          class="connecta-install-icon"
+          src="/connecta-icon-192.png"
+          alt="CONNECTA"
+        >
+
+        <div>
+
+          <h2
+            class="connecta-install-title"
+            id="connectaInstallTitle"
+          >
+            Install CONNECTA
+          </h2>
+
+          <p class="connecta-install-subtitle">
+            dollachat.com
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <p class="connecta-install-text">
+        Install CONNECTA on your phone for faster access
+        to your chats, groups, stories and friends.
+      </p>
+
+
+      <div class="connecta-install-benefits">
+
+        <div class="connecta-install-benefit">
+
+          <span class="connecta-install-benefit-icon">
+            ⚡
+          </span>
+
+          <span>
+            Open CONNECTA quickly from your home screen
+          </span>
+
+        </div>
+
+
+        <div class="connecta-install-benefit">
+
+          <span class="connecta-install-benefit-icon">
+            💬
+          </span>
+
+          <span>
+            Stay connected to your conversations
+          </span>
+
+        </div>
+
+
+        <div class="connecta-install-benefit">
+
+          <span class="connecta-install-benefit-icon">
+            🔔
+          </span>
+
+          <span>
+            Receive CONNECTA notifications
+          </span>
+
+        </div>
+
+      </div>
+
+
+      <div class="connecta-install-actions">
+
+        <button
+          type="button"
+          class="connecta-install-button"
+          id="installConnectaBtn"
+        >
+          📱 Install CONNECTA
+        </button>
+
+        <button
+          type="button"
+          class="connecta-install-later"
+          id="installConnectaLater"
+        >
+          Continue in browser
+        </button>
+
+      </div>
+
+
+      <p class="connecta-install-note">
+        Installation is handled securely by your browser.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <!-- =========================================
+       DASHBOARD SCRIPT
+  ========================================= -->
 
   <script type="module" src="js/dashboard.js"></script>
+
+
+  <!-- =========================================
+       PWA SERVICE WORKER + INSTALL LOGIC
+  ========================================= -->
+
+  <script>
+    /*
+     * Register CONNECTA service worker.
+     */
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+
+        navigator.serviceWorker
+          .register("/service-worker.js")
+          .then((registration) => {
+
+            console.log(
+              "CONNECTA service worker registered:",
+              registration.scope
+            );
+
+          })
+          .catch((error) => {
+
+            console.error(
+              "CONNECTA service worker registration failed:",
+              error
+            );
+
+          });
+
+      });
+    }
+
+
+    /*
+     * CONNECTA installation prompt.
+     */
+    let deferredInstallPrompt = null;
+
+    const installOverlay =
+      document.getElementById("connectaInstallOverlay");
+
+    const installButton =
+      document.getElementById("installConnectaBtn");
+
+    const installLaterButton =
+      document.getElementById("installConnectaLater");
+
+
+    /*
+     * Check whether CONNECTA is already running
+     * as an installed PWA.
+     */
+    function isConnectaInstalled() {
+
+      return (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone === true
+      );
+
+    }
+
+
+    /*
+     * Open our CONNECTA installation modal.
+     */
+    function showConnectaInstallPrompt() {
+
+      if (!installOverlay) {
+        return;
+      }
+
+      if (isConnectaInstalled()) {
+        return;
+      }
+
+      installOverlay.classList.add("show");
+
+      document.body.style.overflow = "hidden";
+
+    }
+
+
+    /*
+     * Close installation modal.
+     */
+    function hideConnectaInstallPrompt() {
+
+      if (!installOverlay) {
+        return;
+      }
+
+      installOverlay.classList.remove("show");
+
+      document.body.style.overflow = "";
+
+    }
+
+
+    /*
+     * Chrome provides the install event when the
+     * site meets its installation conditions.
+     */
+    window.addEventListener(
+      "beforeinstallprompt",
+      (event) => {
+
+        event.preventDefault();
+
+        deferredInstallPrompt = event;
+
+        /*
+         * Wait briefly so the dashboard can finish
+         * rendering before showing the prompt.
+         */
+        setTimeout(() => {
+
+          showConnectaInstallPrompt();
+
+        }, 900);
+
+      }
+    );
+
+
+    /*
+     * Install CONNECTA.
+     */
+    if (installButton) {
+
+      installButton.addEventListener(
+        "click",
+        async () => {
+
+          if (!deferredInstallPrompt) {
+
+            /*
+             * Chrome may not expose the native prompt
+             * at this exact moment.
+             */
+            hideConnectaInstallPrompt();
+
+            return;
+
+          }
+
+          try {
+
+            await deferredInstallPrompt.prompt();
+
+            const choice =
+              await deferredInstallPrompt.userChoice;
+
+            console.log(
+              "CONNECTA installation result:",
+              choice.outcome
+            );
+
+          } catch (error) {
+
+            console.error(
+              "CONNECTA installation error:",
+              error
+            );
+
+          }
+
+          deferredInstallPrompt = null;
+
+          hideConnectaInstallPrompt();
+
+        }
+      );
+
+    }
+
+
+    /*
+     * User chooses to continue using Chrome.
+     */
+    if (installLaterButton) {
+
+      installLaterButton.addEventListener(
+        "click",
+        () => {
+
+          hideConnectaInstallPrompt();
+
+        }
+      );
+
+    }
+
+
+    /*
+     * Chrome fires this after successful installation.
+     */
+    window.addEventListener(
+      "appinstalled",
+      () => {
+
+        console.log(
+          "CONNECTA was successfully installed."
+        );
+
+        deferredInstallPrompt = null;
+
+        hideConnectaInstallPrompt();
+
+      }
+    );
+
+
+    /*
+     * If the user installs CONNECTA using Chrome's
+     * own menu, close our prompt as soon as the
+     * browser switches to standalone mode.
+     */
+    window.addEventListener(
+      "pageshow",
+      () => {
+
+        if (isConnectaInstalled()) {
+          hideConnectaInstallPrompt();
+        }
+
+      }
+    );
+
+  </script>
+
 </body>
 </html>
