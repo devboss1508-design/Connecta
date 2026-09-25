@@ -2,21 +2,14 @@
    CONNECTA — PROFILE
    File: frontend/js/profile.js
 
-   UPDATED ARCHITECTURE
-   ---------------------------------------------------------
-   PRIVATE PROFILE
-   • Own profile → users/{uid}
-
-   PUBLIC PROFILE
-   • Other users → publicProfiles/{uid}
-
-   FEATURES
+   PERFORMANCE UPDATED VERSION
    ---------------------------------------------------------
    • Instant profile display
    • Cache-first rendering
    • Firebase Auth fallback
    • Background Firestore refresh
    • Realtime profile updates
+   • App/PWA foreground refresh
    • Own/private profile
    • Other/public profile
    • Follow / Unfollow
@@ -26,9 +19,9 @@
    • Account verification
    • M-PESA verification
    • Referral information
-   • Global Meet public information
-   • No private data exposed to other users
    • No "Loading profile..." screen
+   • NO publicProfiles dependency
+   • NO Global Meet dependency
 ========================================================= */
 
 
@@ -74,14 +67,6 @@ const VERIFICATION_AMOUNT =
     999;
 
 
-const PRIVATE_PROFILES_COLLECTION =
-    "users";
-
-
-const PUBLIC_PROFILES_COLLECTION =
-    "publicProfiles";
-
-
 /* =========================================================
    STATE
 ========================================================= */
@@ -100,17 +85,42 @@ let isFollowing = false;
 
 let currentUserFollowing = [];
 
+let initializedProfileUid = null;
+
+let profileInitializationInProgress = false;
+
+
+/*
+ * Prevents repeated foreground refreshes from firing
+ * too frequently when Android/PWA sends multiple
+ * visibility events.
+ */
+let lastForegroundRefresh =
+    0;
+
 
 /* =========================================================
    CACHE
 ========================================================= */
 
 const OWN_PROFILE_CACHE_KEY =
-    "connectaOwnProfileCache_v3";
+    "connectaOwnProfileCache_v2";
 
 
 const PUBLIC_PROFILE_CACHE_KEY =
-    "connectaPublicProfileCache_v3";
+    "connectaPublicProfileCache_v2";
+
+
+/*
+ * Cache is considered fresh for this period.
+ *
+ * IMPORTANT:
+ * A stale cache is still displayed immediately.
+ * Freshness only controls whether we request an
+ * additional background refresh.
+ */
+const PROFILE_CACHE_FRESH_MS =
+    2 * 60 * 1000;
 
 
 /* =========================================================
@@ -122,7 +132,7 @@ const $ = id =>
 
 
 /* =========================================================
-   INSTALL INSTANT PROFILE STYLES
+   INSTALL PROFILE STYLES
 ========================================================= */
 
 function installInstantProfileStyles() {
@@ -218,57 +228,6 @@ function installInstantProfileStyles() {
             place-items: center;
             font-size: 27px;
             font-weight: 900;
-        }
-
-
-        .connecta-global-meet-info {
-            margin-top: 14px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 7px;
-        }
-
-
-        .connecta-global-meet-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 6px 10px;
-            border-radius: 999px;
-            background: #f0fdf4;
-            color: #166534;
-            border: 1px solid #bbf7d0;
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-
-        .connecta-language-list {
-            margin-top: 10px;
-            text-align: center;
-            font-size: 12px;
-            color: #64748b;
-        }
-
-
-        .connecta-interest-list {
-            margin-top: 10px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 6px;
-        }
-
-
-        .connecta-interest-chip {
-            padding: 5px 9px;
-            border-radius: 999px;
-            background: #f8fafc;
-            color: #475569;
-            border: 1px solid #e2e8f0;
-            font-size: 11px;
-            font-weight: 700;
         }
 
     `;
@@ -482,15 +441,34 @@ function isOwnProfile(
 
 
 /* =========================================================
+   CACHE AGE
+========================================================= */
+
+function isCacheFresh(
+    profile
+) {
+
+    if (
+        !profile ||
+        !profile.cachedAt
+    ) {
+
+        return false;
+    }
+
+
+    return (
+        Date.now() -
+        Number(profile.cachedAt)
+    ) < PROFILE_CACHE_FRESH_MS;
+}
+
+
+/* =========================================================
    OWN PROFILE CACHE
 ========================================================= */
 
 function getOwnProfileCache() {
-
-    if (!currentUser) {
-        return null;
-    }
-
 
     try {
 
@@ -509,8 +487,17 @@ function getOwnProfileCache() {
             JSON.parse(raw);
 
 
+        if (!cache) {
+            return null;
+        }
+
+
+        /*
+         * If Firebase Auth is already restored,
+         * make sure the cache belongs to this user.
+         */
         if (
-            !cache ||
+            currentUser &&
             cache.uid !== currentUser.uid
         ) {
 
@@ -543,7 +530,15 @@ function saveOwnProfileCache(
 
     if (
         !profile ||
-        !currentUser ||
+        !profile.uid
+    ) {
+
+        return;
+    }
+
+
+    if (
+        currentUser &&
         profile.uid !== currentUser.uid
     ) {
 
@@ -572,7 +567,7 @@ function saveOwnProfileCache(
 
             email:
                 profile.email ||
-                currentUser.email ||
+                currentUser?.email ||
                 "",
 
             phone:
@@ -589,9 +584,6 @@ function saveOwnProfileCache(
 
             isOnline:
                 profile.isOnline === true,
-
-            lastSeen:
-                profile.lastSeen || null,
 
             isVerified:
                 profile.isVerified === true,
@@ -745,19 +737,51 @@ function savePublicProfileCache(
 
     try {
 
-        const publicProfile =
-            getPublicProfile(
-                profile
-            );
+        const publicProfile = {
 
+            uid:
+                profile.uid,
 
-        if (!publicProfile) {
-            return;
-        }
+            firstName:
+                profile.firstName || "",
 
+            lastName:
+                profile.lastName || "",
 
-        publicProfile.cachedAt =
-            Date.now();
+            displayName:
+                profile.displayName || "",
+
+            username:
+                profile.username || "",
+
+            photoURL:
+                profile.photoURL || "",
+
+            photoUrl:
+                profile.photoUrl || "",
+
+            bio:
+                profile.bio || "",
+
+            isOnline:
+                profile.isOnline === true,
+
+            isVerified:
+                profile.isVerified === true,
+
+            followersCount:
+                Number(
+                    profile.followersCount || 0
+                ),
+
+            followingCount:
+                Number(
+                    profile.followingCount || 0
+                ),
+
+            cachedAt:
+                Date.now()
+        };
 
 
         localStorage.setItem(
@@ -782,39 +806,15 @@ function savePublicProfileCache(
 
 /* =========================================================
    PUBLIC PROFILE FILTER
-   ---------------------------------------------------------
-   IMPORTANT:
-   Only fields in this function can be displayed
-   from another user's public profile.
 ========================================================= */
 
 function getPublicProfile(
     profile
 ) {
 
-    if (!profile?.uid) {
+    if (!profile) {
         return null;
     }
-
-
-    const interests =
-        Array.isArray(
-            profile.interests
-        )
-            ? profile.interests
-                .filter(Boolean)
-                .slice(0, 20)
-            : [];
-
-
-    const languages =
-        Array.isArray(
-            profile.languages
-        )
-            ? profile.languages
-                .filter(Boolean)
-                .slice(0, 20)
-            : [];
 
 
     return {
@@ -843,27 +843,8 @@ function getPublicProfile(
         bio:
             profile.bio || "",
 
-        gender:
-            profile.gender || "",
-
-        age:
-            Number(profile.age || 0),
-
-        country:
-            profile.country || "",
-
-        city:
-            profile.city || "",
-
-        interests,
-
-        languages,
-
         isOnline:
             profile.isOnline === true,
-
-        lastSeen:
-            profile.lastSeen || null,
 
         isVerified:
             profile.isVerified === true,
@@ -876,29 +857,7 @@ function getPublicProfile(
         followingCount:
             Number(
                 profile.followingCount || 0
-            ),
-
-        globalMeetEnabled:
-            profile.globalMeetEnabled === true,
-
-        globalChatEnabled:
-            profile.globalChatEnabled === true,
-
-        globalChatStatus:
-            profile.globalChatStatus ||
-            "unavailable",
-
-        availability:
-            profile.availability ||
-            "unavailable",
-
-        globalMeetStatus:
-            profile.globalMeetStatus ||
-            "",
-
-        status:
-            profile.status ||
-            "active"
+            )
 
     };
 }
@@ -991,186 +950,6 @@ function createInstantAuthProfile(
 
 
 /* =========================================================
-   CREATE PUBLIC PROFILE DATA
-   ---------------------------------------------------------
-   Used to keep publicProfiles/{uid} synchronized
-   with safe information from the user's own profile.
-========================================================= */
-
-function createPublicProfileData(
-    profile
-) {
-
-    if (!profile?.uid) {
-        return null;
-    }
-
-
-    return {
-
-        uid:
-            profile.uid,
-
-        firstName:
-            profile.firstName || "",
-
-        lastName:
-            profile.lastName || "",
-
-        displayName:
-            profile.displayName || "",
-
-        username:
-            profile.username || "",
-
-        photoURL:
-            profile.photoURL || "",
-
-        photoUrl:
-            profile.photoUrl || "",
-
-        bio:
-            profile.bio || "",
-
-        gender:
-            profile.gender || "",
-
-        age:
-            Number(profile.age || 0),
-
-        country:
-            profile.country || "",
-
-        city:
-            profile.city || "",
-
-        interests:
-            Array.isArray(profile.interests)
-                ? profile.interests
-                    .filter(Boolean)
-                    .slice(0, 20)
-                : [],
-
-        languages:
-            Array.isArray(profile.languages)
-                ? profile.languages
-                    .filter(Boolean)
-                    .slice(0, 20)
-                : [],
-
-        isOnline:
-            profile.isOnline === true,
-
-        lastSeen:
-            profile.lastSeen ||
-            null,
-
-        isVerified:
-            profile.isVerified === true,
-
-        followersCount:
-            Number(
-                profile.followersCount || 0
-            ),
-
-        followingCount:
-            Number(
-                profile.followingCount || 0
-            ),
-
-        globalMeetEnabled:
-            profile.globalMeetEnabled === true,
-
-        globalChatEnabled:
-            profile.globalChatEnabled === true,
-
-        globalChatStatus:
-            profile.globalChatStatus ||
-            "unavailable",
-
-        availability:
-            profile.availability ||
-            "unavailable",
-
-        globalMeetStatus:
-            profile.globalMeetStatus ||
-            "",
-
-        status:
-            profile.status ||
-            "active",
-
-        updatedAt:
-            serverTimestamp()
-
-    };
-}
-
-
-/* =========================================================
-   SYNC PUBLIC PROFILE
-   ---------------------------------------------------------
-   Only the owner can call this from the frontend.
-========================================================= */
-
-async function syncOwnPublicProfile(
-    profile
-) {
-
-    if (
-        !currentUser?.uid ||
-        !profile?.uid ||
-        profile.uid !== currentUser.uid
-    ) {
-
-        return;
-    }
-
-
-    const publicProfile =
-        createPublicProfileData(
-            profile
-        );
-
-
-    if (!publicProfile) {
-        return;
-    }
-
-
-    try {
-
-        await updateDoc(
-
-            doc(
-                db,
-                PUBLIC_PROFILES_COLLECTION,
-                currentUser.uid
-            ),
-
-            publicProfile
-
-        );
-
-    } catch (error) {
-
-        /*
-         * The public profile may not exist yet.
-         *
-         * We intentionally do not create it here
-         * because Firestore rules / profile setup
-         * may handle creation elsewhere.
-         */
-
-        console.warn(
-            "Public profile sync skipped:",
-            error
-        );
-    }
-}
-
-
-/* =========================================================
    LOAD CACHED PROFILE
 ========================================================= */
 
@@ -1241,16 +1020,14 @@ async function markCurrentUserOnline() {
 
     try {
 
-        const userRef =
+        await updateDoc(
+
             doc(
                 db,
-                PRIVATE_PROFILES_COLLECTION,
+                "users",
                 currentUser.uid
-            );
+            ),
 
-
-        await updateDoc(
-            userRef,
             {
 
                 isOnline:
@@ -1260,6 +1037,7 @@ async function markCurrentUserOnline() {
                     serverTimestamp()
 
             }
+
         );
 
     } catch (error) {
@@ -1327,7 +1105,7 @@ async function loadCurrentUserFollowing() {
 
                 doc(
                     db,
-                    PRIVATE_PROFILES_COLLECTION,
+                    "users",
                     currentUser.uid
                 )
 
@@ -1452,164 +1230,6 @@ function markProfileImagesReady() {
 
             }
         );
-}
-
-
-/* =========================================================
-   GLOBAL MEET INFORMATION
-========================================================= */
-
-function renderGlobalMeetInfo(
-    profile
-) {
-
-    if (!profile) {
-        return "";
-    }
-
-
-    const enabled =
-        profile.globalMeetEnabled === true ||
-        profile.globalChatEnabled === true;
-
-
-    if (!enabled) {
-        return "";
-    }
-
-
-    const chips = [];
-
-
-    if (profile.country) {
-
-        chips.push(`
-            <span class="connecta-global-meet-chip">
-                🌍
-                ${escapeHtml(profile.country)}
-            </span>
-        `);
-    }
-
-
-    if (profile.city) {
-
-        chips.push(`
-            <span class="connecta-global-meet-chip">
-                📍
-                ${escapeHtml(profile.city)}
-            </span>
-        `);
-    }
-
-
-    if (
-        profile.age &&
-        Number(profile.age) > 0
-    ) {
-
-        chips.push(`
-            <span class="connecta-global-meet-chip">
-                ${escapeHtml(
-                    String(profile.age)
-                )} yrs
-            </span>
-        `);
-    }
-
-
-    if (profile.gender) {
-
-        chips.push(`
-            <span class="connecta-global-meet-chip">
-                ${escapeHtml(
-                    String(profile.gender)
-                )}
-            </span>
-        `);
-    }
-
-
-    const interests =
-        Array.isArray(
-            profile.interests
-        )
-            ? profile.interests
-            : [];
-
-
-    const languages =
-        Array.isArray(
-            profile.languages
-        )
-            ? profile.languages
-            : [];
-
-
-    const interestsHtml =
-        interests.length
-
-            ? `
-                <div class="connecta-interest-list">
-
-                    ${interests
-                        .slice(0, 8)
-                        .map(
-                            interest => `
-                                <span class="connecta-interest-chip">
-                                    ${escapeHtml(
-                                        interest
-                                    )}
-                                </span>
-                            `
-                        )
-                        .join("")
-                    }
-
-                </div>
-              `
-
-            : "";
-
-
-    const languagesHtml =
-        languages.length
-
-            ? `
-                <div class="connecta-language-list">
-
-                    🗣️
-                    ${languages
-                        .slice(0, 8)
-                        .map(
-                            language =>
-                                escapeHtml(
-                                    language
-                                )
-                        )
-                        .join(", ")
-                    }
-
-                </div>
-              `
-
-            : "";
-
-
-    return `
-
-        <div class="connecta-global-meet-info">
-
-            ${chips.join("")}
-
-        </div>
-
-
-        ${interestsHtml}
-
-        ${languagesHtml}
-
-    `;
 }
 
 
@@ -1874,18 +1494,6 @@ function renderProfile(
 
         `;
     }
-
-
-    /* =====================================================
-       GLOBAL MEET
-    ===================================================== */
-
-    const globalMeetHtml =
-        own
-            ? ""
-            : renderGlobalMeetInfo(
-                safeProfile
-            );
 
 
     /* =====================================================
@@ -2192,6 +1800,7 @@ function renderProfile(
 
         `;
 
+
     }
 
 
@@ -2246,9 +1855,6 @@ function renderProfile(
 
 
                     ${bioHtml}
-
-
-                    ${globalMeetHtml}
 
 
                     <div class="profile-main-action">
@@ -2528,7 +2134,7 @@ async function toggleFollow(
         const currentUserRef =
             doc(
                 db,
-                PRIVATE_PROFILES_COLLECTION,
+                "users",
                 currentUser.uid
             );
 
@@ -2536,7 +2142,7 @@ async function toggleFollow(
         const targetUserRef =
             doc(
                 db,
-                PRIVATE_PROFILES_COLLECTION,
+                "users",
                 targetUid
             );
 
@@ -3143,14 +2749,14 @@ async function handleProfilePhotoUpload(
 
 
         /* =================================================
-           FIRESTORE PRIVATE PROFILE
+           FIRESTORE PHOTO
         ================================================= */
 
         await updateDoc(
 
             doc(
                 db,
-                PRIVATE_PROFILES_COLLECTION,
+                "users",
                 currentUser.uid
             ),
 
@@ -3169,52 +2775,12 @@ async function handleProfilePhotoUpload(
 
             viewedUser.photoURL =
                 photoURL;
-
-            viewedUser.photoUrl =
-                photoURL;
         }
 
 
         saveOwnProfileCache(
             viewedUser
         );
-
-
-        /* =================================================
-           UPDATE PUBLIC PROFILE PHOTO
-        ================================================= */
-
-        try {
-
-            await updateDoc(
-
-                doc(
-                    db,
-                    PUBLIC_PROFILES_COLLECTION,
-                    currentUser.uid
-                ),
-
-                {
-
-                    photoURL,
-
-                    photoUrl:
-                        photoURL,
-
-                    updatedAt:
-                        serverTimestamp()
-
-                }
-
-            );
-
-        } catch (publicError) {
-
-            console.warn(
-                "Public profile photo update skipped:",
-                publicError
-            );
-        }
 
 
         /* =================================================
@@ -3342,10 +2908,10 @@ async function handleProfilePhotoUpload(
 
 
 /* =========================================================
-   LOAD OWN PROFILE
+   LOAD PROFILE FROM FIRESTORE
 ========================================================= */
 
-async function loadOwnProfile(
+async function loadProfile(
     uid
 ) {
 
@@ -3359,7 +2925,7 @@ async function loadOwnProfile(
         const profileRef =
             doc(
                 db,
-                PRIVATE_PROFILES_COLLECTION,
+                "users",
                 uid
             );
 
@@ -3374,34 +2940,14 @@ async function loadOwnProfile(
             !snapshot.exists()
         ) {
 
+            /*
+             * Do not destroy an already visible
+             * cached/instant profile.
+             */
+
             if (!viewedUser) {
 
-                const container =
-                    $("profileContainer");
-
-
-                if (container) {
-
-                    container.innerHTML = `
-
-                        <div class="connecta-profile-fallback">
-
-                            <div class="connecta-profile-fallback-avatar">
-                                ?
-                            </div>
-
-                            <strong>
-                                Profile unavailable
-                            </strong>
-
-                            <p>
-                                Your CONNECTA profile could not be found.
-                            </p>
-
-                        </div>
-
-                    `;
-                }
+                renderProfileUnavailable();
             }
 
 
@@ -3418,120 +2964,60 @@ async function loadOwnProfile(
         };
 
 
-        profile.email =
-            profile.email ||
-            currentUser?.email ||
-            "";
-
-
-        profile.isOnline =
-            true;
-
-
-        currentUserFollowing =
-            Array.isArray(
-                profile.following
-            )
-                ? [
-                    ...profile.following
-                ]
-                : [];
-
-
-        viewedUser =
-            profile;
-
-
-        saveOwnProfileCache(
-            profile
-        );
-
-
-        renderProfile(
-            profile
-        );
-
-    } catch (error) {
-
-        console.warn(
-            "Own profile refresh failed:",
-            error
-        );
-    }
-}
-
-
-/* =========================================================
-   LOAD PUBLIC PROFILE
-   ---------------------------------------------------------
-   IMPORTANT:
-   This NEVER reads users/{uid} for another user.
-========================================================= */
-
-async function loadPublicProfile(
-    uid
-) {
-
-    if (!uid) {
-        return;
-    }
-
-
-    try {
-
-        const profileRef =
-            doc(
-                db,
-                PUBLIC_PROFILES_COLLECTION,
-                uid
-            );
-
-
-        const snapshot =
-            await getDoc(
-                profileRef
-            );
-
+        /* =================================================
+           OWN PROFILE
+        ================================================= */
 
         if (
-            !snapshot.exists()
+            isOwnProfile(uid)
         ) {
 
-            /*
-             * Do not fall back to users/{uid}.
-             *
-             * This is intentional.
-             *
-             * Other users must only be loaded
-             * from publicProfiles.
-             */
+            profile.email =
+                profile.email ||
+                currentUser?.email ||
+                "";
 
-            if (
-                !getPublicProfileCache(uid)
-            ) {
 
-                renderProfileUnavailable();
+            profile.isOnline =
+                true;
 
-            }
+
+            currentUserFollowing =
+                Array.isArray(
+                    profile.following
+                )
+                    ? [
+                        ...profile.following
+                    ]
+                    : [];
+
+
+            viewedUser =
+                profile;
+
+
+            saveOwnProfileCache(
+                profile
+            );
+
+
+            renderProfile(
+                profile
+            );
 
 
             return;
         }
 
+
+        /* =================================================
+           OTHER USER
+        ================================================= */
 
         const publicProfile =
-            getPublicProfile({
-
-                uid,
-
-                ...snapshot.data()
-
-            });
-
-
-        if (!publicProfile) {
-            return;
-        }
+            getPublicProfile(
+                profile
+            );
 
 
         savePublicProfileCache(
@@ -3546,56 +3032,15 @@ async function loadPublicProfile(
     } catch (error) {
 
         console.warn(
-            "Public profile refresh failed:",
+            "Background profile refresh failed:",
             error
         );
 
+
         /*
-         * Keep cached profile visible.
-         *
-         * Do not destroy it because of a
-         * temporary network or Firestore error.
+         * Cached profile remains visible.
          */
-
-        if (
-            !getPublicProfileCache(uid)
-        ) {
-
-            renderProfileUnavailable();
-
-        }
     }
-}
-
-
-/* =========================================================
-   LOAD PROFILE
-========================================================= */
-
-async function loadProfile(
-    uid
-) {
-
-    if (!uid) {
-        return;
-    }
-
-
-    if (
-        isOwnProfile(uid)
-    ) {
-
-        await loadOwnProfile(
-            uid
-        );
-
-        return;
-    }
-
-
-    await loadPublicProfile(
-        uid
-    );
 }
 
 
@@ -3622,14 +3067,12 @@ function renderProfileUnavailable() {
                 ?
             </div>
 
-
             <strong>
                 Profile unavailable
             </strong>
 
-
             <p>
-                This CONNECTA profile is not available.
+                This CONNECTA profile could not be found.
             </p>
 
         </div>
@@ -3639,10 +3082,10 @@ function renderProfileUnavailable() {
 
 
 /* =========================================================
-   REALTIME OWN PROFILE LISTENER
+   REALTIME PROFILE LISTENER
 ========================================================= */
 
-function listenToOwnProfile(
+function listenToProfile(
     uid
 ) {
 
@@ -3651,10 +3094,19 @@ function listenToOwnProfile(
     }
 
 
+    if (stopProfileListener) {
+
+        stopProfileListener();
+
+        stopProfileListener =
+            null;
+    }
+
+
     const profileRef =
         doc(
             db,
-            PRIVATE_PROFILES_COLLECTION,
+            "users",
             uid
         );
 
@@ -3683,120 +3135,60 @@ function listenToOwnProfile(
                 };
 
 
-                profile.email =
-                    profile.email ||
-                    currentUser?.email ||
-                    "";
-
-
-                profile.isOnline =
-                    true;
-
-
-                currentUserFollowing =
-                    Array.isArray(
-                        profile.following
-                    )
-                        ? [
-                            ...profile.following
-                        ]
-                        : [];
-
-
-                viewedUser =
-                    profile;
-
-
-                saveOwnProfileCache(
-                    profile
-                );
-
-
-                renderProfile(
-                    profile
-                );
-
-            },
-
-            error => {
-
-                console.warn(
-                    "Own profile realtime listener:",
-                    error
-                );
-
-            }
-
-        );
-}
-
-
-/* =========================================================
-   REALTIME PUBLIC PROFILE LISTENER
-   ---------------------------------------------------------
-   IMPORTANT:
-   Other users are ONLY read from publicProfiles.
-========================================================= */
-
-function listenToPublicProfile(
-    uid
-) {
-
-    if (!uid) {
-        return;
-    }
-
-
-    const profileRef =
-        doc(
-            db,
-            PUBLIC_PROFILES_COLLECTION,
-            uid
-        );
-
-
-    stopProfileListener =
-        onSnapshot(
-
-            profileRef,
-
-            snapshot => {
+                /* =========================================
+                   OWN PROFILE
+                ========================================= */
 
                 if (
-                    !snapshot.exists()
+                    isOwnProfile(uid)
                 ) {
 
-                    /*
-                     * Do not read private users/{uid}
-                     * as a fallback.
-                     */
+                    profile.email =
+                        profile.email ||
+                        currentUser?.email ||
+                        "";
 
-                    if (
-                        !getPublicProfileCache(uid)
-                    ) {
 
-                        renderProfileUnavailable();
+                    profile.isOnline =
+                        true;
 
-                    }
+
+                    currentUserFollowing =
+                        Array.isArray(
+                            profile.following
+                        )
+                            ? [
+                                ...profile.following
+                            ]
+                            : [];
+
+
+                    viewedUser =
+                        profile;
+
+
+                    saveOwnProfileCache(
+                        profile
+                    );
+
+
+                    renderProfile(
+                        profile
+                    );
 
 
                     return;
                 }
 
+
+                /* =========================================
+                   OTHER USER
+                ========================================= */
 
                 const publicProfile =
-                    getPublicProfile({
-
-                        uid,
-
-                        ...snapshot.data()
-
-                    });
-
-
-                if (!publicProfile) {
-                    return;
-                }
+                    getPublicProfile(
+                        profile
+                    );
 
 
                 savePublicProfileCache(
@@ -3813,7 +3205,7 @@ function listenToPublicProfile(
             error => {
 
                 console.warn(
-                    "Public profile realtime listener:",
+                    "Profile realtime listener:",
                     error
                 );
 
@@ -3824,41 +3216,195 @@ function listenToPublicProfile(
 
 
 /* =========================================================
-   REALTIME PROFILE LISTENER
+   FOREGROUND PROFILE REFRESH
+   ---------------------------------------------------------
+   Used when the user returns to CONNECTA from:
+   • Android app/PWA
+   • another browser tab
+   • another application
+   • screen lock
 ========================================================= */
 
-function listenToProfile(
-    uid
-) {
+async function refreshProfileOnForeground() {
 
-    if (!uid) {
+    if (
+        !currentUser?.uid
+    ) {
+
         return;
     }
 
 
-    if (stopProfileListener) {
-
-        stopProfileListener();
-
-        stopProfileListener =
-            null;
-    }
+    const now =
+        Date.now();
 
 
+    /*
+     * Prevent repeated Android visibility events
+     * from causing multiple Firestore reads.
+     */
     if (
-        isOwnProfile(uid)
+        now -
+        lastForegroundRefresh <
+        5000
     ) {
 
-        listenToOwnProfile(
-            uid
-        );
+        return;
+    }
 
-    } else {
 
-        listenToPublicProfile(
-            uid
+    lastForegroundRefresh =
+        now;
+
+
+    const profileUid =
+        getProfileUid() ||
+        currentUser.uid;
+
+
+    /*
+     * Reattach realtime listener if necessary.
+     */
+    if (
+        !stopProfileListener ||
+        initializedProfileUid !== profileUid
+    ) {
+
+        listenToProfile(
+            profileUid
         );
     }
+
+
+    /*
+     * Refresh profile in background.
+     */
+    await loadProfile(
+        profileUid
+    );
+
+
+    /*
+     * If viewing own profile, update presence.
+     */
+    if (
+        profileUid === currentUser.uid
+    ) {
+
+        markCurrentUserOnline()
+            .catch(
+                error => {
+
+                    console.warn(
+                        "Foreground presence update failed:",
+                        error
+                    );
+
+                }
+            );
+    }
+
+
+    /*
+     * Refresh following state in background.
+     */
+    loadCurrentUserFollowing()
+        .catch(
+            error => {
+
+                console.warn(
+                    "Foreground following refresh failed:",
+                    error
+                );
+
+            }
+        );
+}
+
+
+/* =========================================================
+   PAGE VISIBILITY / PWA EVENTS
+========================================================= */
+
+function setupForegroundRefresh() {
+
+    document.addEventListener(
+        "visibilitychange",
+        () => {
+
+            if (
+                document.visibilityState ===
+                "visible"
+            ) {
+
+                refreshProfileOnForeground()
+                    .catch(
+                        error => {
+
+                            console.warn(
+                                "Visibility profile refresh failed:",
+                                error
+                            );
+
+                        }
+                    );
+            }
+
+        }
+    );
+
+
+    window.addEventListener(
+        "pageshow",
+        () => {
+
+            refreshProfileOnForeground()
+                .catch(
+                    error => {
+
+                        console.warn(
+                            "Pageshow profile refresh failed:",
+                            error
+                        );
+
+                    }
+                );
+
+        }
+    );
+
+
+    window.addEventListener(
+        "focus",
+        () => {
+
+            /*
+             * Only refresh when the document
+             * is actually visible.
+             */
+            if (
+                document.visibilityState !==
+                "visible"
+            ) {
+
+                return;
+            }
+
+
+            refreshProfileOnForeground()
+                .catch(
+                    error => {
+
+                        console.warn(
+                            "Focus profile refresh failed:",
+                            error
+                        );
+
+                    }
+                );
+
+        }
+    );
 }
 
 
@@ -4097,7 +3643,7 @@ async function resetVerificationState(
 
             doc(
                 db,
-                PRIVATE_PROFILES_COLLECTION,
+                "users",
                 currentUser.uid
             ),
 
@@ -4663,7 +4209,7 @@ async function checkVerificationStatus(
                 closeVerificationModal();
 
 
-                await loadOwnProfile(
+                await loadProfile(
                     currentUser.uid
                 );
 
@@ -4854,11 +4400,31 @@ async function initializeProfile(
     user
 ) {
 
+    /*
+     * Prevent duplicate initialization caused by
+     * Firebase Auth restoration events.
+     */
+    if (
+        profileInitializationInProgress
+    ) {
+
+        return;
+    }
+
+
+    profileInitializationInProgress =
+        true;
+
+
     currentUser =
         user;
 
 
     if (!user) {
+
+        profileInitializationInProgress =
+            false;
+
 
         location.replace(
             "login.html"
@@ -4877,6 +4443,10 @@ async function initializeProfile(
         user.uid;
 
 
+    initializedProfileUid =
+        profileUid;
+
+
     /* =====================================================
        STEP 1
        SHOW LOCAL PROFILE IMMEDIATELY
@@ -4886,16 +4456,21 @@ async function initializeProfile(
         false;
 
 
+    /*
+     * Existing cached profile is always preferred.
+     *
+     * Even if stale, it is displayed immediately.
+     */
     displayedInstantProfile =
         loadCachedProfile(
             profileUid
         );
 
 
-    /* =====================================================
-       OWN PROFILE AUTH FALLBACK
-    ===================================================== */
-
+    /*
+     * If this is our own profile and no cache exists,
+     * Firebase Auth provides an immediate fallback.
+     */
     if (
         !displayedInstantProfile &&
         profileUid === user.uid
@@ -4924,13 +4499,13 @@ async function initializeProfile(
     }
 
 
-    /* =====================================================
-       OTHER USER FALLBACK
-       -----------------------------------------------------
-       This is deliberately neutral.
-       We do NOT read users/{uid}.
-    ===================================================== */
-
+    /*
+     * Other user with no cache.
+     *
+     * Show the same neutral fallback as before.
+     * Firestore will replace it as soon as the profile
+     * arrives.
+     */
     if (
         !displayedInstantProfile &&
         profileUid !== user.uid
@@ -4966,16 +4541,7 @@ async function initializeProfile(
                 0,
 
             followingCount:
-                0,
-
-            globalMeetEnabled:
-                false,
-
-            globalChatEnabled:
-                false,
-
-            status:
-                "active"
+                0
 
         };
 
@@ -4988,6 +4554,36 @@ async function initializeProfile(
 
     /* =====================================================
        STEP 2
+       START REALTIME LISTENER
+    ===================================================== */
+
+    listenToProfile(
+        profileUid
+    );
+
+
+    /* =====================================================
+       STEP 3
+       BACKGROUND FIRESTORE REFRESH
+    ===================================================== */
+
+    loadProfile(
+        profileUid
+    )
+        .catch(
+            error => {
+
+                console.warn(
+                    "Profile background refresh failed:",
+                    error
+                );
+
+            }
+        );
+
+
+    /* =====================================================
+       STEP 4
        PRESENCE IN BACKGROUND
     ===================================================== */
 
@@ -5010,8 +4606,8 @@ async function initializeProfile(
 
 
     /* =====================================================
-       STEP 3
-       LOAD FOLLOWING IN BACKGROUND
+       STEP 5
+       FOLLOWING IN BACKGROUND
     ===================================================== */
 
     loadCurrentUserFollowing()
@@ -5027,34 +4623,8 @@ async function initializeProfile(
         );
 
 
-    /* =====================================================
-       STEP 4
-       REALTIME PROFILE LISTENER
-    ===================================================== */
-
-    listenToProfile(
-        profileUid
-    );
-
-
-    /* =====================================================
-       STEP 5
-       BACKGROUND FIRESTORE REFRESH
-    ===================================================== */
-
-    loadProfile(
-        profileUid
-    )
-        .catch(
-            error => {
-
-                console.warn(
-                    "Profile background refresh failed:",
-                    error
-                );
-
-            }
-        );
+    profileInitializationInProgress =
+        false;
 }
 
 
@@ -5068,19 +4638,42 @@ setupBackButton();
 
 setupVerificationEvents();
 
+setupForegroundRefresh();
+
 
 /*
  * Firebase Auth restores the existing session.
  *
  * There is deliberately:
- * • NO login screen for an already authenticated user
+ *
  * • NO artificial delay
  * • NO "Loading profile..." screen
+ * • NO publicProfiles dependency
+ * • NO Global Meet dependency
  */
 
 onAuthStateChanged(
     auth,
-    initializeProfile
+    user => {
+
+        initializeProfile(
+            user
+        )
+            .catch(
+                error => {
+
+                    profileInitializationInProgress =
+                        false;
+
+                    console.error(
+                        "Profile initialization failed:",
+                        error
+                    );
+
+                }
+            );
+
+    }
 );
 
 
