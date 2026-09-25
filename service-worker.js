@@ -3,7 +3,7 @@
    FAST CACHE-FIRST VERSION
 ========================================================= */
 
-const CACHE_NAME = "connecta-pwa-v2";
+const CACHE_NAME = "connecta-pwa-v3";
 
 
 /* =========================================================
