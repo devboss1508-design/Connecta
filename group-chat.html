@@ -106,23 +106,15 @@
            GROUP CHAT PAGE
         ========================================================= */
 
-.group-chat-page {
-    width: 100%;
+        .group-chat-page {
 
-    height: var(--connecta-group-app-height, 100dvh);
+            height: 100dvh;
 
-    min-height: 0;
+            display: flex;
 
-    max-height: var(--connecta-group-app-height, 100dvh);
+            flex-direction: column;
+        }
 
-    display: flex;
-
-    flex-direction: column;
-
-    overflow: hidden;
-
-    position: relative;
-}
 
         /* =========================================================
            HEADER
@@ -460,40 +452,22 @@
            CHAT PAGE
         ========================================================= */
 
-.messages-area {
-    flex: 1 1 auto;
+        .messages-area {
 
-    min-height: 0;
+            flex: 1;
 
-    height: auto;
+            overflow-y: auto;
+            overflow-x: hidden;
 
-    overflow-y: auto;
-    overflow-x: hidden;
+            padding:
+                82px
+                10px
+                92px;
 
-    /*
-     * Space for:
-     * - fixed composer
-     * - Android safe area
-     * - final message visibility
-     */
-    padding:
-        82px
-        10px
-        calc(
-            125px +
-            env(safe-area-inset-bottom, 0px)
-        );
+            scroll-behavior: smooth;
 
-    scroll-behavior: smooth;
-
-    -webkit-overflow-scrolling: touch;
-
-    overscroll-behavior: contain;
-
-    overflow-anchor: auto;
-
-    scrollbar-width: thin;
-}
+            -webkit-overflow-scrolling: touch;
+        }
 
 
         .messages-inner {
@@ -1284,75 +1258,51 @@
            COMPOSER
         ========================================================= */
 
-.composer-wrap {
-    position: fixed;
+        .composer-wrap {
 
-    left: 0;
-    right: 0;
-    bottom: 0;
+            position: fixed;
 
-    width: 100%;
+            left: 0;
+            right: 0;
 
-    z-index: 90;
+            bottom: 0;
 
-    /*
-     * Keep the complete composer inside the visible
-     * Android/PWA viewport.
-     */
-    padding:
-        7px
-        9px
-        max(
-            7px,
-            calc(
-                7px +
-                env(safe-area-inset-bottom, 0px)
-            )
-        );
+            z-index: 90;
 
-    min-height: 56px;
+            padding:
+                7px
+                9px
+                calc(
+                    7px +
+                    env(safe-area-inset-bottom)
+                );
 
-    background:
-        rgba(255,255,255,.97);
+            background:
+                rgba(255,255,255,.97);
 
-    border-top:
-        1px solid
-        var(--border);
+            border-top:
+                1px solid
+                var(--border);
 
-    backdrop-filter:
-        blur(12px);
-
-    -webkit-backdrop-filter:
-        blur(12px);
-
-    box-sizing: border-box;
-
-    flex-shrink: 0;
-
-    /*
-     * Prevent accidental horizontal overflow.
-     */
-    overflow: hidden;
-}
+            backdrop-filter:
+                blur(12px);
+        }
 
 
- .composer {
-    width: 100%;
+        .composer {
 
-    max-width: 680px;
+            width: 100%;
 
-    min-width: 0;
+            max-width: 680px;
 
-    margin: 0 auto;
+            margin: 0 auto;
 
-    display: flex;
+            display: flex;
 
-    align-items: flex-end;
+            align-items: flex-end;
 
-    gap: 6px;
-
-    box-sizing: border-box;
-}
+            gap: 6px;
+        }
 
 
         .composer-action {
@@ -3534,118 +3484,13 @@
 <!-- =========================================================
      JAVASCRIPT
 ========================================================= -->
-<script>
-(function () {
 
-    const root = document.documentElement;
-
-    function updateGroupChatViewport() {
-
-        let height = window.innerHeight;
-
-        if (
-            window.visualViewport &&
-            window.visualViewport.height
-        ) {
-            height = window.visualViewport.height;
-        }
-
-        if (
-            !height ||
-            !Number.isFinite(height)
-        ) {
-            return;
-        }
-
-        root.style.setProperty(
-            "--connecta-group-app-height",
-            `${Math.round(height)}px`
-        );
-    }
-
-
-    updateGroupChatViewport();
-
-
-    window.addEventListener(
-        "resize",
-        updateGroupChatViewport,
-        {
-            passive: true
-        }
-    );
-
-
-    window.addEventListener(
-        "orientationchange",
-        function () {
-
-            setTimeout(
-                updateGroupChatViewport,
-                80
-            );
-
-            setTimeout(
-                updateGroupChatViewport,
-                300
-            );
-
-        },
-        {
-            passive: true
-        }
-    );
-
-
-    if (window.visualViewport) {
-
-        window.visualViewport.addEventListener(
-            "resize",
-            updateGroupChatViewport,
-            {
-                passive: true
-            }
-        );
-
-        window.visualViewport.addEventListener(
-            "scroll",
-            updateGroupChatViewport,
-            {
-                passive: true
-            }
-        );
-    }
-
-
-    /*
-     * Android installed PWAs can settle their viewport
-     * shortly after launch.
-     */
-    setTimeout(
-        updateGroupChatViewport,
-        100
-    );
-
-    setTimeout(
-        updateGroupChatViewport,
-        500
-    );
-
-    setTimeout(
-        updateGroupChatViewport,
-        1000
-    );
-
-})();
-</script>
-
-    
 <script
     type="module"
-    src="js/group-chat.js?v=20260925-3"
+    src="js/group-chat.js"
 ></script>
 
 
 </body>
 
-    </html>
+</html>
