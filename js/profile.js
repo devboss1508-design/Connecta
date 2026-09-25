@@ -2850,75 +2850,114 @@ async function loadProfile(
             );
 
 
+        /*
+         * =================================================
+         * LOAD FIRESTORE DOCUMENT
+         * =================================================
+         */
+
+        const snapshot =
+            await getDoc(
+                profileRef
+            );
+
+
+        /*
+         * =================================================
+         * DIAGNOSTICS
+         * =================================================
+         */
+
         console.log(
-    "[CONNECTA PROFILE] Firestore path:",
-    `users/${uid}`
-);
+            "[CONNECTA PROFILE] Firestore path:",
+            `users/${uid}`
+        );
 
-console.log(
-    "[CONNECTA PROFILE] Exists:",
-    snapshot.exists()
-);
 
-console.log(
-    "[CONNECTA PROFILE] Current Firebase UID:",
-    currentUser?.uid
-);
+        console.log(
+            "[CONNECTA PROFILE] Exists:",
+            snapshot.exists()
+        );
 
-console.log(
-    "[CONNECTA PROFILE] Requested UID:",
-    getProfileUid()
-);
 
+        console.log(
+            "[CONNECTA PROFILE] Current Firebase UID:",
+            currentUser?.uid
+        );
+
+
+        console.log(
+            "[CONNECTA PROFILE] Requested UID:",
+            getProfileUid()
+        );
+
+
+        /*
+         * =================================================
+         * PROFILE DOES NOT EXIST
+         * =================================================
+         */
 
         if (!snapshot.exists()) {
 
-    console.warn(
-        "[CONNECTA PROFILE] Profile document does not exist:",
-        `users/${uid}`
-    );
+            console.warn(
+                "[CONNECTA PROFILE] Profile document does not exist:",
+                `users/${uid}`
+            );
 
-    /*
-     * IMPORTANT:
-     * Never destroy an already-rendered
-     * instant/cache profile.
-     */
 
-    if (
-        !viewedUser ||
-        viewedUser.uid !== uid
-    ) {
+            /*
+             * IMPORTANT:
+             *
+             * Never destroy an already-rendered
+             * cached/Auth profile.
+             */
 
-        const container =
-            $("profileContainer");
+            if (
+                !viewedUser ||
+                viewedUser.uid !== uid
+            ) {
 
-        if (container) {
+                const container =
+                    $("profileContainer");
 
-            container.innerHTML = `
 
-                <div class="connecta-profile-fallback">
+                if (container) {
 
-                    <div class="connecta-profile-fallback-avatar">
-                        ?
-                    </div>
+                    container.innerHTML = `
 
-                    <strong>
-                        Profile unavailable
-                    </strong>
+                        <div class="connecta-profile-fallback">
 
-                    <p>
-                        This CONNECTA profile could not be found.
-                    </p>
+                            <div class="connecta-profile-fallback-avatar">
+                                ?
+                            </div>
 
-                </div>
+                            <strong>
+                                Profile unavailable
+                            </strong>
 
-            `;
+                            <p>
+                                This CONNECTA profile could not be found.
+                            </p>
+
+                        </div>
+
+                    `;
+
+                }
+
+            }
+
+
+            return;
         }
-    }
 
-    return;
- }
 
+        /*
+         * =================================================
+         * BUILD PROFILE OBJECT
+         * =================================================
+         */
 
         const profile = {
 
@@ -2929,9 +2968,17 @@ console.log(
         };
 
 
-        /* =================================================
-           OWN PROFILE
-        ================================================= */
+        console.log(
+            "[CONNECTA PROFILE] Profile loaded:",
+            profile
+        );
+
+
+        /*
+         * =================================================
+         * OWN PROFILE
+         * =================================================
+         */
 
         if (
             isOwnProfile(uid)
@@ -2961,10 +3008,18 @@ console.log(
                 profile;
 
 
+            /*
+             * Save fresh profile locally
+             */
+
             saveOwnProfileCache(
                 profile
             );
 
+
+            /*
+             * Render immediately
+             */
 
             renderProfile(
                 profile
@@ -2975,9 +3030,13 @@ console.log(
         }
 
 
-        /* =================================================
-           OTHER USER
-        ================================================= */
+        /*
+         * =================================================
+         * OTHER USER PROFILE
+         * =================================================
+         *
+         * Only public fields are passed to the UI.
+         */
 
         const publicProfile =
             getPublicProfile(
@@ -2985,10 +3044,18 @@ console.log(
             );
 
 
+        /*
+         * Save public profile cache
+         */
+
         savePublicProfileCache(
             publicProfile
         );
 
+
+        /*
+         * Render public profile
+         */
 
         renderProfile(
             publicProfile
@@ -2996,8 +3063,8 @@ console.log(
 
     } catch (error) {
 
-        console.warn(
-            "Background profile refresh failed:",
+        console.error(
+            "[CONNECTA PROFILE] Background profile refresh failed:",
             error
         );
 
@@ -3005,10 +3072,10 @@ console.log(
         /*
          * IMPORTANT:
          *
-         * Do not destroy cached/instant
-         * profile because of a temporary
-         * network problem.
+         * Do NOT destroy cached/Auth profile because
+         * of a temporary Firestore/network problem.
          */
+
     }
 }
 
