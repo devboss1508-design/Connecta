@@ -464,209 +464,68 @@ async function getSenderName(
 ) {
 
     /*
-     * First use the sender information already
-     * stored inside the message.
+     * Names that should NOT be treated as real names.
+     *
+     * If the message contains one of these placeholder
+     * names, we continue looking up the sender profile.
      */
-
-    const directName =
-
-        message.senderName ||
-
-        message.senderDisplayName ||
-
-        message.displayName;
-
-
-    if (directName) {
-
-        return String(
-            directName
-        ).trim();
-
-    }
+    const invalidNames = new Set([
+        "",
+        "CONNECTA User",
+        "CONNECTA user",
+        "User",
+        "Unknown User",
+        "Unknown"
+    ]);
 
 
     /*
-     * If the message contains first and last names,
-     * build the full name.
-     */
-
-    const firstName =
-        String(
-            message.senderFirstName || ""
-        ).trim();
-
-
-    const lastName =
-        String(
-            message.senderLastName || ""
-        ).trim();
-
-
-    const fullName =
-        `${firstName} ${lastName}`
-            .trim();
-
-
-    if (fullName) {
-
-        return fullName;
-
-    }
-
-
-    /*
-     * If the message does not contain the sender's
-     * name, use the sender UID to find the profile.
+     * =====================================================
+     * 1. GET SENDER UID
+     * =====================================================
      */
 
     const senderId =
         message.senderId ||
         message.senderUid ||
-        message.uid;
+        message.uid ||
+        "";
 
 
-    if (senderId) {
+    /*
+     * =====================================================
+     * 2. CHECK NAME STORED IN MESSAGE
+     * =====================================================
+     */
 
-        try {
+    const directNames = [
 
-            /*
-             * First try the public profile.
-             */
+        message.senderName,
 
-            const publicProfileRef =
-                doc(
-                    db,
-                    "publicProfiles",
-                    senderId
-                );
+        message.senderDisplayName,
 
+        message.displayName
 
-            const publicProfileSnapshot =
-                await getDoc(
-                    publicProfileRef
-                );
+    ];
 
 
-            if (
-                publicProfileSnapshot.exists()
-            ) {
+    for (
+        const possibleName
+        of directNames
+    ) {
 
-                const profile =
-                    publicProfileSnapshot.data();
-
-
-                const profileName =
-
-                    profile.displayName ||
-
-                    profile.name ||
-
-                    profile.fullName;
+        const name =
+            String(
+                possibleName || ""
+            ).trim();
 
 
-                if (profileName) {
+        if (
+            name &&
+            !invalidNames.has(name)
+        ) {
 
-                    return String(
-                        profileName
-                    ).trim();
-
-                }
-
-            }
-
-
-        } catch (error) {
-
-            console.warn(
-                "[CONNECTA NOTIFICATIONS] Public profile lookup failed:",
-                error
-            );
-
-        }
-
-
-        /*
-         * Fallback to the existing users collection.
-         *
-         * This allows the notification to still show
-         * the real name if publicProfiles has not yet
-         * been created for this user.
-         */
-
-        try {
-
-            const userRef =
-                doc(
-                    db,
-                    "users",
-                    senderId
-                );
-
-
-            const userSnapshot =
-                await getDoc(
-                    userRef
-                );
-
-
-            if (
-                userSnapshot.exists()
-            ) {
-
-                const user =
-                    userSnapshot.data();
-
-
-                const userName =
-
-                    user.displayName ||
-
-                    user.name ||
-
-                    user.fullName;
-
-
-                if (userName) {
-
-                    return String(
-                        userName
-                    ).trim();
-
-                }
-
-
-                const userFirstName =
-                    String(
-                        user.firstName || ""
-                    ).trim();
-
-
-                const userLastName =
-                    String(
-                        user.lastName || ""
-                    ).trim();
-
-
-                const combinedName =
-                    `${userFirstName} ${userLastName}`
-                        .trim();
-
-
-                if (combinedName) {
-
-                    return combinedName;
-
-                }
-
-            }
-
-        } catch (error) {
-
-            console.warn(
-                "[CONNECTA NOTIFICATIONS] User profile lookup failed:",
-                error
-            );
+            return name;
 
         }
 
@@ -674,7 +533,294 @@ async function getSenderName(
 
 
     /*
-     * Final fallback.
+     * =====================================================
+     * 3. CHECK FIRST + LAST NAME STORED IN MESSAGE
+     * =====================================================
+     */
+
+    const messageFirstName =
+        String(
+            message.senderFirstName || ""
+        ).trim();
+
+
+    const messageLastName =
+        String(
+            message.senderLastName || ""
+        ).trim();
+
+
+    const messageFullName =
+        `${messageFirstName} ${messageLastName}`
+            .trim();
+
+
+    if (
+        messageFullName &&
+        !invalidNames.has(messageFullName)
+    ) {
+
+        return messageFullName;
+
+    }
+
+
+    /*
+     * =====================================================
+     * 4. NO UID = FINAL FALLBACK
+     * =====================================================
+     */
+
+    if (!senderId) {
+
+        return "CONNECTA User";
+
+    }
+
+
+    /*
+     * =====================================================
+     * 5. LOOK UP PUBLIC PROFILE
+     * =====================================================
+     */
+
+    try {
+
+        const publicProfileRef =
+            doc(
+                db,
+                "publicProfiles",
+                senderId
+            );
+
+
+        const publicProfileSnapshot =
+            await getDoc(
+                publicProfileRef
+            );
+
+
+        if (
+            publicProfileSnapshot.exists()
+        ) {
+
+            const profile =
+                publicProfileSnapshot.data();
+
+
+            const profileFirstName =
+                String(
+                    profile.firstName || ""
+                ).trim();
+
+
+            const profileLastName =
+                String(
+                    profile.lastName || ""
+                ).trim();
+
+
+            const profileFullName =
+                `${profileFirstName} ${profileLastName}`
+                    .trim();
+
+
+            /*
+             * Prefer the real display name.
+             */
+
+            const profileDisplayName =
+                String(
+                    profile.displayName ||
+                    profile.fullName ||
+                    profile.name ||
+                    ""
+                ).trim();
+
+
+            if (
+                profileDisplayName &&
+                !invalidNames.has(
+                    profileDisplayName
+                )
+            ) {
+
+                return profileDisplayName;
+
+            }
+
+
+            /*
+             * Fallback to first + last name.
+             */
+
+            if (
+                profileFullName
+            ) {
+
+                return profileFullName;
+
+            }
+
+
+            /*
+             * Username fallback.
+             */
+
+            const username =
+                String(
+                    profile.username || ""
+                )
+                    .trim()
+                    .replace(
+                        /^@/,
+                        ""
+                    );
+
+
+            if (username) {
+
+                return `@${username}`;
+
+            }
+
+        }
+
+    } catch (error) {
+
+        console.warn(
+            "[CONNECTA NOTIFICATIONS] Public profile lookup failed:",
+            error
+        );
+
+    }
+
+
+    /*
+     * =====================================================
+     * 6. FALLBACK TO USERS COLLECTION
+     *
+     * This is especially important for users who don't
+     * yet have a publicProfiles document.
+     * =====================================================
+     */
+
+    try {
+
+        const userRef =
+            doc(
+                db,
+                "users",
+                senderId
+            );
+
+
+        const userSnapshot =
+            await getDoc(
+                userRef
+            );
+
+
+        if (
+            userSnapshot.exists()
+        ) {
+
+            const user =
+                userSnapshot.data();
+
+
+            /*
+             * Display name.
+             */
+
+            const userDisplayName =
+                String(
+                    user.displayName ||
+                    user.fullName ||
+                    user.name ||
+                    ""
+                ).trim();
+
+
+            if (
+                userDisplayName &&
+                !invalidNames.has(
+                    userDisplayName
+                )
+            ) {
+
+                return userDisplayName;
+
+            }
+
+
+            /*
+             * First + last name.
+             */
+
+            const userFirstName =
+                String(
+                    user.firstName || ""
+                ).trim();
+
+
+            const userLastName =
+                String(
+                    user.lastName || ""
+                ).trim();
+
+
+            const userFullName =
+                `${userFirstName} ${userLastName}`
+                    .trim();
+
+
+            if (
+                userFullName
+            ) {
+
+                return userFullName;
+
+            }
+
+
+            /*
+             * Username.
+             */
+
+            const username =
+                String(
+                    user.username || ""
+                )
+                    .trim()
+                    .replace(
+                        /^@/,
+                        ""
+                    );
+
+
+            if (username) {
+
+                return `@${username}`;
+
+            }
+
+        }
+
+    } catch (error) {
+
+        console.warn(
+            "[CONNECTA NOTIFICATIONS] User profile lookup failed:",
+            error
+        );
+
+    }
+
+
+    /*
+     * =====================================================
+     * 7. FINAL FALLBACK
+     * =====================================================
      */
 
     return "CONNECTA User";
