@@ -1,13 +1,27 @@
 /* =========================================================
    CONNECTA NOTIFICATION ENGINE
-   Version: 1.0
+   Version: 2.0
 
-   Safe standalone notification layer.
-   Does NOT modify:
+   Supports:
+   - Private chat messages
+   - Joined group messages
+   - In-app popup notifications
+   - Browser / Android notifications
+   - Cache-safe duplicate prevention
+   - Initial-message protection
+   - Private chat navigation
+   - Group chat navigation
+
+   DOES NOT MODIFY:
    - chat.js
    - group-chat.js
    - dashboard.js
    - Firestore message structure
+========================================================= */
+
+
+/* =========================================================
+   FIREBASE
 ========================================================= */
 
 import {
@@ -15,11 +29,19 @@ import {
     db
 } from "./firebase.js";
 
+
+/* =========================================================
+   FIRESTORE
+========================================================= */
+
 import {
     collection,
+    doc,
+    getDocs,
+    onSnapshot,
     query,
     where,
-    onSnapshot
+    limit
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 
@@ -30,23 +52,31 @@ import {
 const NOTIFICATION_CONFIG = {
 
     /*
-     * How long the in-app popup remains visible.
+     * How long an in-app popup stays visible.
      */
-    popupDuration:
-        4500,
+    popupDuration: 4500,
 
     /*
-     * Prevent the same message from generating
-     * another notification.
+     * Maximum number of processed message IDs
+     * stored locally.
      */
-    processedLimit:
-        200,
+    processedLimit: 300,
 
     /*
-     * Storage key for processed messages.
+     * Maximum number of active conversation listeners.
+     */
+    maxPrivateConversations: 100,
+
+    /*
+     * Maximum number of joined groups.
+     */
+    maxGroups: 100,
+
+    /*
+     * Local storage key.
      */
     storageKey:
-        "connectaProcessedNotifications_v1"
+        "connectaProcessedNotifications_v2"
 
 };
 
@@ -57,13 +87,67 @@ const NOTIFICATION_CONFIG = {
 
 let currentUser = null;
 
-let stopPrivateMessages = null;
-
 let notificationStarted = false;
 
-let processedMessages = new Set();
+let processedMessages =
+    new Set();
 
-let notificationPermissionRequested = false;
+
+/*
+ * Private conversation listeners.
+ *
+ * chatId -> unsubscribe
+ */
+const privateConversationListeners =
+    new Map();
+
+
+/*
+ * Group message listeners.
+ *
+ * groupId -> unsubscribe
+ */
+const groupMessageListeners =
+    new Map();
+
+
+/*
+ * Prevent duplicate initialization.
+ */
+let stopPrivateChatsListener = null;
+
+let stopGroupsListener = null;
+
+
+/*
+ * Prevent the same conversation from being
+ * initialized multiple times at the same time.
+ */
+const initializingPrivateChats =
+    new Set();
+
+const initializingGroups =
+    new Set();
+
+
+/*
+ * Used to detect the first snapshot.
+ *
+ * Existing messages in the first snapshot
+ * must NOT create notifications.
+ */
+const initializedPrivateConversations =
+    new Set();
+
+const initializedGroups =
+    new Set();
+
+
+/*
+ * Permission request guard.
+ */
+let notificationPermissionRequested =
+    false;
 
 
 /* =========================================================
@@ -90,11 +174,22 @@ function escapeHtml(value) {
         .replace(
             /[&<>"']/g,
             character => ({
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#039;"
+
+                "&":
+                    "&amp;",
+
+                "<":
+                    "&lt;",
+
+                ">":
+                    "&gt;",
+
+                '"':
+                    "&quot;",
+
+                "'":
+                    "&#039;"
+
             }[character])
         );
 
@@ -102,7 +197,111 @@ function escapeHtml(value) {
 
 
 /* =========================================================
-   LOAD PROCESSED NOTIFICATIONS
+   TIMESTAMP HELPERS
+========================================================= */
+
+function timestampToMillis(value) {
+
+    if (!value) {
+
+        return 0;
+
+    }
+
+
+    if (
+        typeof value?.toMillis ===
+        "function"
+    ) {
+
+        return value.toMillis();
+
+    }
+
+
+    if (
+        typeof value?.toDate ===
+        "function"
+    ) {
+
+        const date =
+            value.toDate();
+
+        return date instanceof Date
+            ? date.getTime()
+            : 0;
+
+    }
+
+
+    if (
+        typeof value?.seconds ===
+        "number"
+    ) {
+
+        return (
+            value.seconds * 1000 +
+            Math.floor(
+                Number(
+                    value.nanoseconds || 0
+                ) / 1000000
+            )
+        );
+
+    }
+
+
+    if (
+        typeof value?._seconds ===
+        "number"
+    ) {
+
+        return (
+            value._seconds * 1000 +
+            Math.floor(
+                Number(
+                    value._nanoseconds || 0
+                ) / 1000000
+            )
+        );
+
+    }
+
+
+    if (
+        typeof value ===
+        "number"
+    ) {
+
+        return value;
+
+    }
+
+
+    if (
+        typeof value ===
+        "string"
+    ) {
+
+        const parsed =
+            new Date(value)
+                .getTime();
+
+
+        return Number.isNaN(parsed)
+            ? 0
+            : parsed;
+
+    }
+
+
+    return 0;
+
+}
+
+
+/* =========================================================
+   LOAD PROCESSED MESSAGE IDS
 ========================================================= */
 
 function loadProcessedNotifications() {
@@ -138,12 +337,16 @@ function loadProcessedNotifications() {
         processedMessages =
             new Set(
                 values
+                    .filter(Boolean)
+                    .slice(
+                        -NOTIFICATION_CONFIG.processedLimit
+                    )
             );
 
     } catch (error) {
 
         console.warn(
-            "CONNECTA notification history could not be loaded:",
+            "[CONNECTA NOTIFICATIONS] Could not load history:",
             error
         );
 
@@ -153,7 +356,7 @@ function loadProcessedNotifications() {
 
 
 /* =========================================================
-   SAVE PROCESSED NOTIFICATIONS
+   SAVE PROCESSED MESSAGE IDS
 ========================================================= */
 
 function saveProcessedNotifications() {
@@ -181,7 +384,7 @@ function saveProcessedNotifications() {
     } catch (error) {
 
         console.warn(
-            "CONNECTA notification history could not be saved:",
+            "[CONNECTA NOTIFICATIONS] Could not save history:",
             error
         );
 
@@ -195,10 +398,10 @@ function saveProcessedNotifications() {
 ========================================================= */
 
 function markMessageProcessed(
-    messageId
+    messageKey
 ) {
 
-    if (!messageId) {
+    if (!messageKey) {
 
         return;
 
@@ -206,13 +409,9 @@ function markMessageProcessed(
 
 
     processedMessages.add(
-        messageId
+        messageKey
     );
 
-
-    /*
-     * Keep the local set small.
-     */
 
     if (
         processedMessages.size >
@@ -241,6 +440,46 @@ function markMessageProcessed(
 
 
 /* =========================================================
+   MESSAGE KEY
+========================================================= */
+
+function getMessageKey(
+    type,
+    parentId,
+    messageId
+) {
+
+    return `${type}:${parentId}:${messageId}`;
+
+}
+
+
+/* =========================================================
+   SENDER NAME
+========================================================= */
+
+function getSenderName(
+    message
+) {
+
+    return (
+
+        message.senderName ||
+
+        message.senderDisplayName ||
+
+        message.displayName ||
+
+        message.senderFirstName ||
+
+        "CONNECTA User"
+
+    );
+
+}
+
+
+/* =========================================================
    MESSAGE PREVIEW
 ========================================================= */
 
@@ -248,10 +487,22 @@ function getMessagePreview(
     message
 ) {
 
+    const type =
+        String(
+            message.type || ""
+        )
+            .toLowerCase();
+
+
     if (
-        message.type === "image" ||
+        type === "image" ||
+
+        message.imageURL ||
+
         message.imageUrl ||
+
         message.photoURL ||
+
         message.photoUrl
     ) {
 
@@ -262,8 +513,11 @@ function getMessagePreview(
 
     const text =
         String(
-            message.text || ""
-        ).trim();
+            message.text ||
+            message.message ||
+            ""
+        )
+            .trim();
 
 
     if (!text) {
@@ -273,9 +527,9 @@ function getMessagePreview(
     }
 
 
-    return text.length > 90
+    return text.length > 100
 
-        ? `${text.slice(0, 87)}...`
+        ? `${text.slice(0, 97)}...`
 
         : text;
 
@@ -283,25 +537,31 @@ function getMessagePreview(
 
 
 /* =========================================================
-   GET SENDER NAME
+   GROUP NAME
 ========================================================= */
 
-function getSenderName(
+function getGroupName(
+    group,
     message
 ) {
 
     return (
-        message.senderName ||
-        message.displayName ||
-        message.senderDisplayName ||
-        "CONNECTA User"
+
+        group?.name ||
+
+        message.groupName ||
+
+        message.groupTitle ||
+
+        "CONNECTA Group"
+
     );
 
 }
 
 
 /* =========================================================
-   CREATE NOTIFICATION CONTAINER
+   ENSURE POPUP CONTAINER
 ========================================================= */
 
 function ensureNotificationContainer() {
@@ -335,25 +595,37 @@ function ensureNotificationContainer() {
 
     container.setAttribute(
         "aria-atomic",
-        "true"
+        "false"
     );
 
 
     container.style.cssText = `
-        position: fixed;
-        top: calc(
-            14px +
-            env(safe-area-inset-top, 0px)
-        );
-        left: 12px;
-        right: 12px;
-        z-index: 999999;
 
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        position:fixed;
 
-        pointer-events: none;
+        top:
+            calc(
+                14px +
+                env(
+                    safe-area-inset-top,
+                    0px
+                )
+            );
+
+        left:12px;
+
+        right:12px;
+
+        z-index:999999;
+
+        display:flex;
+
+        flex-direction:column;
+
+        gap:8px;
+
+        pointer-events:none;
+
     `;
 
 
@@ -368,7 +640,104 @@ function ensureNotificationContainer() {
 
 
 /* =========================================================
-   SHOW IN-APP POPUP
+   NOTIFICATION STYLES
+========================================================= */
+
+function installNotificationStyles() {
+
+    if (
+        $("connectaNotificationStyles")
+    ) {
+
+        return;
+
+    }
+
+
+    const style =
+        document.createElement(
+            "style"
+        );
+
+
+    style.id =
+        "connectaNotificationStyles";
+
+
+    style.textContent = `
+
+        @keyframes connectaNotificationIn {
+
+            from {
+
+                opacity:0;
+
+                transform:
+                    translateY(-14px)
+                    scale(.97);
+
+            }
+
+            to {
+
+                opacity:1;
+
+                transform:
+                    translateY(0)
+                    scale(1);
+
+            }
+
+        }
+
+
+        @keyframes connectaNotificationOut {
+
+            from {
+
+                opacity:1;
+
+                transform:
+                    translateY(0);
+
+            }
+
+            to {
+
+                opacity:0;
+
+                transform:
+                    translateY(-10px);
+
+            }
+
+        }
+
+
+        .connecta-message-notification {
+
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                Roboto,
+                Arial,
+                sans-serif;
+
+        }
+
+    `;
+
+
+    document.head.appendChild(
+        style
+    );
+
+}
+
+
+/* =========================================================
+   SHOW IN-APP NOTIFICATION
 ========================================================= */
 
 function showInAppNotification(
@@ -377,6 +746,11 @@ function showInAppNotification(
 
     const container =
         ensureNotificationContainer();
+
+
+    const isGroup =
+        message.notificationType ===
+        "group";
 
 
     const senderName =
@@ -389,6 +763,23 @@ function showInAppNotification(
         getMessagePreview(
             message
         );
+
+
+    const title =
+        isGroup
+
+            ? getGroupName(
+                message.group,
+                message
+            )
+
+            : senderName;
+
+
+    const subtitle =
+        isGroup
+            ? senderName
+            : "New message";
 
 
     const notification =
@@ -406,36 +797,57 @@ function showInAppNotification(
 
 
     notification.style.cssText = `
-        width: 100%;
-        max-width: 430px;
-        margin: 0 auto;
 
-        display: flex;
-        align-items: center;
-        gap: 11px;
+        width:100%;
 
-        padding: 12px 14px;
+        max-width:430px;
 
-        border: 0;
-        border-radius: 17px;
+        margin:0 auto;
 
-        background: #ffffff;
-        color: #17211b;
+        display:flex;
+
+        align-items:center;
+
+        gap:11px;
+
+        padding:12px 14px;
+
+        border:0;
+
+        border-radius:17px;
+
+        background:#ffffff;
+
+        color:#17211b;
 
         box-shadow:
             0 10px 35px
             rgba(0,0,0,.18);
 
-        text-align: left;
+        text-align:left;
 
-        cursor: pointer;
+        cursor:pointer;
 
-        pointer-events: auto;
+        pointer-events:auto;
 
         animation:
             connectaNotificationIn
-            .25s ease-out;
+            .25s
+            ease-out;
+
     `;
+
+
+    const icon =
+        isGroup
+            ? "👥"
+            : "💬";
+
+
+    const iconBackground =
+        isGroup
+            ? "#ecfdf3"
+            : "#e8f8ed";
 
 
     notification.innerHTML = `
@@ -445,21 +857,17 @@ function showInAppNotification(
                 width:43px;
                 height:43px;
                 min-width:43px;
-
                 border-radius:50%;
-
                 display:flex;
                 align-items:center;
                 justify-content:center;
-
-                background:#e8f8ed;
+                background:${iconBackground};
                 color:#16a34a;
-
                 font-size:19px;
                 font-weight:800;
             "
         >
-            💬
+            ${icon}
         </div>
 
 
@@ -488,15 +896,17 @@ function showInAppNotification(
                     "
                 >
                     ${escapeHtml(
-                        senderName
+                        title
                     )}
                 </strong>
+
 
                 <span
                     style="
                         font-size:10px;
                         color:#22c55e;
                         font-weight:800;
+                        flex-shrink:0;
                     "
                 >
                     NEW
@@ -505,12 +915,35 @@ function showInAppNotification(
             </div>
 
 
+            ${
+                isGroup
+
+                    ? `
+
+                        <div
+                            style="
+                                font-size:10px;
+                                color:#16a34a;
+                                font-weight:700;
+                                margin-bottom:2px;
+                            "
+                        >
+                            ${escapeHtml(
+                                subtitle
+                            )}
+                        </div>
+
+                      `
+
+                    : ""
+            }
+
+
             <div
                 style="
                     font-size:12px;
                     line-height:1.4;
                     color:#66736b;
-
                     white-space:nowrap;
                     overflow:hidden;
                     text-overflow:ellipsis;
@@ -532,28 +965,43 @@ function showInAppNotification(
             "
         >
             ›
+
         </span>
 
     `;
 
-
-    /*
-     * Open the appropriate private chat.
-     */
 
     notification.addEventListener(
         "click",
         () => {
 
             if (
-                message.senderId &&
-                currentUser
+                isGroup
             ) {
 
-                location.href =
-                    `chat.html?uid=${encodeURIComponent(
-                        message.senderId
-                    )}`;
+                if (
+                    message.groupId
+                ) {
+
+                    location.href =
+                        `group-chat.html?groupId=${encodeURIComponent(
+                            message.groupId
+                        )}`;
+
+                }
+
+            } else {
+
+                if (
+                    message.senderId
+                ) {
+
+                    location.href =
+                        `chat.html?uid=${encodeURIComponent(
+                            message.senderId
+                        )}`;
+
+                }
 
             }
 
@@ -570,7 +1018,8 @@ function showInAppNotification(
 
 
     /*
-     * Maximum of 3 simultaneous popups.
+     * Maximum three simultaneous
+     * notifications.
      */
 
     while (
@@ -578,7 +1027,8 @@ function showInAppNotification(
         3
     ) {
 
-        container.lastElementChild?.remove();
+        container.lastElementChild
+            ?.remove();
 
     }
 
@@ -587,23 +1037,26 @@ function showInAppNotification(
         () => {
 
             if (
-                notification.isConnected
+                !notification.isConnected
             ) {
 
-                notification.style.animation =
-                    "connectaNotificationOut .2s ease-in forwards";
-
-
-                setTimeout(
-                    () => {
-
-                        notification.remove();
-
-                    },
-                    220
-                );
+                return;
 
             }
+
+
+            notification.style.animation =
+                "connectaNotificationOut .2s ease-in forwards";
+
+
+            setTimeout(
+                () => {
+
+                    notification.remove();
+
+                },
+                220
+            );
 
         },
         NOTIFICATION_CONFIG.popupDuration
@@ -619,14 +1072,6 @@ function showInAppNotification(
 function showBrowserNotification(
     message
 ) {
-
-    /*
-     * Browser notifications only work when:
-     *
-     * - Notification API exists
-     * - permission has been granted
-     * - page is not currently the active page
-     */
 
     if (
         !("Notification" in window)
@@ -648,10 +1093,8 @@ function showBrowserNotification(
 
 
     /*
-     * Don't create an OS notification while the
-     * user is actively looking at CONNECTA.
-     *
-     * The in-app popup is enough in that situation.
+     * If CONNECTA is currently visible,
+     * the in-app popup is enough.
      */
 
     if (
@@ -664,30 +1107,56 @@ function showBrowserNotification(
     }
 
 
+    const isGroup =
+        message.notificationType ===
+        "group";
+
+
     const senderName =
         getSenderName(
             message
         );
 
 
-    const preview =
-        getMessagePreview(
+    const groupName =
+        getGroupName(
+            message.group,
             message
         );
+
+
+    const title =
+        isGroup
+
+            ? `CONNECTA • ${groupName}`
+
+            : `CONNECTA • ${senderName}`;
+
+
+    const preview =
+        isGroup
+
+            ? `${senderName}: ${getMessagePreview(
+                message
+            )}`
+
+            : getMessagePreview(
+                message
+            );
 
 
     try {
 
         const notification =
             new Notification(
-                `CONNECTA • ${senderName}`,
+                title,
                 {
 
                     body:
                         preview,
 
                     tag:
-                        `connecta-message-${message.id}`,
+                        `connecta-${message.notificationType}-${message.parentId}-${message.id}`,
 
                     icon:
                         "/connecta-icon-192.png",
@@ -697,8 +1166,14 @@ function showBrowserNotification(
 
                     data: {
 
+                        type:
+                            message.notificationType,
+
                         uid:
-                            message.senderId
+                            message.senderId || "",
+
+                        groupId:
+                            message.groupId || ""
 
                     }
 
@@ -713,13 +1188,33 @@ function showBrowserNotification(
 
 
                 if (
-                    message.senderId
+                    message.notificationType ===
+                    "group"
                 ) {
 
-                    location.href =
-                        `chat.html?uid=${encodeURIComponent(
-                            message.senderId
-                        )}`;
+                    if (
+                        message.groupId
+                    ) {
+
+                        location.href =
+                            `group-chat.html?groupId=${encodeURIComponent(
+                                message.groupId
+                            )}`;
+
+                    }
+
+                } else {
+
+                    if (
+                        message.senderId
+                    ) {
+
+                        location.href =
+                            `chat.html?uid=${encodeURIComponent(
+                                message.senderId
+                            )}`;
+
+                    }
 
                 }
 
@@ -731,7 +1226,7 @@ function showBrowserNotification(
     } catch (error) {
 
         console.warn(
-            "CONNECTA browser notification failed:",
+            "[CONNECTA NOTIFICATIONS] Browser notification failed:",
             error
         );
 
@@ -741,55 +1236,7 @@ function showBrowserNotification(
 
 
 /* =========================================================
-   REQUEST NOTIFICATION PERMISSION
-========================================================= */
-
-async function requestNotificationPermission() {
-
-    if (
-        notificationPermissionRequested
-    ) {
-
-        return;
-
-    }
-
-
-    notificationPermissionRequested =
-        true;
-
-
-    if (
-        !("Notification" in window)
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        Notification.permission !==
-        "default"
-    ) {
-
-        return;
-
-    }
-
-
-    /*
-     * We intentionally do not force the permission
-     * request immediately on page load.
-     *
-     * Call this from a user interaction later.
-     */
-
-}
-
-
-/* =========================================================
-   PROCESS NEW MESSAGE
+   PROCESS INCOMING MESSAGE
 ========================================================= */
 
 function processIncomingMessage(
@@ -808,26 +1255,15 @@ function processIncomingMessage(
 
 
     /*
-     * Never notify the sender about their own message.
+     * Never notify yourself.
      */
 
     if (
-        message.senderId ===
-        currentUser.uid
-    ) {
-
-        return;
-
-    }
-
-
-    /*
-     * Already processed.
-     */
-
-    if (
-        processedMessages.has(
-            message.id
+        String(
+            message.senderId || ""
+        ) ===
+        String(
+            currentUser.uid
         )
     ) {
 
@@ -837,14 +1273,33 @@ function processIncomingMessage(
 
 
     /*
-     * Only notify messages addressed to
-     * the current user.
+     * Build a unique notification key.
+     */
+
+    const messageKey =
+        getMessageKey(
+
+            message.notificationType ||
+                "private",
+
+            message.parentId ||
+                message.chatId ||
+                message.groupId ||
+                "",
+
+            message.id
+
+        );
+
+
+    /*
+     * Already handled.
      */
 
     if (
-        message.receiverId &&
-        message.receiverId !==
-        currentUser.uid
+        processedMessages.has(
+            messageKey
+        )
     ) {
 
         return;
@@ -852,8 +1307,15 @@ function processIncomingMessage(
     }
 
 
+    /*
+     * Mark BEFORE showing the notification.
+     *
+     * This prevents duplicate notifications if
+     * multiple realtime events arrive quickly.
+     */
+
     markMessageProcessed(
-        message.id
+        messageKey
     );
 
 
@@ -870,121 +1332,19 @@ function processIncomingMessage(
 
 
 /* =========================================================
-   LISTEN TO PRIVATE MESSAGES
+   PRIVATE CHAT MESSAGE LISTENER
 ========================================================= */
 
-function listenToPrivateMessages() {
-
-    if (
-        !currentUser
-    ) {
-
-        return;
-
-    }
-
-
-    if (
-        stopPrivateMessages
-    ) {
-
-        stopPrivateMessages();
-
-        stopPrivateMessages =
-            null;
-
-    }
-
-
-    /*
-     * Listen only to chats where the current user
-     * participates.
-     *
-     * This does NOT read every chat on CONNECTA.
-     */
-
-    const chatsQuery =
-        query(
-
-            collection(
-                db,
-                "chats"
-            ),
-
-            where(
-                "participants",
-                "array-contains",
-                currentUser.uid
-            )
-
-        );
-
-
-    stopPrivateMessages =
-        onSnapshot(
-
-            chatsQuery,
-
-            snapshot => {
-
-                snapshot.docChanges()
-                    .forEach(
-                        change => {
-
-                            /*
-                             * Only process newly-created
-                             * chat documents here.
-                             *
-                             * Actual message notifications
-                             * are handled below through
-                             * each conversation listener.
-                             */
-
-                            if (
-                                change.type ===
-                                "added"
-                            ) {
-
-                                listenToConversation(
-                                    change.doc.id
-                                );
-
-                            }
-
-                        }
-                    );
-
-            },
-
-            error => {
-
-                console.warn(
-                    "CONNECTA notification chat listener failed:",
-                    error
-                );
-
-            }
-
-        );
-
-}
-
-
-/* =========================================================
-   CONVERSATION MESSAGE LISTENERS
-========================================================= */
-
-const conversationListeners =
-    new Map();
-
-
-function listenToConversation(
+function listenToPrivateConversation(
     chatId
 ) {
 
     if (
         !chatId ||
-        conversationListeners.has(
+        privateConversationListeners.has(
+            chatId
+        ) ||
+        initializingPrivateChats.has(
             chatId
         )
     ) {
@@ -992,6 +1352,11 @@ function listenToConversation(
         return;
 
     }
+
+
+    initializingPrivateChats.add(
+        chatId
+    );
 
 
     const messagesRef =
@@ -1005,8 +1370,13 @@ function listenToConversation(
 
     const messagesQuery =
         query(
-            messagesRef
+            messagesRef,
+            limit(100)
         );
+
+
+    let firstSnapshot =
+        true;
 
 
     const unsubscribe =
@@ -1015,6 +1385,65 @@ function listenToConversation(
             messagesQuery,
 
             snapshot => {
+
+                /*
+                 * FIRST SNAPSHOT
+                 *
+                 * These messages already existed
+                 * before the notification listener
+                 * started.
+                 *
+                 * Mark them processed without
+                 * notifying.
+                 */
+
+                if (firstSnapshot) {
+
+                    snapshot.docs.forEach(
+                        messageDoc => {
+
+                            const data =
+                                messageDoc.data();
+
+
+                            const messageKey =
+                                getMessageKey(
+
+                                    "private",
+
+                                    chatId,
+
+                                    messageDoc.id
+
+                                );
+
+
+                            processedMessages.add(
+                                messageKey
+                            );
+
+                        }
+                    );
+
+
+                    firstSnapshot =
+                        false;
+
+
+                    initializedPrivateConversations
+                        .add(chatId);
+
+
+                    /*
+                     * Keep local storage updated.
+                     */
+
+                    saveProcessedNotifications();
+
+                    return;
+
+                }
+
 
                 snapshot.docChanges()
                     .forEach(
@@ -1030,17 +1459,26 @@ function listenToConversation(
                             }
 
 
-                            processIncomingMessage(
-                                {
-                                    id:
-                                        change.doc.id,
+                            const data =
+                                change.doc.data();
 
+
+                            processIncomingMessage({
+
+                                notificationType:
+                                    "private",
+
+                                parentId:
                                     chatId,
 
-                                    ...change.doc.data()
+                                chatId,
 
-                                }
-                            );
+                                id:
+                                    change.doc.id,
+
+                                ...data
+
+                            });
 
                         }
                     );
@@ -1050,7 +1488,632 @@ function listenToConversation(
             error => {
 
                 console.warn(
-                    "CONNECTA conversation notification listener failed:",
+                    "[CONNECTA NOTIFICATIONS] Private conversation listener failed:",
+                    chatId,
+                    error
+                );
+
+
+                initializingPrivateChats
+                    .delete(chatId);
+
+            }
+
+        );
+
+
+    privateConversationListeners.set(
+        chatId,
+        unsubscribe
+    );
+
+
+    initializingPrivateChats
+        .delete(chatId);
+
+}
+
+
+/* =========================================================
+   PRIVATE CHAT LISTENER
+========================================================= */
+
+function listenToPrivateChats() {
+
+    if (
+        !currentUser
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        stopPrivateChatsListener
+    ) {
+
+        stopPrivateChatsListener();
+
+        stopPrivateChatsListener =
+            null;
+
+    }
+
+
+    const chatsQuery =
+        query(
+
+            collection(
+                db,
+                "chats"
+            ),
+
+            where(
+                "participants",
+                "array-contains",
+                currentUser.uid
+            ),
+
+            limit(
+                NOTIFICATION_CONFIG
+                    .maxPrivateConversations
+            )
+
+        );
+
+
+    stopPrivateChatsListener =
+        onSnapshot(
+
+            chatsQuery,
+
+            snapshot => {
+
+                snapshot.docs.forEach(
+                    chatDoc => {
+
+                        listenToPrivateConversation(
+                            chatDoc.id
+                        );
+
+                    }
+                );
+
+            },
+
+            error => {
+
+                console.warn(
+                    "[CONNECTA NOTIFICATIONS] Private chats listener failed:",
+                    error
+                );
+
+            }
+
+        );
+
+}
+
+
+/* =========================================================
+   GROUP MESSAGE LISTENER
+========================================================= */
+
+function listenToGroupMessages(
+    groupId,
+    groupData = {}
+) {
+
+    if (
+        !groupId ||
+        groupMessageListeners.has(
+            groupId
+        ) ||
+        initializingGroups.has(
+            groupId
+        )
+    ) {
+
+        return;
+
+    }
+
+
+    /*
+     * Make sure the current user is actually
+     * a member of this group.
+     */
+
+    const memberIds =
+        Array.isArray(
+            groupData.memberIds
+        )
+            ? groupData.memberIds
+            : [];
+
+
+    const members =
+        Array.isArray(
+            groupData.members
+        )
+            ? groupData.members
+            : [];
+
+
+    const isOwner =
+        String(
+            groupData.ownerId || ""
+        ) ===
+        String(
+            currentUser?.uid || ""
+        );
+
+
+    const isMember =
+        memberIds.includes(
+            currentUser.uid
+        ) ||
+
+        members.includes(
+            currentUser.uid
+        ) ||
+
+        isOwner;
+
+
+    if (!isMember) {
+
+        return;
+
+    }
+
+
+    initializingGroups.add(
+        groupId
+    );
+
+
+    const messagesRef =
+        collection(
+            db,
+            "groups",
+            groupId,
+            "groupMessages"
+        );
+
+
+    const messagesQuery =
+        query(
+            messagesRef,
+            limit(100)
+        );
+
+
+    let firstSnapshot =
+        true;
+
+
+    const unsubscribe =
+        onSnapshot(
+
+            messagesQuery,
+
+            snapshot => {
+
+                /*
+                 * FIRST SNAPSHOT:
+                 *
+                 * Mark existing messages as
+                 * already seen.
+                 */
+
+                if (firstSnapshot) {
+
+                    snapshot.docs.forEach(
+                        messageDoc => {
+
+                            const messageKey =
+                                getMessageKey(
+
+                                    "group",
+
+                                    groupId,
+
+                                    messageDoc.id
+
+                                );
+
+
+                            processedMessages.add(
+                                messageKey
+                            );
+
+                        }
+                    );
+
+
+                    firstSnapshot =
+                        false;
+
+
+                    initializedGroups
+                        .add(groupId);
+
+
+                    saveProcessedNotifications();
+
+                    return;
+
+                }
+
+
+                snapshot.docChanges()
+                    .forEach(
+                        change => {
+
+                            if (
+                                change.type !==
+                                "added"
+                            ) {
+
+                                return;
+
+                            }
+
+
+                            const data =
+                                change.doc.data();
+
+
+                            processIncomingMessage({
+
+                                notificationType:
+                                    "group",
+
+                                parentId:
+                                    groupId,
+
+                                groupId,
+
+                                group:
+                                    groupData,
+
+                                id:
+                                    change.doc.id,
+
+                                ...data
+
+                            });
+
+                        }
+                    );
+
+            },
+
+            error => {
+
+                console.warn(
+                    "[CONNECTA NOTIFICATIONS] Group listener failed:",
+                    groupId,
+                    error
+                );
+
+
+                initializingGroups
+                    .delete(groupId);
+
+            }
+
+        );
+
+
+    groupMessageListeners.set(
+        groupId,
+        unsubscribe
+    );
+
+
+    initializingGroups
+        .delete(groupId);
+
+}
+
+
+/* =========================================================
+   LOAD JOINED GROUPS
+========================================================= */
+
+async function loadJoinedGroups() {
+
+    if (
+        !currentUser
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        const groupsRef =
+            collection(
+                db,
+                "groups"
+            );
+
+
+        /*
+         * Groups using memberIds.
+         */
+
+        const memberIdsQuery =
+            query(
+
+                groupsRef,
+
+                where(
+                    "memberIds",
+                    "array-contains",
+                    currentUser.uid
+                ),
+
+                limit(
+                    NOTIFICATION_CONFIG
+                        .maxGroups
+                )
+
+            );
+
+
+        /*
+         * Older groups may use members.
+         */
+
+        const membersQuery =
+            query(
+
+                groupsRef,
+
+                where(
+                    "members",
+                    "array-contains",
+                    currentUser.uid
+                ),
+
+                limit(
+                    NOTIFICATION_CONFIG
+                        .maxGroups
+                )
+
+            );
+
+
+        const [
+            memberIdsSnapshot,
+            membersSnapshot
+        ] =
+            await Promise.allSettled([
+
+                getDocs(
+                    memberIdsQuery
+                ),
+
+                getDocs(
+                    membersQuery
+                )
+
+            ]);
+
+
+        const groups =
+            new Map();
+
+
+        if (
+            memberIdsSnapshot.status ===
+            "fulfilled"
+        ) {
+
+            memberIdsSnapshot.value.docs
+                .forEach(
+                    groupDoc => {
+
+                        groups.set(
+                            groupDoc.id,
+                            {
+
+                                groupId:
+                                    groupDoc.id,
+
+                                ...groupDoc.data()
+
+                            }
+                        );
+
+                    }
+                );
+
+        }
+
+
+        if (
+            membersSnapshot.status ===
+            "fulfilled"
+        ) {
+
+            membersSnapshot.value.docs
+                .forEach(
+                    groupDoc => {
+
+                        groups.set(
+                            groupDoc.id,
+                            {
+
+                                groupId:
+                                    groupDoc.id,
+
+                                ...groupDoc.data()
+
+                            }
+                        );
+
+                    }
+                );
+
+        }
+
+
+        /*
+         * Listen to every joined group.
+         */
+
+        groups.forEach(
+            group => {
+
+                listenToGroupMessages(
+
+                    group.groupId,
+
+                    group
+
+                );
+
+            }
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "[CONNECTA NOTIFICATIONS] Could not load joined groups:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   LIVE GROUP MEMBERSHIP LISTENER
+========================================================= */
+
+function listenToGroups() {
+
+    if (
+        !currentUser
+    ) {
+
+        return;
+
+    }
+
+
+    if (
+        stopGroupsListener
+    ) {
+
+        stopGroupsListener();
+
+        stopGroupsListener =
+            null;
+
+    }
+
+
+    const groupsRef =
+        collection(
+            db,
+            "groups"
+        );
+
+
+    const memberIdsQuery =
+        query(
+
+            groupsRef,
+
+            where(
+                "memberIds",
+                "array-contains",
+                currentUser.uid
+            ),
+
+            limit(
+                NOTIFICATION_CONFIG
+                    .maxGroups
+            )
+
+        );
+
+
+    const membersQuery =
+        query(
+
+            groupsRef,
+
+            where(
+                "members",
+                "array-contains",
+                currentUser.uid
+            ),
+
+            limit(
+                NOTIFICATION_CONFIG
+                    .maxGroups
+            )
+
+        );
+
+
+    let currentGroupIds =
+        new Set();
+
+
+    const handleGroupsSnapshot =
+        snapshot => {
+
+            snapshot.docs.forEach(
+                groupDoc => {
+
+                    const group = {
+
+                        groupId:
+                            groupDoc.id,
+
+                        ...groupDoc.data()
+
+                    };
+
+
+                    currentGroupIds.add(
+                        group.groupId
+                    );
+
+
+                    listenToGroupMessages(
+                        group.groupId,
+                        group
+                    );
+
+                }
+            );
+
+        };
+
+
+    const unsubscribeMemberIds =
+        onSnapshot(
+
+            memberIdsQuery,
+
+            handleGroupsSnapshot,
+
+            error => {
+
+                console.warn(
+                    "[CONNECTA NOTIFICATIONS] memberIds group listener failed:",
                     error
                 );
 
@@ -1059,16 +2122,122 @@ function listenToConversation(
         );
 
 
-    conversationListeners.set(
-        chatId,
-        unsubscribe
-    );
+    const unsubscribeMembers =
+        onSnapshot(
+
+            membersQuery,
+
+            handleGroupsSnapshot,
+
+            error => {
+
+                console.warn(
+                    "[CONNECTA NOTIFICATIONS] members group listener failed:",
+                    error
+                );
+
+            }
+
+        );
+
+
+    /*
+     * We keep both listeners under one cleanup
+     * function.
+     */
+
+    stopGroupsListener =
+        () => {
+
+            try {
+
+                unsubscribeMemberIds();
+
+            } catch {
+
+                // Ignore cleanup errors.
+
+            }
+
+
+            try {
+
+                unsubscribeMembers();
+
+            } catch {
+
+                // Ignore cleanup errors.
+
+            }
+
+        };
 
 }
 
 
 /* =========================================================
-   START NOTIFICATIONS
+   REQUEST BROWSER NOTIFICATION PERMISSION
+========================================================= */
+
+async function requestNotificationPermission() {
+
+    if (
+        notificationPermissionRequested
+    ) {
+
+        return Notification.permission;
+
+    }
+
+
+    notificationPermissionRequested =
+        true;
+
+
+    if (
+        !("Notification" in window)
+    ) {
+
+        return "unsupported";
+
+    }
+
+
+    if (
+        Notification.permission ===
+        "default"
+    ) {
+
+        try {
+
+            const permission =
+                await Notification.requestPermission();
+
+
+            return permission;
+
+        } catch (error) {
+
+            console.warn(
+                "[CONNECTA NOTIFICATIONS] Permission request failed:",
+                error
+            );
+
+
+            return Notification.permission;
+
+        }
+
+    }
+
+
+    return Notification.permission;
+
+}
+
+
+/* =========================================================
+   START ENGINE
 ========================================================= */
 
 async function startConnectaNotifications() {
@@ -1102,155 +2271,200 @@ async function startConnectaNotifications() {
     loadProcessedNotifications();
 
 
-    /*
-     * Add notification animations once.
-     */
-
-    if (
-        !document.getElementById(
-            "connectaNotificationStyles"
-        )
-    ) {
-
-        const style =
-            document.createElement(
-                "style"
-            );
-
-
-        style.id =
-            "connectaNotificationStyles";
-
-
-        style.textContent = `
-
-            @keyframes connectaNotificationIn {
-
-                from {
-                    opacity:0;
-                    transform:
-                        translateY(-12px)
-                        scale(.98);
-                }
-
-                to {
-                    opacity:1;
-                    transform:
-                        translateY(0)
-                        scale(1);
-                }
-
-            }
-
-
-            @keyframes connectaNotificationOut {
-
-                from {
-                    opacity:1;
-                    transform:
-                        translateY(0);
-                    }
-                
-                to {
-                    opacity:0;
-                    transform:
-                        translateY(-8px);
-                }
-
-            }
-
-        `;
-
-
-        document.head.appendChild(
-            style
-        );
-
-    }
+    installNotificationStyles();
 
 
     /*
-     * Start listening for chats belonging
-     * to the current user.
+     * Start private chat monitoring.
      */
 
-    listenToPrivateMessages();
+    listenToPrivateChats();
+
+
+    /*
+     * Start joined group monitoring.
+     */
+
+    listenToGroups();
+
+
+    /*
+     * Also load groups once immediately.
+     *
+     * This helps when a group listener has not
+     * delivered its first snapshot yet.
+     */
+
+    loadJoinedGroups();
+
+
+    console.log(
+        "[CONNECTA NOTIFICATIONS] Started for:",
+        currentUser.uid
+    );
 
 }
 
 
 /* =========================================================
-   AUTH START
+   STOP ENGINE
 ========================================================= */
 
-const unsubscribeAuth =
-    auth.onAuthStateChanged(
-        user => {
+function stopConnectaNotifications() {
 
-            if (!user) {
+    /*
+     * Private chats.
+     */
 
-                notificationStarted =
-                    false;
+    if (
+        stopPrivateChatsListener
+    ) {
 
-                currentUser =
-                    null;
+        try {
 
-                if (
-                    stopPrivateMessages
-                ) {
+            stopPrivateChatsListener();
 
-                    stopPrivateMessages();
+        } catch {
 
-                    stopPrivateMessages =
-                        null;
+            // Ignore cleanup errors.
+
+        }
+
+
+        stopPrivateChatsListener =
+            null;
+
+    }
+
+
+    privateConversationListeners
+        .forEach(
+            unsubscribe => {
+
+                try {
+
+                    unsubscribe();
+
+                } catch {
+
+                    // Ignore cleanup errors.
 
                 }
 
-
-                conversationListeners
-                    .forEach(
-                        unsubscribe => {
-
-                            try {
-
-                                unsubscribe();
-
-                            } catch {
-
-                                // Ignore cleanup errors.
-
-                            }
-
-                        }
-                    );
-
-
-                conversationListeners.clear();
-
-
-                return;
-
             }
+        );
 
 
-            currentUser =
-                user;
+    privateConversationListeners.clear();
 
 
-            startConnectaNotifications();
+    /*
+     * Groups.
+     */
+
+    if (
+        stopGroupsListener
+    ) {
+
+        try {
+
+            stopGroupsListener();
+
+        } catch {
+
+            // Ignore cleanup errors.
 
         }
-    );
+
+
+        stopGroupsListener =
+            null;
+
+    }
+
+
+    groupMessageListeners
+        .forEach(
+            unsubscribe => {
+
+                try {
+
+                    unsubscribe();
+
+                } catch {
+
+                    // Ignore cleanup errors.
+
+                }
+
+            }
+        );
+
+
+    groupMessageListeners.clear();
+
+
+    initializingPrivateChats.clear();
+    initializingGroups.clear();
+
+    initializedPrivateConversations.clear();
+    initializedGroups.clear();
+
+
+    notificationStarted =
+        false;
+
+}
 
 
 /* =========================================================
-   OPTIONAL PUBLIC API
+   AUTH
+========================================================= */
+
+auth.onAuthStateChanged(
+    user => {
+
+        /*
+         * Logged out.
+         */
+
+        if (!user) {
+
+            stopConnectaNotifications();
+
+            currentUser =
+                null;
+
+            return;
+
+        }
+
+
+        /*
+         * Logged in.
+         */
+
+        currentUser =
+            user;
+
+
+        startConnectaNotifications();
+
+    }
+);
+
+
+/* =========================================================
+   PUBLIC API
 ========================================================= */
 
 window.CONNECTA_NOTIFICATIONS = {
 
     start:
         startConnectaNotifications,
+
+    stop:
+        stopConnectaNotifications,
 
     requestPermission:
         requestNotificationPermission
