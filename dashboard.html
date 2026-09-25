@@ -353,6 +353,11 @@
   📱 <span>Install CONNECTA App</span>
 </a>
 
+<!-- FCM NOTIFICATIONS -->
+<a href="#" id="enableConnectaNotifications">
+  🔔 <span>Enable Notifications</span>
+</a>
+
 <a href="#" data-coming="Settings">
   ⚙️ <span>Settings</span>
 </a>
@@ -702,6 +707,11 @@
 
 <script
     type="module"
+    src="js/connectaPushNotifications.js"
+></script>
+
+<script
+    type="module"
     src="js/dashboard.js"
 ></script>
 
@@ -938,6 +948,132 @@
   );
 
 }
+
+  /* =========================================================
+     CONNECTA FCM NOTIFICATION BUTTON
+  ========================================================= */
+
+  const enableConnectaNotifications =
+    document.getElementById(
+      "enableConnectaNotifications"
+    );
+
+
+  if (enableConnectaNotifications) {
+
+    enableConnectaNotifications.addEventListener(
+      "click",
+      async (event) => {
+
+        event.preventDefault();
+
+
+        /*
+         * Make sure the FCM module has loaded.
+         */
+
+        if (
+          !window.CONNECTA_PUSH ||
+          typeof window.CONNECTA_PUSH.enable !== "function"
+        ) {
+
+          alert(
+            "CONNECTA notifications are still loading. " +
+            "Please try again in a moment."
+          );
+
+          return;
+
+        }
+
+
+        /*
+         * Enable notifications.
+         */
+
+        try {
+
+          const result =
+            await window.CONNECTA_PUSH.enable();
+
+
+          if (
+            result &&
+            result.success
+          ) {
+
+            alert(
+              "🔔 Notifications enabled successfully!\n\n" +
+              "You can now receive CONNECTA notifications " +
+              "even when CONNECTA is not open."
+            );
+
+
+            /*
+             * Change button text.
+             */
+
+            enableConnectaNotifications.innerHTML =
+              "✅ <span>Notifications Enabled</span>";
+
+
+            enableConnectaNotifications.style.pointerEvents =
+              "none";
+
+
+            return;
+
+          }
+
+
+          /*
+           * Permission denied.
+           */
+
+          if (
+            result &&
+            result.reason === "denied"
+          ) {
+
+            alert(
+              "Notifications are blocked for CONNECTA.\n\n" +
+              "Please open your browser/site notification " +
+              "settings and allow notifications for dollachat.com."
+            );
+
+            return;
+
+          }
+
+
+          /*
+           * Other failure.
+           */
+
+          alert(
+            "CONNECTA could not enable notifications yet.\n\n" +
+            "Please check your internet connection and try again."
+          );
+
+        } catch (error) {
+
+          console.error(
+            "[CONNECTA] Enable notification error:",
+            error
+          );
+
+
+          alert(
+            "Something went wrong while enabling notifications.\n\n" +
+            "Please try again."
+          );
+
+        }
+
+      }
+    );
+
+  }
 
 
     /*
