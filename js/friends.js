@@ -1,5 +1,5 @@
 /* =========================================================
-   CONNECTA — GLOBAL CHAT / MEET & CHAT
+   CONNECTA — GLOBAL MEET
    friends.js
 ========================================================= */
 
@@ -24,44 +24,69 @@ import {
 
 
 /* =========================================================
-   CONFIG
+   CONFIGURATION
 ========================================================= */
 
 const BACKEND_URL =
   "https://connecta-backend-com.onrender.com";
 
-const GLOBAL_CHAT_PAYMENT_INITIATE =
-  `${BACKEND_URL}/api/global-chat/payment/initiate`;
 
-const GLOBAL_CHAT_PAYMENT_STATUS =
-  `${BACKEND_URL}/api/global-chat/payment/status`;
+/*
+ * These endpoints will be implemented in the
+ * CONNECTA backend.
+ */
 
-const GLOBAL_CHAT_FEE = 20;
+const PAYMENT_INITIATE_URL =
+  `${BACKEND_URL}/api/global-meet/payment/initiate`;
+
+const PAYMENT_STATUS_URL =
+  `${BACKEND_URL}/api/global-meet/payment/status`;
 
 
 /*
- * Public profiles are used for discovery.
- *
- * Expected document:
- *
- * publicProfiles/{uid}
- *
- * {
- *   uid,
- *   displayName,
- *   username,
- *   photoURL,
- *   gender,
- *   country,
- *   isOnline,
- *   isVerified,
- *   globalChatEnabled,
- *   globalChatStatus,
- *   globalChatBio
- * }
+ * Global Meet connection fee.
  */
+
+const GLOBAL_MEET_FEE = 20;
+
+
+/*
+ * Public discovery collection.
+ *
+ * IMPORTANT:
+ * Do not use the private users collection for
+ * discovering other people's profiles.
+ */
+
 const PUBLIC_PROFILES_COLLECTION =
   "publicProfiles";
+
+
+/*
+ * Local cache.
+ */
+
+const PUBLIC_PROFILES_CACHE_KEY =
+  "connectaGlobalMeetProfiles_v1";
+
+
+const PUBLIC_PROFILES_CACHE_TIME_KEY =
+  "connectaGlobalMeetProfilesCacheTime_v1";
+
+
+const CURRENT_USER_CACHE_KEY =
+  "connectaCurrentUserProfile_v1";
+
+
+/*
+ * Cache lifetime.
+ *
+ * Cached profiles are displayed immediately.
+ * Firebase then refreshes them in realtime.
+ */
+
+const PROFILE_CACHE_MAX_AGE =
+  1000 * 60 * 30;
 
 
 /* =========================================================
@@ -69,10 +94,11 @@ const PUBLIC_PROFILES_COLLECTION =
 ========================================================= */
 
 let currentUser = null;
+
 let currentProfile = null;
 
 let allUsers = [];
-let followingUsers = [];
+
 let followerUsers = [];
 
 let activeTab = "discover";
@@ -83,20 +109,23 @@ let selectedGender = "everyone";
 
 let selectedCountry = "all";
 
+let selectedInterest = "all";
+
 let selectedChatUser = null;
 
 let unsubscribeUsers = null;
-let unsubscribeProfile = null;
 
-let toastTimer = null;
+let unsubscribeProfile = null;
 
 let paymentPollingTimer = null;
 
 let paymentInProgress = false;
 
+let toastTimer = null;
+
 
 /* =========================================================
-   ELEMENTS
+   DOM
 ========================================================= */
 
 const friendSearch =
@@ -104,95 +133,114 @@ const friendSearch =
     "friendSearch"
   );
 
+
 const discoverList =
   document.getElementById(
     "discoverList"
   );
 
-const followingList =
-  document.getElementById(
-    "followingList"
-  );
-
-const followersList =
-  document.getElementById(
-    "followersList"
-  );
 
 const discoverCount =
   document.getElementById(
     "discoverCount"
   );
 
+
+const followingList =
+  document.getElementById(
+    "followingList"
+  );
+
+
+const followersList =
+  document.getElementById(
+    "followersList"
+  );
+
+
 const followingListCount =
   document.getElementById(
     "followingListCount"
   );
+
 
 const followersListCount =
   document.getElementById(
     "followersListCount"
   );
 
+
 const followingCount =
   document.getElementById(
     "followingCount"
   );
+
 
 const followersCount =
   document.getElementById(
     "followersCount"
   );
 
+
 const toast =
   document.getElementById(
     "friendsToast"
   );
+
 
 const menuBtn =
   document.getElementById(
     "menuBtn"
   );
 
+
 const sideMenu =
   document.getElementById(
     "sideMenu"
   );
+
 
 const menuOverlay =
   document.getElementById(
     "menuOverlay"
   );
 
+
 const logoutBtn =
   document.getElementById(
     "logoutBtn"
   );
+
 
 const profileBtn =
   document.getElementById(
     "profileBtn"
   );
 
+
 const connectionBtn =
   document.getElementById(
     "connectionBtn"
   );
+
 
 const balanceAmount =
   document.getElementById(
     "balanceAmount"
   );
 
+
 const menuAvatar =
   document.getElementById(
     "menuAvatar"
   );
 
+
 const menuName =
   document.getElementById(
     "menuName"
   );
+
 
 const menuUsername =
   document.getElementById(
@@ -200,49 +248,71 @@ const menuUsername =
   );
 
 
-/* =========================================================
-   GLOBAL CHAT ELEMENTS
-========================================================= */
-
 const genderButtons =
   document.querySelectorAll(
     ".gender-btn"
   );
+
 
 const countryFilter =
   document.getElementById(
     "countryFilter"
   );
 
+
+const interestButtons =
+  document.querySelectorAll(
+    ".interest-btn"
+  );
+
+
 const paymentOverlay =
   document.getElementById(
     "chatPaymentOverlay"
   );
+
+
+const paymentForm =
+  document.getElementById(
+    "paymentForm"
+  );
+
+
+const paymentSuccess =
+  document.getElementById(
+    "paymentSuccess"
+  );
+
 
 const paymentAvatar =
   document.getElementById(
     "chatPaymentAvatar"
   );
 
+
 const paymentUserName =
   document.getElementById(
     "chatPaymentUserName"
   );
+
+
+const paymentCountry =
+  document.getElementById(
+    "chatPaymentCountry"
+  );
+
 
 const paymentAmount =
   document.getElementById(
     "chatPaymentAmount"
   );
 
-const paymentPhone =
-  document.getElementById(
-    "chatPaymentPhone"
-  );
 
 const paymentCancel =
   document.getElementById(
     "chatPaymentCancel"
   );
+
 
 const paymentSubmit =
   document.getElementById(
@@ -250,8 +320,20 @@ const paymentSubmit =
   );
 
 
+const contactSupportBtn =
+  document.getElementById(
+    "contactSupportBtn"
+  );
+
+
+const skeleton =
+  document.getElementById(
+    "globalMeetSkeleton"
+  );
+
+
 /* =========================================================
-   HELPERS
+   HTML ESCAPE
 ========================================================= */
 
 function escapeHtml(value = "") {
@@ -267,6 +349,7 @@ function escapeHtml(value = "") {
     .replaceAll('"', "&quot;")
 
     .replaceAll("'", "&#039;");
+
 }
 
 
@@ -281,17 +364,21 @@ function getFullName(user = {}) {
       user.firstName || ""
     ).trim();
 
+
   const last =
     String(
       user.lastName || ""
     ).trim();
+
 
   const combined =
     `${first} ${last}`.trim();
 
 
   if (combined) {
+
     return combined;
+
   }
 
 
@@ -312,6 +399,7 @@ function getFullName(user = {}) {
 
 
   return "CONNECTA User";
+
 }
 
 
@@ -324,6 +412,7 @@ function getInitials(user = {}) {
   const name =
     getFullName(user);
 
+
   const parts =
     name
       .split(/\s+/)
@@ -331,7 +420,9 @@ function getInitials(user = {}) {
 
 
   if (!parts.length) {
+
     return "U";
+
   }
 
 
@@ -348,33 +439,7 @@ function getInitials(user = {}) {
     parts[0][0] +
     parts[parts.length - 1][0]
   ).toUpperCase();
-}
 
-
-/* =========================================================
-   VERIFIED BADGE
-========================================================= */
-
-function verifiedBadge(user = {}) {
-
-  if (
-    user.isVerified !== true
-  ) {
-
-    return "";
-
-  }
-
-
-  return `
-    <span
-      class="verified-badge"
-      aria-label="Verified account"
-      title="Verified account"
-    >
-      ✓
-    </span>
-  `;
 }
 
 
@@ -385,11 +450,15 @@ function verifiedBadge(user = {}) {
 function showToast(message) {
 
   if (!toast) {
+
     return;
+
   }
 
 
-  clearTimeout(toastTimer);
+  clearTimeout(
+    toastTimer
+  );
 
 
   toast.textContent =
@@ -410,8 +479,9 @@ function showToast(message) {
         );
 
       },
-      2800
+      3000
     );
+
 }
 
 
@@ -422,7 +492,9 @@ function showToast(message) {
 function openMenu() {
 
   if (!sideMenu) {
+
     return;
+
   }
 
 
@@ -444,13 +516,16 @@ function openMenu() {
     "aria-hidden",
     "false"
   );
+
 }
 
 
 function closeMenu() {
 
   if (!sideMenu) {
+
     return;
+
   }
 
 
@@ -472,6 +547,7 @@ function closeMenu() {
     "aria-hidden",
     "true"
   );
+
 }
 
 
@@ -502,7 +578,9 @@ if (menuOverlay) {
 function renderHeaderProfile() {
 
   if (!currentProfile) {
+
     return;
+
   }
 
 
@@ -610,13 +688,15 @@ function renderHeaderProfile() {
 
 
 /* =========================================================
-   IS FOLLOWING
+   FOLLOWING
 ========================================================= */
 
 function isFollowing(userId) {
 
   if (!currentProfile) {
+
     return false;
+
   }
 
 
@@ -636,10 +716,12 @@ function isFollowing(userId) {
 
 
 /* =========================================================
-   NORMALIZE COUNTRY
+   COUNTRY NORMALIZER
 ========================================================= */
 
-function normalizeCountry(value = "") {
+function normalizeCountry(
+  value = ""
+) {
 
   return String(value || "")
     .trim()
@@ -651,13 +733,17 @@ function normalizeCountry(value = "") {
 
 
 /* =========================================================
-   COUNTRY DISPLAY
+   COUNTRY LABEL
 ========================================================= */
 
-function countryLabel(value = "") {
+function getCountryLabel(
+  value = ""
+) {
 
   const normalized =
-    normalizeCountry(value);
+    normalizeCountry(
+      value
+    );
 
 
   const countries = {
@@ -701,237 +787,265 @@ function countryLabel(value = "") {
   };
 
 
-  return countries[normalized] ||
-    (
-      value
-        ? String(value)
-        : "Unknown country"
-    );
+  return countries[
+    normalized
+  ] || (
+    value
+      ? String(value)
+      : "🌍 Global"
+  );
 
 }
 
 
 /* =========================================================
-   RENDER AVATAR
+   GENDER LABEL
 ========================================================= */
 
-function renderAvatar(user) {
-
-  const initials =
-    escapeHtml(
-      getInitials(user)
-    );
-
-
-  const photo =
-    user.photoURL
-      ? `
-        <img
-          src="${escapeHtml(
-            user.photoURL
-          )}"
-          alt=""
-          loading="lazy"
-        >
-      `
-      : initials;
-
-
-  const online =
-    user.isOnline === true
-      ? `<span class="online-dot"></span>`
-      : "";
-
-
-  return `
-    <div class="user-avatar">
-      ${photo}
-      ${online}
-    </div>
-  `;
-}
-
-
-/* =========================================================
-   RENDER GLOBAL USER CARD
-========================================================= */
-
-function renderGlobalUserCard(user) {
-
-  const userId =
-    user.uid;
-
-
-  const name =
-    getFullName(user);
-
-
-  const username =
-    user.username
-      ? `@${user.username}`
-      : "";
-
-
-  const following =
-    isFollowing(userId);
-
-
-  const isOnline =
-    user.isOnline === true;
-
-
-  const followText =
-    following
-      ? "Following"
-      : "Follow";
-
-
-  const followClass =
-    following
-      ? "follow-btn following"
-      : "follow-btn";
-
-
-  const country =
-    countryLabel(
-      user.country
-    );
-
+function getGenderLabel(
+  value = ""
+) {
 
   const gender =
-    String(
-      user.gender || ""
-    ).toLowerCase();
-
-
-  let genderLabel =
-    "";
+    String(value || "")
+      .trim()
+      .toLowerCase();
 
 
   if (gender === "male") {
 
-    genderLabel =
-      "👨 Male";
-
-  } else if (gender === "female") {
-
-    genderLabel =
-      "👩 Female";
+    return "👨 Male";
 
   }
 
 
-  const bio =
-    String(
-      user.globalChatBio || ""
-    ).trim();
+  if (gender === "female") {
+
+    return "👩 Female";
+
+  }
 
 
-  return `
-    <article
-      class="user-card"
-      data-user-id="${escapeHtml(userId)}"
-    >
+  return "";
 
-      ${renderAvatar(user)}
-
-      <div
-        class="user-info"
-        data-profile-id="${escapeHtml(userId)}"
-      >
-
-        <div class="user-name">
-
-          <span class="user-name-text">
-            ${escapeHtml(name)}
-          </span>
-
-          ${verifiedBadge(user)}
-
-        </div>
+}
 
 
-        <div class="username">
-          ${escapeHtml(username)}
-        </div>
+/* =========================================================
+   INTEREST NORMALIZER
+========================================================= */
+
+function normalizeInterest(
+  value = ""
+) {
+
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", "-")
+    .replaceAll(" ", "-");
+
+}
 
 
-        <div
-          class="
-            online-status
-            ${isOnline ? "online" : "offline"}
-          "
-        >
-          ${
-            isOnline
-              ? "● Online"
-              : "○ Offline"
-          }
-        </div>
+/* =========================================================
+   INTEREST LABEL
+========================================================= */
+
+function getInterestLabel(
+  value = ""
+) {
+
+  const interest =
+    normalizeInterest(
+      value
+    );
 
 
-        <div class="global-user-details">
+  const labels = {
 
-          <span class="user-meta-chip">
-            ${escapeHtml(country)}
-          </span>
+    relationship:
+      "❤️ Relationship",
 
-          ${
-            genderLabel
-              ? `
-                <span class="user-meta-chip">
-                  ${escapeHtml(
-                    genderLabel
-                  )}
-                </span>
-              `
-              : ""
-          }
+    friendship:
+      "💬 Friendship",
 
-        </div>
+    swahili:
+      "🗣️ Swahili",
 
+    "african-languages":
+      "🌍 African Languages",
 
-        ${
-          bio
-            ? `
-              <div class="global-bio">
-                ${escapeHtml(bio)}
-              </div>
-            `
-            : ""
-        }
+    culture:
+      "🤝 Culture",
 
-      </div>
+    dating:
+      "💕 Dating",
+
+    language:
+      "🗣️ Language",
+
+    travel:
+      "✈️ Travel",
+
+    business:
+      "💼 Business"
+
+  };
 
 
-      <div class="user-actions">
+  return labels[
+    interest
+  ] || String(value);
 
-        <button
-          type="button"
-          class="${followClass}"
-          data-follow-id="${escapeHtml(userId)}"
-        >
-          ${followText}
-        </button>
+}
 
 
-        <button
-          type="button"
-          class="chat-btn"
-          data-chat-id="${escapeHtml(userId)}"
-        >
-          💬 Chat
-        </button>
+/* =========================================================
+   GET INTERESTS
+========================================================= */
+
+function getUserInterests(
+  user = {}
+) {
+
+  let interests = [];
 
 
-        <div class="chat-fee-label">
-          KSh ${GLOBAL_CHAT_FEE}
-        </div>
+  if (
+    Array.isArray(
+      user.interests
+    )
+  ) {
 
-      </div>
+    interests =
+      user.interests;
 
-    </article>
-  `;
+  } else if (
+    typeof user.interests ===
+    "string"
+  ) {
+
+    interests =
+      user.interests
+        .split(",")
+        .map(
+          item =>
+            item.trim()
+        )
+        .filter(Boolean);
+
+  }
+
+
+  /*
+   * Support older/public profile
+   * fields if present.
+   */
+
+  if (
+    user.globalChatInterest &&
+    !interests.length
+  ) {
+
+    interests = [
+      user.globalChatInterest
+    ];
+
+  }
+
+
+  return interests;
+
+}
+
+
+/* =========================================================
+   INTEREST MATCH
+========================================================= */
+
+function matchesInterest(
+  user
+) {
+
+  if (
+    selectedInterest ===
+    "all"
+  ) {
+
+    return true;
+
+  }
+
+
+  const interests =
+    getUserInterests(
+      user
+    );
+
+
+  return interests.some(
+    interest =>
+      normalizeInterest(
+        interest
+      ) ===
+      selectedInterest
+  );
+
+}
+
+
+/* =========================================================
+   GENDER MATCH
+========================================================= */
+
+function matchesGender(
+  user
+) {
+
+  if (
+    selectedGender ===
+    "everyone"
+  ) {
+
+    return true;
+
+  }
+
+
+  return String(
+    user.gender || ""
+  )
+    .trim()
+    .toLowerCase() ===
+    selectedGender;
+
+}
+
+
+/* =========================================================
+   COUNTRY MATCH
+========================================================= */
+
+function matchesCountry(
+  user
+) {
+
+  if (
+    selectedCountry ===
+    "all"
+  ) {
+
+    return true;
+
+  }
+
+
+  return normalizeCountry(
+    user.country
+  ) ===
+  selectedCountry;
+
 }
 
 
@@ -939,16 +1053,21 @@ function renderGlobalUserCard(user) {
    SEARCH MATCH
 ========================================================= */
 
-function matchesSearch(user) {
+function matchesSearch(
+  user
+) {
 
   if (!searchTerm) {
+
     return true;
+
   }
 
 
   const name =
-    getFullName(user)
-      .toLowerCase();
+    getFullName(
+      user
+    ).toLowerCase();
 
 
   const username =
@@ -965,72 +1084,62 @@ function matchesSearch(user) {
 
   const bio =
     String(
-      user.globalChatBio || ""
+      user.bio ||
+      user.globalChatBio ||
+      ""
     ).toLowerCase();
 
 
+  const interests =
+    getUserInterests(
+      user
+    )
+      .join(" ")
+      .toLowerCase();
+
+
   return (
-    name.includes(searchTerm) ||
-    username.includes(searchTerm) ||
-    country.includes(searchTerm) ||
-    bio.includes(searchTerm)
+    name.includes(
+      searchTerm
+    ) ||
+    username.includes(
+      searchTerm
+    ) ||
+    country.includes(
+      searchTerm
+    ) ||
+    bio.includes(
+      searchTerm
+    ) ||
+    interests.includes(
+      searchTerm
+    )
   );
+
 }
 
 
 /* =========================================================
-   GENDER MATCH
+   PROFILE ELIGIBILITY
 ========================================================= */
 
-function matchesGender(user) {
-
-  if (
-    selectedGender ===
-    "everyone"
-  ) {
-
-    return true;
-
-  }
-
-
-  return String(
-    user.gender || ""
-  ).trim().toLowerCase()
-    === selectedGender;
-}
-
-
-/* =========================================================
-   COUNTRY MATCH
-========================================================= */
-
-function matchesCountry(user) {
-
-  if (
-    selectedCountry ===
-    "all"
-  ) {
-
-    return true;
-
-  }
-
-
-  return normalizeCountry(
-    user.country
-  ) === selectedCountry;
-}
-
-
-/* =========================================================
-   GLOBAL CHAT ELIGIBILITY
-========================================================= */
-
-function isAvailableForGlobalChat(user) {
+function isGlobalMeetProfile(
+  user
+) {
 
   if (!user) {
+
     return false;
+
+  }
+
+
+  if (
+    !user.uid
+  ) {
+
+    return false;
+
   }
 
 
@@ -1044,8 +1153,35 @@ function isAvailableForGlobalChat(user) {
   }
 
 
+  /*
+   * The profile must explicitly opt in.
+   */
+
   if (
-    user.globalChatEnabled !== true
+    user.globalChatEnabled !==
+    true
+  ) {
+
+    return false;
+
+  }
+
+
+  /*
+   * Support both old and new status names.
+   */
+
+  if (
+    user.globalChatStatus &&
+    ![
+      "available",
+      "online",
+      "active"
+    ].includes(
+      String(
+        user.globalChatStatus
+      ).toLowerCase()
+    )
   ) {
 
     return false;
@@ -1054,9 +1190,40 @@ function isAvailableForGlobalChat(user) {
 
 
   if (
-    user.globalChatStatus &&
-    user.globalChatStatus !==
-      "available"
+    user.availability &&
+    ![
+      "available",
+      "online",
+      "active"
+    ].includes(
+      String(
+        user.availability
+      ).toLowerCase()
+    )
+  ) {
+
+    return false;
+
+  }
+
+
+  /*
+   * Banned/deactivated public profiles
+   * should never appear.
+   */
+
+  if (
+    user.status &&
+    [
+      "banned",
+      "suspended",
+      "disabled",
+      "inactive"
+    ].includes(
+      String(
+        user.status
+      ).toLowerCase()
+    )
   ) {
 
     return false;
@@ -1065,20 +1232,23 @@ function isAvailableForGlobalChat(user) {
 
 
   return true;
+
 }
 
 
 /* =========================================================
-   SORT GLOBAL USERS
+   SORT PROFILES
 ========================================================= */
 
-function sortGlobalUsers(users) {
+function sortProfiles(
+  users
+) {
 
   return [...users].sort(
     (a, b) => {
 
       /*
-       * Online first.
+       * Available/online first.
        */
 
       if (
@@ -1102,7 +1272,7 @@ function sortGlobalUsers(users) {
 
 
       /*
-       * Verified first.
+       * Verified profiles first.
        */
 
       if (
@@ -1129,18 +1299,12 @@ function sortGlobalUsers(users) {
        * Then alphabetical.
        */
 
-      const nameA =
-        getFullName(a)
-          .toLowerCase();
-
-      const nameB =
-        getFullName(b)
-          .toLowerCase();
-
-
-      return nameA.localeCompare(
-        nameB
-      );
+      return getFullName(a)
+        .toLowerCase()
+        .localeCompare(
+          getFullName(b)
+            .toLowerCase()
+        );
 
     }
   );
@@ -1149,21 +1313,36 @@ function sortGlobalUsers(users) {
 
 
 /* =========================================================
-   FILTER GLOBAL USERS
+   FILTER PROFILES
 ========================================================= */
 
-function getFilteredGlobalUsers() {
+function getFilteredProfiles() {
 
-  return sortGlobalUsers(
+  return sortProfiles(
 
     allUsers.filter(
       user => {
 
         return (
-          isAvailableForGlobalChat(user) &&
-          matchesGender(user) &&
-          matchesCountry(user) &&
-          matchesSearch(user)
+          isGlobalMeetProfile(
+            user
+          ) &&
+
+          matchesGender(
+            user
+          ) &&
+
+          matchesCountry(
+            user
+          ) &&
+
+          matchesInterest(
+            user
+          ) &&
+
+          matchesSearch(
+            user
+          )
         );
 
       }
@@ -1175,50 +1354,449 @@ function getFilteredGlobalUsers() {
 
 
 /* =========================================================
-   EMPTY DISCOVER
+   RENDER VERIFIED BADGE
 ========================================================= */
 
-function renderGlobalEmpty() {
+function renderVerifiedBadge(
+  user
+) {
 
-  if (!discoverList) {
-    return;
+  if (
+    user.isVerified !==
+    true
+  ) {
+
+    return "";
+
   }
 
 
-  let message =
-    "No people match your current filters.";
+  return `
+    <span
+      class="verified-badge"
+      title="Verified account"
+      aria-label="Verified account"
+    >
+      ✓
+    </span>
+  `;
 
+}
+
+
+/* =========================================================
+   RENDER PROFILE PHOTO
+========================================================= */
+
+function renderProfilePhoto(
+  user
+) {
 
   if (
-    !searchTerm &&
-    selectedGender === "everyone" &&
-    selectedCountry === "all"
+    user.photoURL
   ) {
 
-    message =
-      "No one is currently available for Global Chat.";
+    return `
+      <img
+        class="profile-photo"
+        src="${escapeHtml(
+          user.photoURL
+        )}"
+        alt=""
+        loading="lazy"
+      >
+    `;
+
+  }
+
+
+  return `
+    <div class="profile-photo-placeholder">
+      ${escapeHtml(
+        getInitials(user)
+      )}
+    </div>
+  `;
+
+}
+
+
+/* =========================================================
+   RENDER INTEREST CHIPS
+========================================================= */
+
+function renderInterestChips(
+  user
+) {
+
+  const interests =
+    getUserInterests(
+      user
+    )
+      .slice(
+        0,
+        4
+      );
+
+
+  if (!interests.length) {
+
+    return "";
+
+  }
+
+
+  return interests
+    .map(
+      interest => `
+        <span class="profile-interest">
+          ${escapeHtml(
+            getInterestLabel(
+              interest
+            )
+          )}
+        </span>
+      `
+    )
+    .join("");
+
+}
+
+
+/* =========================================================
+   RENDER PROFILE CARD
+========================================================= */
+
+function renderGlobalProfileCard(
+  user
+) {
+
+  const userId =
+    user.uid;
+
+
+  const name =
+    getFullName(
+      user
+    );
+
+
+  const username =
+    user.username
+      ? `@${user.username}`
+      : "";
+
+
+  const country =
+    getCountryLabel(
+      user.country
+    );
+
+
+  const gender =
+    getGenderLabel(
+      user.gender
+    );
+
+
+  const following =
+    isFollowing(
+      userId
+    );
+
+
+  const online =
+    user.isOnline ===
+    true;
+
+
+  const bio =
+    String(
+      user.bio ||
+      user.globalChatBio ||
+      "Looking forward to meeting new people on CONNECTA."
+    ).trim();
+
+
+  const languages =
+    Array.isArray(
+      user.languages
+    )
+      ? user.languages
+      : [];
+
+
+  const languageText =
+    languages
+      .slice(0, 4)
+      .map(
+        item =>
+          String(item)
+      )
+      .join(
+        " • "
+      );
+
+
+  return `
+    <article
+      class="global-profile-card"
+      data-user-id="${escapeHtml(
+        userId
+      )}"
+    >
+
+      <div class="profile-photo-area">
+
+        ${renderProfilePhoto(user)}
+
+        <div class="photo-gradient"></div>
+
+
+        <div class="availability-badge">
+
+          <span
+            class="
+              online-indicator
+              ${
+                online
+                  ? ""
+                  : "offline-indicator"
+              }
+            "
+          ></span>
+
+          ${
+            online
+              ? "Available now"
+              : "Available"
+          }
+
+        </div>
+
+
+        <div class="photo-country">
+
+          ${escapeHtml(
+            country
+          )}
+
+        </div>
+
+
+        ${
+          user.isVerified === true
+            ? `
+              <div class="photo-verified">
+                ✓
+              </div>
+            `
+            : ""
+        }
+
+      </div>
+
+
+      <div class="profile-content">
+
+        <div class="profile-name-row">
+
+          <h3 class="profile-name">
+
+            ${escapeHtml(
+              name
+            )}
+
+          </h3>
+
+          ${renderVerifiedBadge(
+            user
+          )}
+
+        </div>
+
+
+        <div class="profile-username">
+
+          ${escapeHtml(
+            username
+          )}
+
+          ${
+            gender
+              ? `
+                ·
+                ${escapeHtml(
+                  gender
+                )}
+              `
+              : ""
+          }
+
+        </div>
+
+
+        <div class="profile-bio">
+
+          ${escapeHtml(
+            bio
+          )}
+
+        </div>
+
+
+        <div class="profile-interests">
+
+          ${renderInterestChips(
+            user
+          )}
+
+        </div>
+
+
+        ${
+          languageText
+            ? `
+              <div class="profile-languages">
+                🗣️
+                <span>
+                  ${escapeHtml(
+                    languageText
+                  )}
+                </span>
+              </div>
+            `
+            : ""
+        }
+
+
+        <div class="profile-actions">
+
+          <button
+            type="button"
+            class="
+              profile-action
+              follow-btn
+              ${
+                following
+                  ? "following"
+                  : ""
+              }
+            "
+            data-follow-id="${escapeHtml(
+              userId
+            )}"
+          >
+
+            ${
+              following
+                ? "Following"
+                : "Follow"
+            }
+
+          </button>
+
+
+          <button
+            type="button"
+            class="
+              profile-action
+              chat-btn
+            "
+            data-chat-id="${escapeHtml(
+              userId
+            )}"
+          >
+
+            💬 Connect
+
+          </button>
+
+        </div>
+
+
+        <div class="chat-price">
+
+          Connection request ·
+          KSh ${GLOBAL_MEET_FEE}
+
+        </div>
+
+      </div>
+
+    </article>
+  `;
+
+}
+
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+function renderEmptyState() {
+
+  if (!discoverList) {
+
+    return;
 
   }
 
 
   discoverList.innerHTML = `
+
     <div class="empty-state">
 
       <div class="empty-icon">
         🌍
       </div>
 
+
       <div class="empty-title">
-        No chat partners found
+        No profiles found
       </div>
 
+
       <div class="empty-text">
-        ${escapeHtml(message)}
-        Try changing your gender, country or search filter.
+
+        No available Global Meet profiles match
+        your current filters. Try choosing another
+        country, interest or gender.
+
       </div>
 
     </div>
+
   `;
+
+
+  discoverList.style.display =
+    "grid";
+
+}
+
+
+/* =========================================================
+   HIDE SKELETON
+========================================================= */
+
+function hideSkeleton() {
+
+  if (skeleton) {
+
+    skeleton.style.display =
+      "none";
+
+  }
+
+
+  if (discoverList) {
+
+    discoverList.style.display =
+      "grid";
+
+  }
+
 }
 
 
@@ -1228,32 +1806,31 @@ function renderGlobalEmpty() {
 
 function renderDiscover() {
 
-  const users =
-    getFilteredGlobalUsers();
+  hideSkeleton();
 
 
-  /*
-   * There are duplicate discover IDs in the
-   * current HTML for compatibility. The first
-   * element is the main visible Global Chat list.
-   */
+  const profiles =
+    getFilteredProfiles();
+
 
   if (discoverCount) {
 
     discoverCount.textContent =
-      users.length;
+      profiles.length;
 
   }
 
 
   if (!discoverList) {
+
     return;
+
   }
 
 
-  if (!users.length) {
+  if (!profiles.length) {
 
-    renderGlobalEmpty();
+    renderEmptyState();
 
     return;
 
@@ -1261,11 +1838,15 @@ function renderDiscover() {
 
 
   discoverList.innerHTML =
-    users
+    profiles
       .map(
-        renderGlobalUserCard
+        renderGlobalProfileCard
       )
       .join("");
+
+
+  discoverList.style.display =
+    "grid";
 
 }
 
@@ -1277,7 +1858,9 @@ function renderDiscover() {
 function renderFollowing() {
 
   if (!followingList) {
+
     return;
+
   }
 
 
@@ -1290,7 +1873,7 @@ function renderFollowing() {
 
 
   const users =
-    sortGlobalUsers(
+    sortProfiles(
       allUsers.filter(
         user =>
           followingIds.includes(
@@ -1312,6 +1895,7 @@ function renderFollowing() {
   if (!users.length) {
 
     followingList.innerHTML = `
+
       <div class="empty-state">
 
         <div class="empty-icon">
@@ -1319,22 +1903,15 @@ function renderFollowing() {
         </div>
 
         <div class="empty-title">
-          ${
-            searchTerm
-              ? "No matches"
-              : "No following yet"
-          }
+          No following yet
         </div>
 
         <div class="empty-text">
-          ${
-            searchTerm
-              ? "No followed users match your search."
-              : "People you follow will appear here."
-          }
+          Profiles you follow will appear here.
         </div>
 
       </div>
+
     `;
 
     return;
@@ -1345,95 +1922,10 @@ function renderFollowing() {
   followingList.innerHTML =
     users
       .map(
-        renderFollowingCard
+        renderCommunityProfileCard
       )
       .join("");
 
-}
-
-
-/* =========================================================
-   FOLLOWING CARD
-========================================================= */
-
-function renderFollowingCard(user) {
-
-  const userId =
-    user.uid;
-
-
-  const name =
-    getFullName(user);
-
-
-  const username =
-    user.username
-      ? `@${user.username}`
-      : "";
-
-
-  const following =
-    isFollowing(userId);
-
-
-  return `
-    <article
-      class="user-card"
-      data-user-id="${escapeHtml(userId)}"
-    >
-
-      ${renderAvatar(user)}
-
-      <div
-        class="user-info"
-        data-profile-id="${escapeHtml(userId)}"
-      >
-
-        <div class="user-name">
-
-          <span class="user-name-text">
-            ${escapeHtml(name)}
-          </span>
-
-          ${verifiedBadge(user)}
-
-        </div>
-
-
-        <div class="username">
-          ${escapeHtml(username)}
-        </div>
-
-
-        <div
-          class="
-            online-status
-            ${user.isOnline ? "online" : "offline"}
-          "
-        >
-          ${
-            user.isOnline
-              ? "● Online"
-              : "○ Offline"
-          }
-        </div>
-
-      </div>
-
-
-      <button
-        type="button"
-        class="
-          follow-btn
-          ${following ? "following" : ""}
-        "
-        data-follow-id="${escapeHtml(userId)}"
-      >
-        ${following ? "Following" : "Follow"}
-      </button>
-
-    </article>
-  `;
 }
 
 
@@ -1444,12 +1936,14 @@ function renderFollowingCard(user) {
 function renderFollowers() {
 
   if (!followersList) {
+
     return;
+
   }
 
 
   const users =
-    sortGlobalUsers(
+    sortProfiles(
       followerUsers.filter(
         user =>
           matchesSearch(user)
@@ -1468,6 +1962,7 @@ function renderFollowers() {
   if (!users.length) {
 
     followersList.innerHTML = `
+
       <div class="empty-state">
 
         <div class="empty-icon">
@@ -1475,22 +1970,15 @@ function renderFollowers() {
         </div>
 
         <div class="empty-title">
-          ${
-            searchTerm
-              ? "No matches"
-              : "No followers yet"
-          }
+          No followers yet
         </div>
 
         <div class="empty-text">
-          ${
-            searchTerm
-              ? "No followers match your search."
-              : "People who follow you will appear here."
-          }
+          People who follow you will appear here.
         </div>
 
       </div>
+
     `;
 
     return;
@@ -1501,9 +1989,216 @@ function renderFollowers() {
   followersList.innerHTML =
     users
       .map(
-        renderFollowingCard
+        renderCommunityProfileCard
       )
       .join("");
+
+}
+
+
+/* =========================================================
+   COMMUNITY CARD
+========================================================= */
+
+function renderCommunityProfileCard(
+  user
+) {
+
+  const name =
+    getFullName(
+      user
+    );
+
+
+  const following =
+    isFollowing(
+      user.uid
+    );
+
+
+  return `
+
+    <article
+      class="global-profile-card"
+      style="padding:12px;"
+    >
+
+      <div
+        style="
+          display:flex;
+          align-items:center;
+          gap:10px;
+        "
+      >
+
+        <div
+          style="
+            width:50px;
+            height:50px;
+            border-radius:50%;
+            overflow:hidden;
+            display:grid;
+            place-items:center;
+            background:#DCFCE7;
+            color:#15803D;
+            font-weight:900;
+            flex:0 0 50px;
+          "
+        >
+
+          ${
+            user.photoURL
+              ? `
+                <img
+                  src="${escapeHtml(
+                    user.photoURL
+                  )}"
+                  alt=""
+                  style="
+                    width:100%;
+                    height:100%;
+                    object-fit:cover;
+                  "
+                >
+              `
+              : escapeHtml(
+                  getInitials(user)
+                )
+          }
+
+        </div>
+
+
+        <div
+          style="
+            min-width:0;
+            flex:1;
+          "
+        >
+
+          <div
+            style="
+              font-size:13px;
+              font-weight:900;
+            "
+          >
+
+            ${escapeHtml(
+              name
+            )}
+
+            ${renderVerifiedBadge(
+              user
+            )}
+
+          </div>
+
+
+          <div
+            style="
+              margin-top:3px;
+              color:#6B7280;
+              font-size:9px;
+            "
+          >
+
+            ${escapeHtml(
+              user.username
+                ? `@${user.username}`
+                : ""
+            )}
+
+          </div>
+
+        </div>
+
+
+        <button
+          type="button"
+          class="
+            profile-action
+            follow-btn
+            ${
+              following
+                ? "following"
+                : ""
+            }
+          "
+          data-follow-id="${escapeHtml(
+            user.uid
+          )}"
+          style="
+            min-width:72px;
+            padding:0 8px;
+          "
+        >
+
+          ${
+            following
+              ? "Following"
+              : "Follow"
+          }
+
+        </button>
+
+      </div>
+
+    </article>
+
+  `;
+
+}
+
+
+/* =========================================================
+   BUILD FOLLOWERS
+========================================================= */
+
+function buildFollowers() {
+
+  if (!currentUser) {
+
+    return;
+
+  }
+
+
+  followerUsers =
+    allUsers.filter(
+      user => {
+
+        if (
+          user.uid ===
+          currentUser.uid
+        ) {
+
+          return false;
+
+        }
+
+
+        const following =
+          Array.isArray(
+            user.following
+          )
+            ? user.following
+            : [];
+
+
+        return following.includes(
+          currentUser.uid
+        );
+
+      }
+    );
+
+
+  if (followersCount) {
+
+    followersCount.textContent =
+      followerUsers.length;
+
+  }
 
 }
 
@@ -1560,7 +2255,7 @@ function renderCurrentTab() {
 
 
 /* =========================================================
-   TAB SWITCHING
+   TABS
 ========================================================= */
 
 const tabs =
@@ -1569,23 +2264,9 @@ const tabs =
   );
 
 
-const discoverSection =
-  document.getElementById(
-    "discoverSection"
-  );
-
-const followingSection =
-  document.getElementById(
-    "followingSection"
-  );
-
-const followersSection =
-  document.getElementById(
-    "followersSection"
-  );
-
-
-function switchTab(tabName) {
+function switchTab(
+  tabName
+) {
 
   activeTab =
     tabName;
@@ -1604,10 +2285,29 @@ function switchTab(tabName) {
   );
 
 
+  const discoverSection =
+    document.getElementById(
+      "discoverSection"
+    );
+
+
+  const followingSection =
+    document.getElementById(
+      "followingSection"
+    );
+
+
+  const followersSection =
+    document.getElementById(
+      "followersSection"
+    );
+
+
   if (discoverSection) {
 
     discoverSection.hidden =
-      tabName !== "discover";
+      tabName !==
+      "discover";
 
   }
 
@@ -1615,7 +2315,8 @@ function switchTab(tabName) {
   if (followingSection) {
 
     followingSection.hidden =
-      tabName !== "following";
+      tabName !==
+      "following";
 
   }
 
@@ -1623,7 +2324,8 @@ function switchTab(tabName) {
   if (followersSection) {
 
     followersSection.hidden =
-      tabName !== "followers";
+      tabName !==
+      "followers";
 
   }
 
@@ -1718,6 +2420,45 @@ if (countryFilter) {
 
 
 /* =========================================================
+   INTEREST FILTER
+========================================================= */
+
+interestButtons.forEach(
+  button => {
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        selectedInterest =
+          normalizeInterest(
+            button.dataset.interest ||
+            "all"
+          );
+
+
+        interestButtons.forEach(
+          item => {
+
+            item.classList.toggle(
+              "active",
+              item === button
+            );
+
+          }
+        );
+
+
+        renderDiscover();
+
+      }
+    );
+
+  }
+);
+
+
+/* =========================================================
    SEARCH
 ========================================================= */
 
@@ -1742,10 +2483,242 @@ if (friendSearch) {
 
 
 /* =========================================================
+   CACHE — READ PROFILES
+========================================================= */
+
+function loadCachedProfiles() {
+
+  try {
+
+    const raw =
+      localStorage.getItem(
+        PUBLIC_PROFILES_CACHE_KEY
+      );
+
+
+    if (!raw) {
+
+      return false;
+
+    }
+
+
+    const parsed =
+      JSON.parse(
+        raw
+      );
+
+
+    if (
+      !Array.isArray(
+        parsed
+      )
+    ) {
+
+      return false;
+
+    }
+
+
+    allUsers =
+      parsed;
+
+
+    /*
+     * Show cached profiles immediately.
+     */
+
+    if (
+      currentUser &&
+      currentProfile
+    ) {
+
+      renderCurrentTab();
+
+    }
+
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      "Global Meet cache read error:",
+      error
+    );
+
+
+    return false;
+
+  }
+
+}
+
+
+/* =========================================================
+   CACHE — SAVE PROFILES
+========================================================= */
+
+function saveProfilesCache(
+  profiles
+) {
+
+  try {
+
+    localStorage.setItem(
+      PUBLIC_PROFILES_CACHE_KEY,
+      JSON.stringify(
+        profiles
+      )
+    );
+
+
+    localStorage.setItem(
+      PUBLIC_PROFILES_CACHE_TIME_KEY,
+      String(
+        Date.now()
+      )
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Global Meet cache save error:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   CACHE — CURRENT PROFILE
+========================================================= */
+
+function saveCurrentProfileCache() {
+
+  if (
+    !currentProfile
+  ) {
+
+    return;
+
+  }
+
+
+  try {
+
+    localStorage.setItem(
+      CURRENT_USER_CACHE_KEY,
+      JSON.stringify(
+        currentProfile
+      )
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Current profile cache error:",
+      error
+    );
+
+  }
+
+}
+
+
+/* =========================================================
+   CACHE — CURRENT PROFILE READ
+========================================================= */
+
+function loadCachedCurrentProfile() {
+
+  try {
+
+    const raw =
+      localStorage.getItem(
+        CURRENT_USER_CACHE_KEY
+      );
+
+
+    if (!raw) {
+
+      return null;
+
+    }
+
+
+    const parsed =
+      JSON.parse(
+        raw
+      );
+
+
+    if (
+      !parsed ||
+      !parsed.uid
+    ) {
+
+      return null;
+
+    }
+
+
+    return parsed;
+
+  } catch {
+
+    return null;
+
+  }
+
+}
+
+
+/* =========================================================
    LOAD CURRENT PROFILE
 ========================================================= */
 
 async function loadCurrentProfile() {
+
+  /*
+   * Firebase auth session is already active.
+   * We don't authenticate again.
+   */
+
+  if (!currentUser) {
+
+    throw new Error(
+      "No active CONNECTA session."
+    );
+
+  }
+
+
+  /*
+   * Display cached private profile immediately
+   * when it belongs to this authenticated UID.
+   */
+
+  const cached =
+    loadCachedCurrentProfile();
+
+
+  if (
+    cached &&
+    cached.uid ===
+      currentUser.uid
+  ) {
+
+    currentProfile =
+      cached;
+
+
+    renderHeaderProfile();
+
+  }
+
 
   const userRef =
     doc(
@@ -1780,16 +2753,25 @@ async function loadCurrentProfile() {
   };
 
 
+  saveCurrentProfileCache();
+
   renderHeaderProfile();
 
 }
 
 
 /* =========================================================
-   PROFILE LISTENER
+   CURRENT PROFILE REALTIME
 ========================================================= */
 
 function listenToCurrentProfile() {
+
+  if (!currentUser) {
+
+    return;
+
+  }
+
 
   const userRef =
     doc(
@@ -1823,6 +2805,8 @@ function listenToCurrentProfile() {
         };
 
 
+        saveCurrentProfileCache();
+
         renderHeaderProfile();
 
         renderCurrentTab();
@@ -1832,7 +2816,7 @@ function listenToCurrentProfile() {
       error => {
 
         console.error(
-          "Profile listener error:",
+          "Current profile listener error:",
           error
         );
 
@@ -1846,18 +2830,18 @@ function listenToCurrentProfile() {
    LOAD PUBLIC PROFILES
 ========================================================= */
 
-function listenToUsers() {
+function listenToPublicProfiles() {
 
-  const usersRef =
+  const profilesRef =
     collection(
       db,
       PUBLIC_PROFILES_COLLECTION
     );
 
 
-  const usersQuery =
+  const profilesQuery =
     query(
-      usersRef,
+      profilesRef,
       orderBy(
         "createdAt",
         "desc"
@@ -1868,7 +2852,7 @@ function listenToUsers() {
 
   unsubscribeUsers =
     onSnapshot(
-      usersQuery,
+      profilesQuery,
       snapshot => {
 
         allUsers =
@@ -1884,6 +2868,13 @@ function listenToUsers() {
           );
 
 
+        saveProfilesCache(
+          allUsers
+        );
+
+
+        hideSkeleton();
+
         renderCurrentTab();
 
       },
@@ -1891,22 +2882,40 @@ function listenToUsers() {
       error => {
 
         console.error(
-          "Public profiles listener error:",
+          "Public profile listener error:",
           error
         );
 
 
         /*
-         * Don't fall back to reading the private
-         * users collection.
+         * Do NOT fall back to users collection.
          *
-         * Doing that would expose private profile
-         * fields to every browser.
+         * The private users collection contains
+         * sensitive information.
          */
+
+        hideSkeleton();
+
+
+        if (
+          allUsers.length
+        ) {
+
+          renderCurrentTab();
+
+          showToast(
+            "Showing saved profiles. Refreshing connection..."
+          );
+
+          return;
+
+        }
+
 
         if (discoverList) {
 
           discoverList.innerHTML = `
+
             <div class="empty-state">
 
               <div class="empty-icon">
@@ -1914,77 +2923,27 @@ function listenToUsers() {
               </div>
 
               <div class="empty-title">
-                Global Chat profiles are unavailable
+                Global Meet is being prepared
               </div>
 
               <div class="empty-text">
-                Public chat profiles have not been
-                configured yet.
+
+                Public profiles are not available
+                yet. Please try again shortly.
+
               </div>
 
             </div>
+
           `;
 
+          discoverList.style.display =
+            "grid";
+
         }
 
       }
     );
-
-}
-
-
-/* =========================================================
-   BUILD FOLLOWERS
-========================================================= */
-
-function buildFollowers() {
-
-  if (!currentUser) {
-    return;
-  }
-
-
-  followerUsers =
-    allUsers.filter(
-      user => {
-
-        if (
-          user.uid ===
-          currentUser.uid
-        ) {
-
-          return false;
-
-        }
-
-
-        const following =
-          Array.isArray(
-            user.following
-          )
-            ? user.following
-            : [];
-
-
-        return following.includes(
-          currentUser.uid
-        );
-
-      }
-    );
-
-
-  if (followersCount) {
-
-    /*
-     * We prefer the actual public-profile
-     * relationship count when available.
-     */
-
-    followersCount.textContent =
-      followerUsers.length;
-
-  }
 
 }
 
@@ -1999,7 +2958,9 @@ async function toggleFollow(
 ) {
 
   if (!currentUser) {
+
     return;
+
   }
 
 
@@ -2076,7 +3037,7 @@ async function toggleFollow(
         ) {
 
           throw new Error(
-            "That CONNECTA user no longer exists."
+            "That profile no longer exists."
           );
 
         }
@@ -2094,7 +3055,9 @@ async function toggleFollow(
           Array.isArray(
             currentData.following
           )
-            ? [...currentData.following]
+            ? [
+                ...currentData.following
+              ]
             : [];
 
 
@@ -2106,13 +3069,15 @@ async function toggleFollow(
 
         const targetFollowersCount =
           Number(
-            targetData.followersCount || 0
+            targetData.followersCount ||
+            0
           );
 
 
         const currentFollowingCount =
           Number(
-            currentData.followingCount || 0
+            currentData.followingCount ||
+            0
           );
 
 
@@ -2138,7 +3103,8 @@ async function toggleFollow(
               followingCount:
                 Math.max(
                   0,
-                  currentFollowingCount - 1
+                  currentFollowingCount -
+                    1
                 ),
 
               updatedAt:
@@ -2155,7 +3121,8 @@ async function toggleFollow(
               followersCount:
                 Math.max(
                   0,
-                  targetFollowersCount - 1
+                  targetFollowersCount -
+                    1
                 ),
 
               updatedAt:
@@ -2180,7 +3147,8 @@ async function toggleFollow(
                 updatedFollowing,
 
               followingCount:
-                currentFollowingCount + 1,
+                currentFollowingCount +
+                1,
 
               updatedAt:
                 serverTimestamp()
@@ -2194,7 +3162,8 @@ async function toggleFollow(
             {
 
               followersCount:
-                targetFollowersCount + 1,
+                targetFollowersCount +
+                1,
 
               updatedAt:
                 serverTimestamp()
@@ -2209,21 +3178,13 @@ async function toggleFollow(
 
 
     /*
-     * The realtime listener will update
-     * currentProfile. Determine the intended
-     * action from the previous state.
+     * The realtime listener will refresh the state.
      */
 
-    const wasFollowingBefore =
-      isFollowing(
-        targetUserId
-      );
-
-
     showToast(
-      wasFollowingBefore
-        ? "Followed successfully."
-        : "Unfollowed successfully."
+      isFollowing(targetUserId)
+        ? "Following updated."
+        : "Follow updated."
     );
 
 
@@ -2240,7 +3201,6 @@ async function toggleFollow(
       "Unable to update follow status."
     );
 
-
   } finally {
 
     if (button) {
@@ -2256,10 +3216,12 @@ async function toggleFollow(
 
 
 /* =========================================================
-   PAYMENT PHONE NORMALIZER
+   PHONE NORMALIZER
 ========================================================= */
 
-function normalizeKenyanPhone(value) {
+function normalizeKenyanPhone(
+  value
+) {
 
   let phone =
     String(
@@ -2311,15 +3273,17 @@ function normalizeKenyanPhone(value) {
 
 
 /* =========================================================
-   GET FIREBASE TOKEN
+   FIREBASE TOKEN
 ========================================================= */
 
 async function getFirebaseToken() {
 
-  if (!auth.currentUser) {
+  if (
+    !auth.currentUser
+  ) {
 
     throw new Error(
-      "Your login session has expired. Please log in again."
+      "Your CONNECTA session has expired. Please log in again."
     );
 
   }
@@ -2336,10 +3300,14 @@ async function getFirebaseToken() {
    OPEN PAYMENT MODAL
 ========================================================= */
 
-function openChatPaymentModal(user) {
+function openPaymentModal(
+  user
+) {
 
   if (!user) {
+
     return;
+
   }
 
 
@@ -2347,10 +3315,38 @@ function openChatPaymentModal(user) {
     user;
 
 
+  if (paymentForm) {
+
+    paymentForm.style.display =
+      "";
+
+  }
+
+
+  if (paymentSuccess) {
+
+    paymentSuccess.style.display =
+      "none";
+
+  }
+
+
   if (paymentUserName) {
 
     paymentUserName.textContent =
-      getFullName(user);
+      getFullName(
+        user
+      );
+
+  }
+
+
+  if (paymentCountry) {
+
+    paymentCountry.textContent =
+      getCountryLabel(
+        user.country
+      );
 
   }
 
@@ -2358,37 +3354,36 @@ function openChatPaymentModal(user) {
   if (paymentAmount) {
 
     paymentAmount.textContent =
-      `KSh ${GLOBAL_CHAT_FEE}`;
+      `KSh ${GLOBAL_MEET_FEE}`;
 
   }
 
 
   if (paymentAvatar) {
 
-    if (user.photoURL) {
+    if (
+      user.photoURL
+    ) {
 
       paymentAvatar.innerHTML = `
+
         <img
           src="${escapeHtml(
             user.photoURL
           )}"
           alt=""
         >
+
       `;
 
     } else {
 
       paymentAvatar.textContent =
-        getInitials(user);
+        getInitials(
+          user
+        );
 
     }
-
-  }
-
-
-  if (paymentPhone) {
-
-    paymentPhone.value = "";
 
   }
 
@@ -2399,7 +3394,7 @@ function openChatPaymentModal(user) {
       false;
 
     paymentSubmit.textContent =
-      "Pay & Start Chat";
+      `Pay KSh ${GLOBAL_MEET_FEE}`;
 
   }
 
@@ -2421,20 +3416,6 @@ function openChatPaymentModal(user) {
 
   }
 
-
-  setTimeout(
-    () => {
-
-      if (paymentPhone) {
-
-        paymentPhone.focus();
-
-      }
-
-    },
-    100
-  );
-
 }
 
 
@@ -2442,9 +3423,11 @@ function openChatPaymentModal(user) {
    CLOSE PAYMENT MODAL
 ========================================================= */
 
-function closeChatPaymentModal() {
+function closePaymentModal() {
 
-  if (paymentPollingTimer) {
+  if (
+    paymentPollingTimer
+  ) {
 
     clearInterval(
       paymentPollingTimer
@@ -2484,7 +3467,7 @@ function closeChatPaymentModal() {
       false;
 
     paymentSubmit.textContent =
-      "Pay & Start Chat";
+      `Pay KSh ${GLOBAL_MEET_FEE}`;
 
   }
 
@@ -2495,7 +3478,7 @@ if (paymentCancel) {
 
   paymentCancel.addEventListener(
     "click",
-    closeChatPaymentModal
+    closePaymentModal
   );
 
 }
@@ -2509,14 +3492,11 @@ if (paymentOverlay) {
 
       if (
         event.target ===
-        paymentOverlay
+        paymentOverlay &&
+        !paymentInProgress
       ) {
 
-        if (!paymentInProgress) {
-
-          closeChatPaymentModal();
-
-        }
+        closePaymentModal();
 
       }
 
@@ -2527,20 +3507,24 @@ if (paymentOverlay) {
 
 
 /* =========================================================
-   INITIATE GLOBAL CHAT PAYMENT
+   INITIATE PAYMENT
 ========================================================= */
 
-async function initiateGlobalChatPayment() {
+async function initiatePayment() {
 
-  if (paymentInProgress) {
+  if (
+    paymentInProgress
+  ) {
+
     return;
+
   }
 
 
   if (!currentUser) {
 
     showToast(
-      "Please log in again."
+      "Please wait for your CONNECTA session."
     );
 
     return;
@@ -2551,29 +3535,8 @@ async function initiateGlobalChatPayment() {
   if (!selectedChatUser) {
 
     showToast(
-      "Please select a person to chat with."
+      "Please select a profile first."
     );
-
-    return;
-
-  }
-
-
-  const phone =
-    normalizeKenyanPhone(
-      paymentPhone?.value
-    );
-
-
-  if (!phone) {
-
-    showToast(
-      "Enter a valid Kenyan M-PESA number."
-    );
-
-    if (paymentPhone) {
-      paymentPhone.focus();
-    }
 
     return;
 
@@ -2603,7 +3566,7 @@ async function initiateGlobalChatPayment() {
 
     const response =
       await fetch(
-        GLOBAL_CHAT_PAYMENT_INITIATE,
+        PAYMENT_INITIATE_URL,
         {
 
           method:
@@ -2625,10 +3588,8 @@ async function initiateGlobalChatPayment() {
               receiverId:
                 selectedChatUser.uid,
 
-              phone,
-
               amount:
-                GLOBAL_CHAT_FEE
+                GLOBAL_MEET_FEE
 
             })
 
@@ -2646,7 +3607,8 @@ async function initiateGlobalChatPayment() {
 
     } catch {
 
-      data = null;
+      data =
+        null;
 
     }
 
@@ -2656,7 +3618,7 @@ async function initiateGlobalChatPayment() {
       throw new Error(
         data?.message ||
         data?.error ||
-        "Unable to start the M-PESA payment."
+        "Unable to start payment."
       );
 
     }
@@ -2670,7 +3632,7 @@ async function initiateGlobalChatPayment() {
     if (!paymentId) {
 
       throw new Error(
-        "The payment request did not return a payment ID."
+        "Payment ID was not returned."
       );
 
     }
@@ -2685,20 +3647,19 @@ async function initiateGlobalChatPayment() {
 
 
     showToast(
-      "Check your phone and complete the M-PESA prompt."
+      "Check your phone and complete the M-PESA payment."
     );
 
 
-    await pollGlobalChatPayment(
-      paymentId,
-      selectedChatUser.uid
+    await pollPayment(
+      paymentId
     );
 
 
   } catch (error) {
 
     console.error(
-      "Global Chat payment initiation failed:",
+      "Global Meet payment error:",
       error
     );
 
@@ -2713,7 +3674,7 @@ async function initiateGlobalChatPayment() {
         false;
 
       paymentSubmit.textContent =
-        "Pay & Start Chat";
+        `Pay KSh ${GLOBAL_MEET_FEE}`;
 
     }
 
@@ -2729,22 +3690,24 @@ async function initiateGlobalChatPayment() {
 
 
 /* =========================================================
-   POLL GLOBAL CHAT PAYMENT
+   POLL PAYMENT
 ========================================================= */
 
-async function pollGlobalChatPayment(
-  paymentId,
-  receiverId
+async function pollPayment(
+  paymentId
 ) {
 
   const maxAttempts =
     30;
 
+
   let attempts =
     0;
 
 
-  if (paymentPollingTimer) {
+  if (
+    paymentPollingTimer
+  ) {
 
     clearInterval(
       paymentPollingTimer
@@ -2771,7 +3734,7 @@ async function pollGlobalChatPayment(
 
               const response =
                 await fetch(
-                  GLOBAL_CHAT_PAYMENT_STATUS,
+                  PAYMENT_STATUS_URL,
                   {
 
                     method:
@@ -2798,7 +3761,8 @@ async function pollGlobalChatPayment(
                 );
 
 
-              let data = null;
+              let data =
+                null;
 
 
               try {
@@ -2808,7 +3772,8 @@ async function pollGlobalChatPayment(
 
               } catch {
 
-                data = null;
+                data =
+                  null;
 
               }
 
@@ -2826,21 +3791,21 @@ async function pollGlobalChatPayment(
                   .toLowerCase();
 
 
-                /*
-                 * Backend may return any of these
-                 * successful states.
-                 */
-
                 if (
-                  status === "completed" ||
-                  status === "success" ||
-                  data.paid === true ||
-                  data.completed === true
+                  status ===
+                    "completed" ||
+                  status ===
+                    "success" ||
+                  data.paid ===
+                    true ||
+                  data.completed ===
+                    true
                 ) {
 
                   clearInterval(
                     paymentPollingTimer
                   );
+
 
                   paymentPollingTimer =
                     null;
@@ -2850,40 +3815,13 @@ async function pollGlobalChatPayment(
                     false;
 
 
-                  if (paymentSubmit) {
-
-                    paymentSubmit.textContent =
-                      "Payment confirmed";
-
-                  }
-
-
-                  showToast(
-                    "Payment confirmed. Opening conversation..."
+                  showPaymentSuccess(
+                    data
                   );
 
 
-                  /*
-                   * Give Firestore/backend a short
-                   * moment to finish creating/updating
-                   * the conversation.
-                   */
-
-                  setTimeout(
-                    () => {
-
-                      openUnlockedConversation(
-                        data,
-                        receiverId
-                      );
-
-
-                      resolve(
-                        true
-                      );
-
-                    },
-                    500
+                  resolve(
+                    true
                   );
 
 
@@ -2893,14 +3831,19 @@ async function pollGlobalChatPayment(
 
 
                 if (
-                  status === "failed" ||
-                  status === "cancelled" ||
-                  status === "expired"
+                  [
+                    "failed",
+                    "cancelled",
+                    "expired"
+                  ].includes(
+                    status
+                  )
                 ) {
 
                   clearInterval(
                     paymentPollingTimer
                   );
+
 
                   paymentPollingTimer =
                     null;
@@ -2916,7 +3859,7 @@ async function pollGlobalChatPayment(
                       false;
 
                     paymentSubmit.textContent =
-                      "Pay & Start Chat";
+                      `Pay KSh ${GLOBAL_MEET_FEE}`;
 
                   }
 
@@ -2938,18 +3881,17 @@ async function pollGlobalChatPayment(
 
               }
 
-
             } catch (error) {
 
+              /*
+               * Temporary network failures do not
+               * immediately cancel the payment.
+               */
+
               console.error(
-                "Global Chat payment status error:",
+                "Payment status error:",
                 error
               );
-
-              /*
-               * Don't immediately fail because of
-               * a temporary network problem.
-               */
 
             }
 
@@ -2962,6 +3904,7 @@ async function pollGlobalChatPayment(
               clearInterval(
                 paymentPollingTimer
               );
+
 
               paymentPollingTimer =
                 null;
@@ -2977,13 +3920,13 @@ async function pollGlobalChatPayment(
                   false;
 
                 paymentSubmit.textContent =
-                  "Pay & Start Chat";
+                  `Pay KSh ${GLOBAL_MEET_FEE}`;
 
               }
 
 
               showToast(
-                "Payment confirmation timed out. If you completed payment, please check your chats shortly."
+                "Payment confirmation timed out. If you completed payment, contact CONNECTA Support with your payment reference."
               );
 
 
@@ -3004,29 +3947,114 @@ async function pollGlobalChatPayment(
 
 
 /* =========================================================
-   OPEN UNLOCKED CONVERSATION
+   PAYMENT SUCCESS
 ========================================================= */
 
-function openUnlockedConversation(
-  paymentData,
-  receiverId
+function showPaymentSuccess(
+  paymentData = {}
 ) {
 
-  const conversationId =
-    paymentData?.conversationId ||
-    paymentData?.chatId ||
-    paymentData?.conversation?.conversationId;
+  if (paymentForm) {
+
+    paymentForm.style.display =
+      "none";
+
+  }
 
 
-  closeChatPaymentModal();
+  if (paymentSuccess) {
+
+    paymentSuccess.style.display =
+      "";
+
+  }
 
 
-  if (conversationId) {
+  /*
+   * Store reference locally so the Support
+   * button can use it.
+   */
 
-    window.location.href =
-      `chat.html?conversationId=${encodeURIComponent(
-        conversationId
-      )}`;
+  const reference =
+    paymentData.transactionCode ||
+    paymentData.reference ||
+    paymentData.paymentId ||
+    "";
+
+
+  if (contactSupportBtn) {
+
+    contactSupportBtn.dataset.reference =
+      reference;
+
+  }
+
+
+  showToast(
+    "Payment confirmed successfully."
+  );
+
+}
+
+
+/* =========================================================
+   CONTACT CONNECTA SUPPORT
+========================================================= */
+
+function contactSupport() {
+
+  const reference =
+    contactSupportBtn?.dataset.reference ||
+    "";
+
+
+  const selectedName =
+    selectedChatUser
+      ? getFullName(
+          selectedChatUser
+        )
+      : "selected profile";
+
+
+  /*
+   * Replace this number with your official
+   * CONNECTA Support WhatsApp number.
+   *
+   * We intentionally leave it configurable
+   * here rather than inventing a number.
+   */
+
+  const supportNumber =
+    window.CONNECTA_SUPPORT_WHATSAPP ||
+    "";
+
+
+  const message =
+    `Hello CONNECTA Support. I have completed a Global Meet connection payment.
+
+Selected profile: ${selectedName}
+Payment reference: ${reference || "Not available"}
+
+Please verify my payment and help connect me with the selected profile.`;
+
+
+  if (supportNumber) {
+
+    const cleanNumber =
+      supportNumber.replace(
+        /\D/g,
+        ""
+      );
+
+
+    window.open(
+      `https://wa.me/${cleanNumber}?text=${encodeURIComponent(
+        message
+      )}`,
+      "_blank",
+      "noopener"
+    );
+
 
     return;
 
@@ -3034,37 +4062,70 @@ function openUnlockedConversation(
 
 
   /*
-   * Fallback for a chat page that accepts the
-   * other user's UID.
+   * If the support number hasn't yet been
+   * configured, show the message instead of
+   * sending the user to a fake destination.
    */
 
-  if (receiverId) {
+  if (
+    navigator.clipboard
+  ) {
 
-    window.location.href =
-      `chat.html?uid=${encodeURIComponent(
-        receiverId
-      )}`;
+    navigator.clipboard.writeText(
+      message
+    )
+      .then(
+        () => {
 
-    return;
+          showToast(
+            "Support message copied. Add your CONNECTA Support WhatsApp number to continue."
+          );
+
+        }
+      )
+      .catch(
+        () => {
+
+          showToast(
+            "CONNECTA Support contact is not configured yet."
+          );
+
+        }
+      );
+
+  } else {
+
+    showToast(
+      "CONNECTA Support contact is not configured yet."
+    );
 
   }
 
+}
 
-  showToast(
-    "Payment completed, but the conversation could not be opened."
+
+if (contactSupportBtn) {
+
+  contactSupportBtn.addEventListener(
+    "click",
+    contactSupport
   );
 
 }
 
 
 /* =========================================================
-   CHAT BUTTON
+   PROFILE CHAT CLICK
 ========================================================= */
 
-function handleChatClick(userId) {
+function handleConnectClick(
+  userId
+) {
 
   if (!userId) {
+
     return;
+
   }
 
 
@@ -3074,7 +4135,7 @@ function handleChatClick(userId) {
   ) {
 
     showToast(
-      "You cannot start a Global Chat with yourself."
+      "You cannot connect with yourself."
     );
 
     return;
@@ -3093,7 +4154,7 @@ function handleChatClick(userId) {
   if (!user) {
 
     showToast(
-      "This user is no longer available."
+      "This profile is no longer available."
     );
 
     return;
@@ -3102,11 +4163,13 @@ function handleChatClick(userId) {
 
 
   if (
-    !isAvailableForGlobalChat(user)
+    !isGlobalMeetProfile(
+      user
+    )
   ) {
 
     showToast(
-      "This person is currently unavailable for Global Chat."
+      "This profile is currently unavailable."
     );
 
     return;
@@ -3114,7 +4177,7 @@ function handleChatClick(userId) {
   }
 
 
-  openChatPaymentModal(
+  openPaymentModal(
     user
   );
 
@@ -3122,7 +4185,7 @@ function handleChatClick(userId) {
 
 
 /* =========================================================
-   USER CARD CLICKS
+   CARD EVENTS
 ========================================================= */
 
 document.addEventListener(
@@ -3130,7 +4193,7 @@ document.addEventListener(
   event => {
 
     /*
-     * Follow button.
+     * Follow.
      */
 
     const followButton =
@@ -3158,57 +4221,28 @@ document.addEventListener(
 
 
     /*
-     * Chat button.
+     * Connect.
      */
 
-    const chatButton =
+    const connectButton =
       event.target.closest(
         "[data-chat-id]"
       );
 
 
-    if (chatButton) {
+    if (connectButton) {
 
       event.preventDefault();
 
       event.stopPropagation();
 
 
-      handleChatClick(
-        chatButton.dataset.chatId
+      handleConnectClick(
+        connectButton.dataset.chatId
       );
 
 
       return;
-
-    }
-
-
-    /*
-     * Profile.
-     */
-
-    const profileElement =
-      event.target.closest(
-        "[data-profile-id]"
-      );
-
-
-    if (profileElement) {
-
-      const userId =
-        profileElement.dataset.profileId;
-
-
-      if (!userId) {
-        return;
-      }
-
-
-      window.location.href =
-        `profile.html?uid=${encodeURIComponent(
-          userId
-        )}`;
 
     }
 
@@ -3246,7 +4280,7 @@ if (connectionBtn) {
     () => {
 
       showToast(
-        "Connection feature coming soon."
+        "Global Meet connections are available below."
       );
 
     }
@@ -3256,48 +4290,21 @@ if (connectionBtn) {
 
 
 /* =========================================================
-   PAYMENT SUBMIT
+   PAYMENT BUTTON
 ========================================================= */
 
 if (paymentSubmit) {
 
   paymentSubmit.addEventListener(
     "click",
-    initiateGlobalChatPayment
+    initiatePayment
   );
 
 }
 
 
 /* =========================================================
-   ENTER KEY IN PAYMENT PHONE
-========================================================= */
-
-if (paymentPhone) {
-
-  paymentPhone.addEventListener(
-    "keydown",
-    event => {
-
-      if (
-        event.key ===
-        "Enter"
-      ) {
-
-        event.preventDefault();
-
-        initiateGlobalChatPayment();
-
-      }
-
-    }
-  );
-
-}
-
-
-/* =========================================================
-   ESCAPE KEY
+   ESCAPE MODAL
 ========================================================= */
 
 document.addEventListener(
@@ -3317,7 +4324,7 @@ document.addEventListener(
         !paymentInProgress
       ) {
 
-        closeChatPaymentModal();
+        closePaymentModal();
 
       }
 
@@ -3339,21 +4346,27 @@ if (logoutBtn) {
 
       try {
 
-        if (unsubscribeUsers) {
+        if (
+          unsubscribeUsers
+        ) {
 
           unsubscribeUsers();
 
         }
 
 
-        if (unsubscribeProfile) {
+        if (
+          unsubscribeProfile
+        ) {
 
           unsubscribeProfile();
 
         }
 
 
-        if (paymentPollingTimer) {
+        if (
+          paymentPollingTimer
+        ) {
 
           clearInterval(
             paymentPollingTimer
@@ -3416,36 +4429,51 @@ onAuthStateChanged(
     }
 
 
+    /*
+     * This is the existing Firebase session.
+     *
+     * We do NOT ask the user to log in again.
+     */
+
     currentUser =
       user;
+
+
+    /*
+     * First restore public profile cache
+     * so the page can feel instant.
+     */
+
+    loadCachedProfiles();
 
 
     try {
 
       /*
-       * Load the private profile only for
-       * the logged-in user.
+       * Restore/load the current user's
+       * private profile.
        */
 
       await loadCurrentProfile();
 
 
       /*
-       * Listen to own profile.
+       * Start realtime current-user listener.
        */
 
       listenToCurrentProfile();
 
 
       /*
-       * Load PUBLIC profiles only.
+       * Start public profile listener.
        */
 
-      listenToUsers();
+      listenToPublicProfiles();
 
 
       /*
-       * Render initial UI.
+       * Render immediately using whatever
+       * data is already available.
        */
 
       renderCurrentTab();
@@ -3454,14 +4482,17 @@ onAuthStateChanged(
     } catch (error) {
 
       console.error(
-        "Global Chat startup error:",
+        "Global Meet startup error:",
         error
       );
 
 
+      hideSkeleton();
+
+
       showToast(
         error.message ||
-        "Unable to load Global Chat."
+        "Unable to load Global Meet."
       );
 
     }
@@ -3471,28 +4502,34 @@ onAuthStateChanged(
 
 
 /* =========================================================
-   CLEANUP
+   BEFORE UNLOAD
 ========================================================= */
 
 window.addEventListener(
   "beforeunload",
   () => {
 
-    if (unsubscribeUsers) {
+    if (
+      unsubscribeUsers
+    ) {
 
       unsubscribeUsers();
 
     }
 
 
-    if (unsubscribeProfile) {
+    if (
+      unsubscribeProfile
+    ) {
 
       unsubscribeProfile();
 
     }
 
 
-    if (paymentPollingTimer) {
+    if (
+      paymentPollingTimer
+    ) {
 
       clearInterval(
         paymentPollingTimer
