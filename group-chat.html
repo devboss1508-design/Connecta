@@ -106,22 +106,23 @@
            GROUP CHAT PAGE
         ========================================================= */
 
-        .group-chat-page {
+.group-chat-page {
+    width: 100%;
 
-           width: 100%;
+    height: var(--connecta-group-app-height, 100dvh);
 
-           height: var(--connecta-group-app-height, 100vh);
+    min-height: 0;
 
-           min-height: 0;
+    max-height: var(--connecta-group-app-height, 100dvh);
 
-           max-height: var(--connecta-group-app-height, 100vh);
+    display: flex;
 
-           display: flex;
+    flex-direction: column;
 
-           flex-direction: column;
+    overflow: hidden;
 
-           overflow: hidden;
-        }
+    position: relative;
+}
 
         /* =========================================================
            HEADER
@@ -459,8 +460,7 @@
            CHAT PAGE
         ========================================================= */
 
-        .messages-area {
-
+.messages-area {
     flex: 1 1 auto;
 
     min-height: 0;
@@ -471,30 +471,29 @@
     overflow-x: hidden;
 
     /*
-     * The bottom padding must be larger than the fixed
-     * composer so the final message can scroll completely
-     * above it.
+     * Space for:
+     * - fixed composer
+     * - Android safe area
+     * - final message visibility
      */
-      padding:
+    padding:
         82px
         10px
         calc(
-            118px +
-            env(safe-area-inset-bottom)
+            125px +
+            env(safe-area-inset-bottom, 0px)
         );
 
-      scroll-behavior: smooth;
+    scroll-behavior: smooth;
 
-       -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: touch;
 
-        overscroll-behavior: contain;
+    overscroll-behavior: contain;
 
-    /*
-     * Prevent Android PWA from applying unexpected
-     * scroll anchoring when the viewport changes.
-     */
-           overflow-anchor: auto;
-        }
+    overflow-anchor: auto;
+
+    scrollbar-width: thin;
+}
 
 
         .messages-inner {
@@ -1285,18 +1284,19 @@
            COMPOSER
         ========================================================= */
 
-        .composer-wrap {
-
+.composer-wrap {
     position: fixed;
 
     left: 0;
     right: 0;
     bottom: 0;
 
+    width: 100%;
+
     z-index: 90;
 
     /*
-     * Keep the composer completely inside the visible
+     * Keep the complete composer inside the visible
      * Android/PWA viewport.
      */
     padding:
@@ -1306,54 +1306,53 @@
             7px,
             calc(
                 7px +
-                env(safe-area-inset-bottom)
+                env(safe-area-inset-bottom, 0px)
             )
         );
 
-      min-height: 56px;
+    min-height: 56px;
 
-      background:
-         rgba(255,255,255,.97);
+    background:
+        rgba(255,255,255,.97);
 
-        border-top:
-         1px solid
-           var(--border);
+    border-top:
+        1px solid
+        var(--border);
 
-          backdrop-filter:
-           blur(12px);
+    backdrop-filter:
+        blur(12px);
 
-      /*
-         * Never allow flex/layout calculations to shrink it.
-       */
-           flex-shrink: 0;
-        }
+    -webkit-backdrop-filter:
+        blur(12px);
 
-            background:
-                rgba(255,255,255,.97);
+    box-sizing: border-box;
 
-            border-top:
-                1px solid
-                var(--border);
+    flex-shrink: 0;
 
-            backdrop-filter:
-                blur(12px);
-        }
+    /*
+     * Prevent accidental horizontal overflow.
+     */
+    overflow: hidden;
+}
 
 
-        .composer {
+ .composer {
+    width: 100%;
 
-            width: 100%;
+    max-width: 680px;
 
-            max-width: 680px;
+    min-width: 0;
 
-            margin: 0 auto;
+    margin: 0 auto;
 
-            display: flex;
+    display: flex;
 
-            align-items: flex-end;
+    align-items: flex-end;
 
-            gap: 6px;
-        }
+    gap: 6px;
+
+    box-sizing: border-box;
+}
 
 
         .composer-action {
@@ -3643,7 +3642,7 @@
     
 <script
     type="module"
-    src="js/group-chat.js"
+    src="js/group-chat.js?v=20260925-3"
 ></script>
 
 
