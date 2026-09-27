@@ -1,0 +1,18 @@
+{
+  "name": "connecta-functions",
+  "version": "1.0.0",
+  "description": "CONNECTA Firebase push notification functions",
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.4.0",
+    "firebase-functions": "^6.4.0"
+  },
+  "private": true
+}
