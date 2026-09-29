@@ -15,20 +15,23 @@ import {
     getDoc,
     setDoc,
     updateDoc,
+    deleteDoc,
     collection,
     onSnapshot,
     query,
     orderBy,
     serverTimestamp,
     writeBatch,
-    increment
+    increment,
+    arrayUnion
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 
 import {
     ref,
     uploadBytesResumable,
-    getDownloadURL
+    getDownloadURL,
+    deleteObject
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
 
 
@@ -76,27 +79,31 @@ let isMarkingMessages = false;
 const MAX_PHOTO_SIZE =
     5 * 1024 * 1024;
 
+const MAX_PHOTOS_PER_MESSAGE = 10;
 
 const ALLOWED_PHOTO_TYPES = [
-
     "image/jpeg",
-
     "image/png",
-
     "image/webp"
-
 ];
 
 
 /* =====================================================
-   PHOTO STATE
+   MULTIPLE PHOTO STATE
 ===================================================== */
 
-let selectedPhoto = null;
+let selectedPhotos = [];
 
-let selectedPhotoPreviewUrl = null;
+let selectedPhotoPreviewUrls = [];
 
 let isSendingPhoto = false;
+
+
+/* =====================================================
+   EDIT MESSAGE STATE
+===================================================== */
+
+let editingMessageId = null;
 
 
 /* =====================================================
@@ -2171,6 +2178,256 @@ function renderImageMessage(
 
 
 /* =====================================================
+   EDIT MESSAGE
+===================================================== */
+
+async function editMessage(messageId) {
+
+    const message = latestMessages.find(
+        item => item.id === messageId
+    );
+
+    if (!message) {
+        return;
+    }
+
+    if (message.senderId !== currentUser.uid) {
+        alert("You can only edit your own messages.");
+        return;
+    }
+
+    if (message.type !== "text") {
+        alert("Only text messages can be edited.");
+        return;
+    }
+
+    const newText = prompt(
+        "Edit your message:",
+        message.text || ""
+    );
+
+    if (newText === null) {
+        return;
+    }
+
+    const text = newText.trim();
+
+    if (!text) {
+        alert("Message cannot be empty.");
+        return;
+    }
+
+    if (text === message.text) {
+        return;
+    }
+
+    try {
+
+        const control = getChatAccountControl(
+            currentProfile
+        );
+
+        if (
+            control.blocked ||
+            control.messagingRestricted
+        ) {
+            alert(control.message);
+            return;
+        }
+
+        const messageRef = doc(
+            db,
+            "chats",
+            chatId,
+            "messages",
+            messageId
+        );
+
+        await updateDoc(messageRef, {
+
+            text: text,
+
+            edited: true,
+
+            editedAt: serverTimestamp()
+
+        });
+
+    } catch (error) {
+
+        console.error("EDIT MESSAGE ERROR:", error);
+
+        alert("Message could not be edited.");
+
+    }
+
+}
+
+
+/* =====================================================
+   DELETE MESSAGE
+===================================================== */
+
+async function deleteMessage(messageId) {
+
+    const message = latestMessages.find(
+        item => item.id === messageId
+    );
+
+    if (!message) {
+        return;
+    }
+
+    if (message.senderId !== currentUser.uid) {
+        alert("You can only delete your own messages.");
+        return;
+    }
+
+    const confirmed = confirm(
+        "Are you sure you want to delete this message?"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+
+        const control = getChatAccountControl(
+            currentProfile
+        );
+
+        if (
+            control.blocked ||
+            control.messagingRestricted
+        ) {
+            alert(control.message);
+            return;
+        }
+
+        const messageRef = doc(
+            db,
+            "chats",
+            chatId,
+            "messages",
+            messageId
+        );
+
+        await deleteDoc(messageRef);
+
+        /*
+         * Delete the associated photo from Storage.
+         * A failed photo deletion will not restore
+         * the already deleted message.
+         */
+
+        if (message.imagePaths) {
+
+            for (const path of message.imagePaths) {
+
+                try {
+
+                    await deleteObject(
+                        ref(storage, path)
+                    );
+
+                } catch (error) {
+
+                    console.warn(
+                        "Could not delete photo:",
+                        error
+                    );
+
+                }
+
+            }
+
+        } else if (message.imagePath) {
+
+            try {
+
+                await deleteObject(
+                    ref(storage, message.imagePath)
+                );
+
+            } catch (error) {
+
+                console.warn(
+                    "Could not delete photo:",
+                    error
+                );
+
+            }
+
+        }
+
+    } catch (error) {
+
+        console.error("DELETE MESSAGE ERROR:", error);
+
+        alert("Message could not be deleted.");
+
+    }
+
+}
+
+
+/* =====================================================
+   MESSAGE ACTIONS
+===================================================== */
+
+function showMessageActions(messageId) {
+
+    const message = latestMessages.find(
+        item => item.id === messageId
+    );
+
+    if (
+        !message ||
+        message.senderId !== currentUser.uid
+    ) {
+        return;
+    }
+
+    const actions = [];
+
+    if (message.type === "text") {
+        actions.push("Edit");
+    }
+
+    actions.push("Delete");
+
+    const choice = prompt(
+        `Choose an action:\n\n${actions.map(
+            (action, index) =>
+                `${index + 1}. ${action}`
+        ).join("\n")}\n\nEnter the number:`
+    );
+
+    if (choice === null) {
+        return;
+    }
+
+    if (
+        choice.trim() === "1" &&
+        message.type === "text"
+    ) {
+
+        editMessage(messageId);
+
+    } else if (
+        choice.trim() ===
+        (message.type === "text" ? "2" : "1")
+    ) {
+
+        deleteMessage(messageId);
+
+    }
+
+}
+
+
+/* =====================================================
    RENDER MESSAGES
 ===================================================== */
 
@@ -2298,76 +2555,101 @@ function renderMessages(
 
             let messageContent = "";
 
+if (message.type === "images") {
 
-            if (isImage) {
+    const images = Array.isArray(message.images)
+        ? message.images
+        : [];
 
-                messageContent =
-                    renderImageMessage(
-                        message,
-                        tick
-                    );
-
-            } else {
-
-                messageContent = `
-
-                    <span
-                        class="message-text"
-                    >${escapeHtml(
-                        message.text || ""
-                    )}</span>
-
-                    <span
-                        class="message-meta"
+    messageContent = `
+        <div class="multiple-message-images">
+            ${images.map(image => `
+                <a
+                    href="${escapeHtml(image.url)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    <img
+                        src="${escapeHtml(image.url)}"
+                        alt="Shared photo"
+                        loading="lazy"
                     >
+                </a>
+            `).join("")}
+        </div>
 
-                        <span
-                            class="message-time"
-                        >
-                            ${formatTime(
-                                message.createdAt
-                            )}
-                        </span>
+        <span class="message-meta">
+            <span class="message-time">
+                ${formatTime(message.createdAt)}
+            </span>
+            ${message.edited ? "Edited" : ""}
+            ${tick}
+        </span>
+    `;
 
-                        ${tick}
+} else if (isImage) {
 
-                    </span>
+    messageContent = renderImageMessage(
+        message,
+        tick
+    );
 
-                `;
+} else {
 
-            }
+    messageContent = `
+        <span class="message-text">
+            ${escapeHtml(message.text || "")}
+        </span>
+
+        <span class="message-meta">
+            <span class="message-time">
+                ${formatTime(message.createdAt)}
+            </span>
+
+            ${message.edited ? "Edited" : ""}
+            ${tick}
+        </span>
+    `;
+
+}
 
 
             html += `
+    <div
+        class="
+            message-row
+            ${mine ? "outgoing" : "incoming"}
+        "
+        data-message-id="${escapeHtml(message.id)}"
+    >
 
-                <div
-                    class="
-                        message-row
-                        ${mine
-                            ? "outgoing"
-                            : "incoming"}
-                    "
-                    data-message-id="${escapeHtml(
-                        message.id
-                    )}"
+        <div
+            class="
+                message-bubble
+                ${isImage || message.type === "images"
+                    ? "photo-message"
+                    : ""}
+            "
+        >
+
+            ${messageContent}
+
+            ${mine ? `
+                <button
+                    type="button"
+                    class="message-options"
+                    data-message-action="${escapeHtml(message.id)}"
+                    aria-label="Message options"
+                    title="Edit or delete"
                 >
+                    ⋮
+                </button>
+            ` : ""}
 
-                    <div
-                        class="
-                            message-bubble
-                            ${isImage
-                                ? "photo-message"
-                                : ""}
-                        "
-                    >
+        </div>
 
-                        ${messageContent}
-
-                    </div>
-
-                </div>
-
-            `;
+    </div>
+`;
 
         }
     );
@@ -2389,6 +2671,27 @@ function renderMessages(
         );
 
     }
+
+    /* =====================================================
+   MESSAGE ACTION BUTTONS
+===================================================== */
+
+box.querySelectorAll(
+    "[data-message-action]"
+).forEach(button => {
+
+    button.addEventListener("click", event => {
+
+        event.stopPropagation();
+
+        const messageId =
+            button.dataset.messageAction;
+
+        showMessageActions(messageId);
+
+    });
+
+});
 
 }
 
