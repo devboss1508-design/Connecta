@@ -271,141 +271,69 @@ messaging.onBackgroundMessage(
  * Firebase recommends handling notificationclick so we
  * control exactly where the user goes after tapping.
  */
+self.addEventListener("notificationclick", event => {
+    event.notification.close();
 
-self.addEventListener(
-    "notificationclick",
-    event => {
+    const data = event.notification.data || {};
 
-        event.notification.close();
+    let targetUrl = "/dashboard.html";
 
+    if (data.type === "private_message") {
+        const params = new URLSearchParams();
 
-        const data =
-            event.notification.data || {};
-
-
-        let targetUrl =
-            "/dashboard.html";
-
-
-        /*
-         * Private chat
-         */
-
-        if (
-            data.type ===
-            "private_message" &&
-            data.chatId
-        ) {
-
-            targetUrl =
-                `/chat.html?chatId=${encodeURIComponent(
-                    data.chatId
-                )}`;
-
+        if (data.chatId) {
+            params.set("chatId", data.chatId);
         }
 
-
-        /*
-         * Group chat
-         */
-
-        else if (
-            data.type ===
-            "group_message" &&
-            data.groupId
-        ) {
-
-            targetUrl =
-                `/group-chat.html?groupId=${encodeURIComponent(
-                    data.groupId
-                )}`;
-
+        if (data.senderId) {
+            params.set("userId", data.senderId);
         }
 
-
-        /*
-         * Explicit URL supplied by backend
-         */
-
-        else if (
-            data.url
-        ) {
-
-            targetUrl =
-                data.url;
-
+        if (data.senderName) {
+            params.set("senderName", data.senderName);
         }
 
-
-        event.waitUntil(
-
-            clients
-                .matchAll({
-
-                    type:
-                        "window",
-
-                    includeUncontrolled:
-                        true
-
-                })
-
-                .then(
-                    windowClients => {
-
-                        /*
-                         * Look for an existing CONNECTA
-                         * window.
-                         */
-
-                        for (
-                            const client
-                            of windowClients
-                        ) {
-
-                            if (
-                                "focus"
-                                in client
-                            ) {
-
-                                return client
-                                    .navigate(
-                                        targetUrl
-                                    )
-                                    .then(
-                                        () =>
-                                            client.focus()
-                                    );
-
-                            }
-
-                        }
-
-
-                        /*
-                         * No CONNECTA window exists.
-                         *
-                         * Open a new one.
-                         */
-
-                        if (
-                            clients.openWindow
-                        ) {
-
-                            return clients.openWindow(
-                                targetUrl
-                            );
-
-                        }
-
-                    }
-
-                )
-
-        );
-
+        if (data.chatId || data.senderId) {
+            targetUrl = `/chat.html?${params.toString()}`;
+        }
+    } else if (
+        data.type === "group_message" &&
+        data.groupId
+    ) {
+        targetUrl =
+            `/group-chat.html?groupId=${encodeURIComponent(
+                data.groupId
+            )}`;
+    } else if (data.url) {
+        targetUrl = data.url;
     }
-);
+
+    event.waitUntil(
+        clients.matchAll({
+            type: "window",
+            includeUncontrolled: true
+        }).then(async windowClients => {
+            const target = new URL(
+                targetUrl,
+                self.location.origin
+            );
+
+            for (const client of windowClients) {
+                if (new URL(client.url).origin !== self.location.origin) {
+                    continue;
+                }
+
+                if ("navigate" in client) {
+                    await client.navigate(target.href);
+                    return client.focus();
+                }
+            }
+
+            return clients.openWindow(target.href);
+        })
+    );
+});
+                
 
 
 /* =========================================================
