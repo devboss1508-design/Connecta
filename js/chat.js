@@ -50,10 +50,6 @@ let otherUser = null;
 
 let chatId = null;
 
-let targetMessageId = null;
-
-let targetMessageFound = false;
-
 let stopOwnProfile = null;
 
 let stopMessages = null;
@@ -563,12 +559,15 @@ function escapeHtml(
 ===================================================== */
 
 function getOtherUid() {
-    const params =
-        new URLSearchParams(location.search);
 
-    targetMessageId = params.get("messageId");
+    const params =
+        new URLSearchParams(
+            location.search
+        );
+
 
     return params.get("uid");
+
 }
 
 
@@ -2172,50 +2171,6 @@ function renderImageMessage(
 
 
 /* =====================================================
-   NAVIGATE TO EXACT MESSAGE
-===================================================== */
-
-function scrollToTargetMessage() {
-    if (!targetMessageId || targetMessageFound) {
-        return false;
-    }
-
-    const box = $("messagesContainer");
-
-    if (!box) {
-        return false;
-    }
-
-    const messageElement = Array.from(
-        box.querySelectorAll("[data-message-id]")
-    ).find(element =>
-        element.dataset.messageId === targetMessageId
-    );
-
-    if (!messageElement) {
-        return false;
-    }
-
-    targetMessageFound = true;
-
-    messageElement.scrollIntoView({
-        behavior: "smooth",
-        block: "center"
-    });
-
-    messageElement.classList.add("notification-message-highlight");
-
-    setTimeout(() => {
-        messageElement.classList.remove(
-            "notification-message-highlight"
-        );
-    }, 3000);
-
-    return true;
- }
-
-
-/* =====================================================
    RENDER MESSAGES
 ===================================================== */
 
@@ -2422,17 +2377,16 @@ function renderMessages(
         html;
 
 
-    if (targetMessageId && !targetMessageFound) {
-    requestAnimationFrame(() => {
-        if (!scrollToTargetMessage()) {
-            box.scrollTop = box.scrollHeight;
-        }
-    });
-} else if (scrollToBottom) {
-    requestAnimationFrame(() => {
-        box.scrollTop = box.scrollHeight;
-    });
-    }
+    if (scrollToBottom) {
+
+        requestAnimationFrame(
+            () => {
+
+                box.scrollTop =
+                    box.scrollHeight;
+
+            }
+        );
 
     }
 
