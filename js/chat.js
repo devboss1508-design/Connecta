@@ -76,10 +76,20 @@ let isMarkingMessages = false;
    PHOTO CONFIGURATION
 ===================================================== */
 
+// Maximum original photo size: 15 MB
+const MAX_ORIGINAL_PHOTO_SIZE =
+    15 * 1024 * 1024;
+
+// Maximum compressed photo size: 5 MB
 const MAX_PHOTO_SIZE =
     5 * 1024 * 1024;
 
+// Maximum photos per message
 const MAX_PHOTOS_PER_MESSAGE = 10;
+
+// Compression settings
+const PHOTO_MAX_DIMENSION = 1600;
+const PHOTO_QUALITY = 0.82;
 
 const ALLOWED_PHOTO_TYPES = [
     "image/jpeg",
@@ -3200,67 +3210,33 @@ async function sendTextMessage(
    PHOTO VALIDATION
 ===================================================== */
 
-function validatePhoto(
-    file
-) {
+function validatePhoto(file) {
 
     if (!file) {
-
         return {
-
             valid: false,
-
-            message:
-                "Please select a photo."
-
+            message: "Please select a photo."
         };
-
     }
 
-
-    if (
-        !ALLOWED_PHOTO_TYPES.includes(
-            file.type
-        )
-    ) {
-
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
         return {
-
             valid: false,
-
-            message:
-                "Only JPG, PNG and WebP photos are allowed. Videos are not supported."
-
+            message: "Only JPG, PNG and WebP photos are allowed."
         };
-
     }
 
-
-    if (
-        file.size >
-        MAX_PHOTO_SIZE
-    ) {
-
+    if (file.size > MAX_ORIGINAL_PHOTO_SIZE) {
         return {
-
             valid: false,
-
-            message:
-                "Photo must be 5MB or smaller."
-
+            message: "Original photo must be 15 MB or smaller."
         };
-
     }
-
 
     return {
-
         valid: true
-
     };
-
 }
-
 
 /* =====================================================
    PHOTO STATUS
@@ -3470,33 +3446,189 @@ function formatFileSize(
 
 
 /* =====================================================
-   UPLOAD ONE PHOTO
+   COMPRESS PHOTO
+===================================================== */
+
+async function compressPhoto(file) {
+
+    if (!file.type.startsWith("image/")) {
+        throw new Error("Invalid image file.");
+    }
+
+    let bitmap;
+
+    try {
+
+        bitmap = await createImageBitmap(file);
+
+        let width = bitmap.width;
+        let height = bitmap.height;
+
+        // Resize large photos while preserving proportions.
+        const scale = Math.min(
+            1,
+            PHOTO_MAX_DIMENSION / Math.max(width, height)
+        );
+
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+
+        const canvas = document.createElement("canvas");
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const context = canvas.getContext("2d");
+
+        if (!context) {
+            throw new Error("Photo compression is unavailable.");
+        }
+
+        // JPEG does not support transparency.
+        // Use a white background for transparent images.
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, width, height);
+
+        context.drawImage(
+            bitmap,
+            0,
+            0,
+            width,
+            height
+        );
+
+        // Try progressively lower JPEG quality if necessary.
+        const qualities = [0.82, 0.76, 0.70, 0.64, 0.58];
+
+        for (const quality of qualities) {
+
+            const compressed = await new Promise(
+                (resolve, reject) => {
+
+                    canvas.toBlob(
+                        blob => {
+                            if (blob) {
+                                resolve(blob);
+                            } else {
+                                reject(
+                                    new Error("Photo compression failed.")
+                                );
+                            }
+                        },
+                        "image/jpeg",
+                        quality
+                    );
+
+                }
+            );
+
+            if (compressed.size <= MAX_PHOTO_SIZE) {
+                return compressed;
+            }
+        }
+
+        // If still too large, resize further and compress again.
+        const smallerCanvas = document.createElement("canvas");
+
+        const smallerScale = Math.min(
+            1,
+            1200 / Math.max(width, height)
+        );
+
+        smallerCanvas.width = Math.round(width * smallerScale);
+        smallerCanvas.height = Math.round(height * smallerScale);
+
+        const smallerContext = smallerCanvas.getContext("2d");
+
+        if (!smallerContext) {
+            throw new Error("Photo compression is unavailable.");
+        }
+
+        smallerContext.fillStyle = "#ffffff";
+        smallerContext.fillRect(
+            0,
+            0,
+            smallerCanvas.width,
+            smallerCanvas.height
+        );
+
+        smallerContext.drawImage(
+            canvas,
+            0,
+            0,
+            smallerCanvas.width,
+            smallerCanvas.height
+        );
+
+        const finalBlob = await new Promise(
+            (resolve, reject) => {
+
+                smallerCanvas.toBlob(
+                    blob => {
+                        if (blob) {
+                            resolve(blob);
+                        } else {
+                            reject(
+                                new Error("Photo compression failed.")
+                            );
+                        }
+                    },
+                    "image/jpeg",
+                    0.65
+                );
+
+            }
+        );
+
+        if (finalBlob.size > MAX_PHOTO_SIZE) {
+            throw new Error(
+                "This photo is too large to compress. Please select a smaller photo."
+            );
+        }
+
+        return finalBlob;
+
+    } finally {
+
+        if (bitmap) {
+            bitmap.close();
+        }
+
+    }
+}
+
+
+/* =====================================================
+   UPLOAD ONE COMPRESSED PHOTO
 ===================================================== */
 
 async function uploadOnePhoto(file, messageId) {
 
-    const extension = getFileExtension(file);
+    // Compress before uploading.
+    const compressedFile = await compressPhoto(file);
+
+    const extension = "jpg";
 
     const uniqueId = (
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
-)
-    ? crypto.randomUUID()
-    : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        typeof crypto !== "undefined" &&
+        typeof crypto.randomUUID === "function"
+    )
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-     const storagePath =
-       `chatPhotos/${chatId}/${currentUser.uid}/${messageId}_${uniqueId}.${extension}`;
+    const storagePath =
+        `chatPhotos/${chatId}/${currentUser.uid}/${messageId}_${uniqueId}.${extension}`;
 
-     const photoRef = ref(
+    const photoRef = ref(
         storage,
         storagePath
     );
 
     const uploadTask = uploadBytesResumable(
         photoRef,
-        file,
+        compressedFile,
         {
-            contentType: file.type,
+            contentType: "image/jpeg",
             cacheControl: "public,max-age=31536000"
         }
     );
@@ -3520,10 +3652,10 @@ async function uploadOnePhoto(file, messageId) {
         url,
         path: storagePath,
         name: file.name,
-        size: file.size,
-        mimeType: file.type
+        size: compressedFile.size,
+        originalSize: file.size,
+        mimeType: "image/jpeg"
     };
-
 }
 
 
@@ -3761,162 +3893,151 @@ function getFileExtension(
 
 async function sendMessage() {
 
-    const control =
-        getChatAccountControl(
-            currentProfile
-        );
-
+    const control = getChatAccountControl(
+        currentProfile
+    );
 
     if (
         control.blocked ||
         control.messagingRestricted
     ) {
-
         showChatRestrictionNotice(
             control.message ||
             "Private messaging has been restricted by CONNECTA.",
-            control.blocked
-                ? "account"
-                : "messaging"
+            control.blocked ? "account" : "messaging"
         );
-
-
         return;
-
     }
 
-
-    const input =
-        $("messageInput");
-
+    const input = $("messageInput");
 
     if (!input) {
         return;
     }
 
+    const text = input.value.trim();
 
-    const text =
-        input.value.trim();
+    const hasText = Boolean(text);
+    const hasPhoto = selectedPhotos.length > 0;
 
-
-    const hasText =
-        Boolean(text);
-
-
-    const hasPhoto =
-        selectedPhotos.length > 0;
-
-
-    if (
-        !hasText &&
-        !hasPhoto
-    ) {
-
+    if (!hasText && !hasPhoto) {
         return;
-
     }
 
-
-    if (
-        !currentUser ||
-        !otherUser ||
-        !chatId
-    ) {
-
+    if (!currentUser || !otherUser || !chatId) {
         return;
-
     }
 
+    if (isSendingPhoto) {
+        return;
+    }
 
-    const sendButton =
-        $("sendButton");
-
+    const sendButton = $("sendButton");
 
     if (sendButton) {
-
-        sendButton.disabled =
-            true;
-
+        sendButton.disabled = true;
     }
-
 
     try {
 
-        clearTimeout(
-            typingTimer
-        );
+        clearTimeout(typingTimer);
 
+        await setTyping(false);
 
-        await setTyping(
-            false
-        );
-
-
+        // Send text first, if provided.
         if (hasText) {
 
-            await sendTextMessage(
-                text
-            );
+            await sendTextMessage(text);
 
-
-            input.value =
-                "";
+            input.value = "";
 
             resizeTextarea();
 
         }
 
-
+        // Upload and send all selected photos.
         if (hasPhoto) {
 
-          isSendingPhoto = true;
+            isSendingPhoto = true;
 
-       const photos = [...selectedPhotos];
+            const photos = [...selectedPhotos];
 
-        await uploadPhotos(photos);
+            await uploadPhotos(photos);
 
-           clearSelectedPhoto();
+            clearSelectedPhoto();
 
-           isSendingPhoto = false;
+            isSendingPhoto = false;
 
         }
 
-
     } catch (error) {
 
-    console.error("SEND MESSAGE ERROR:", error);
-    console.error("Error code:", error?.code);
-    console.error("Error message:", error?.message);
+        console.error(
+            "SEND MESSAGE ERROR:",
+            error
+        );
 
-    isSendingPhoto = false;
+        console.error(
+            "Error code:",
+            error?.code
+        );
 
-    let message = "Message could not be sent.";
+        console.error(
+            "Error message:",
+            error?.message
+        );
 
-    if (error?.code === "storage/unauthorized") {
-        message = "Firebase Storage denied the photo upload. Check your Storage Rules.";
-    } else if (error?.code === "storage/canceled") {
-        message = "Photo upload was cancelled.";
-    } else if (error?.code === "storage/unknown") {
-        message = "An unknown Firebase Storage error occurred.";
-    } else if (error?.code === "permission-denied") {
-        message = "Firebase Firestore denied saving the message. Check your Firestore Rules.";
-    } else if (error?.message) {
-        message = `Sending failed: ${error.message}`;
+        isSendingPhoto = false;
+
+        let message = "Message could not be sent.";
+
+        if (error?.code === "storage/unauthorized") {
+
+            message =
+                "Firebase Storage denied the photo upload. Check your Storage Rules.";
+
+        } else if (error?.code === "storage/canceled") {
+
+            message =
+                "Photo upload was cancelled.";
+
+        } else if (error?.code === "storage/unknown") {
+
+            message =
+                "An unknown Firebase Storage error occurred.";
+
+        } else if (error?.code === "permission-denied") {
+
+            message =
+                "Firebase Firestore denied saving the message. Check your Firestore Rules.";
+
+        } else if (error?.message) {
+
+            message =
+                `Sending failed: ${error.message}`;
+
+        }
+
+        showChatError(message);
+
+    } finally {
+
+        isSendingPhoto = false;
+
+        if (sendButton) {
+            sendButton.disabled = false;
+        }
+
+        input.focus();
+
     }
 
-    showChatError(message);
-
-} finally {
-
-    isSendingPhoto = false;
-
-    if (sendButton) {
-        sendButton.disabled = false;
-    }
-
-    input.focus();
 }
 
+
+/* =====================================================
+   TYPING
+===================================================== */
 
 /* =====================================================
    TYPING
