@@ -1346,10 +1346,10 @@ async function showInAppNotification(
 
         const url = new URL("chat.html", window.location.href);
 
-        url.searchParams.set("uid", senderId);
+        url.searchParams.set("uid", message.senderId);
         url.searchParams.set("messageId", message.id);
 
-        window.location.href = url.href;
+       window.location.href = url.href;
     }
 
     notification.remove();
