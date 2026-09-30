@@ -1320,45 +1320,40 @@ async function showInAppNotification(
     `;
 
 
-    notification.addEventListener(
-        "click",
-        () => {
-
-            if (
-                isGroup
-            ) {
-
-                if (
-                    message.groupId
-                ) {
-
-                    location.href =
-                        `group-chat.html?groupId=${encodeURIComponent(
-                            message.groupId
-                        )}`;
-
-                }
-
-            } else {
-
-                if (
-                    message.senderId
-                ) {
-
-                    location.href =
-                        `chat.html?uid=${encodeURIComponent(
-                            message.senderId
-                        )}`;
-
-                }
-
-            }
-
-
-            notification.remove();
-
+    notification.addEventListener("click", () => {
+    if (isGroup) {
+        if (!message.groupId || !message.id) {
+            console.error("Missing groupId or message ID", message);
+            return;
         }
-    );
+
+        const url = new URL("group-chat.html", window.location.href);
+
+        url.searchParams.set("groupId", message.groupId);
+        url.searchParams.set("messageId", message.id);
+
+        window.location.href = url.href;
+    } else {
+        const senderId =
+            message.senderId ||
+            message.senderUid ||
+            message.uid;
+
+        if (!senderId || !message.id) {
+            console.error("Missing senderId or message ID", message);
+            return;
+        }
+
+        const url = new URL("chat.html", window.location.href);
+
+        url.searchParams.set("uid", senderId);
+        url.searchParams.set("messageId", message.id);
+
+        window.location.href = url.href;
+    }
+
+    notification.remove();
+});
 
 
     container.prepend(
