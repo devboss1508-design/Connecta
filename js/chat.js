@@ -15,23 +15,20 @@ import {
     getDoc,
     setDoc,
     updateDoc,
-    deleteDoc,
     collection,
     onSnapshot,
     query,
     orderBy,
     serverTimestamp,
     writeBatch,
-    increment,
-    arrayUnion
+    increment
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
 
 
 import {
     ref,
     uploadBytesResumable,
-    getDownloadURL,
-    deleteObject
+    getDownloadURL
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-storage.js";
 
 
@@ -76,44 +73,30 @@ let isMarkingMessages = false;
    PHOTO CONFIGURATION
 ===================================================== */
 
-// Maximum original photo size: 15 MB
-const MAX_ORIGINAL_PHOTO_SIZE =
-    15 * 1024 * 1024;
-
-// Maximum compressed photo size: 5 MB
 const MAX_PHOTO_SIZE =
     5 * 1024 * 1024;
 
-// Maximum photos per message
-const MAX_PHOTOS_PER_MESSAGE = 10;
-
-// Compression settings
-const PHOTO_MAX_DIMENSION = 1600;
-const PHOTO_QUALITY = 0.82;
 
 const ALLOWED_PHOTO_TYPES = [
+
     "image/jpeg",
+
     "image/png",
+
     "image/webp"
+
 ];
 
 
 /* =====================================================
-   MULTIPLE PHOTO STATE
+   PHOTO STATE
 ===================================================== */
 
-let selectedPhotos = [];
+let selectedPhoto = null;
 
-let selectedPhotoPreviewUrls = [];
+let selectedPhotoPreviewUrl = null;
 
 let isSendingPhoto = false;
-
-
-/* =====================================================
-   EDIT MESSAGE STATE
-===================================================== */
-
-let editingMessageId = null;
 
 
 /* =====================================================
@@ -2188,256 +2171,6 @@ function renderImageMessage(
 
 
 /* =====================================================
-   EDIT MESSAGE
-===================================================== */
-
-async function editMessage(messageId) {
-
-    const message = latestMessages.find(
-        item => item.id === messageId
-    );
-
-    if (!message) {
-        return;
-    }
-
-    if (message.senderId !== currentUser.uid) {
-        alert("You can only edit your own messages.");
-        return;
-    }
-
-    if (message.type !== "text") {
-        alert("Only text messages can be edited.");
-        return;
-    }
-
-    const newText = prompt(
-        "Edit your message:",
-        message.text || ""
-    );
-
-    if (newText === null) {
-        return;
-    }
-
-    const text = newText.trim();
-
-    if (!text) {
-        alert("Message cannot be empty.");
-        return;
-    }
-
-    if (text === message.text) {
-        return;
-    }
-
-    try {
-
-        const control = getChatAccountControl(
-            currentProfile
-        );
-
-        if (
-            control.blocked ||
-            control.messagingRestricted
-        ) {
-            alert(control.message);
-            return;
-        }
-
-        const messageRef = doc(
-            db,
-            "chats",
-            chatId,
-            "messages",
-            messageId
-        );
-
-        await updateDoc(messageRef, {
-
-            text: text,
-
-            edited: true,
-
-            editedAt: serverTimestamp()
-
-        });
-
-    } catch (error) {
-
-        console.error("EDIT MESSAGE ERROR:", error);
-
-        alert("Message could not be edited.");
-
-    }
-
-}
-
-
-/* =====================================================
-   DELETE MESSAGE
-===================================================== */
-
-async function deleteMessage(messageId) {
-
-    const message = latestMessages.find(
-        item => item.id === messageId
-    );
-
-    if (!message) {
-        return;
-    }
-
-    if (message.senderId !== currentUser.uid) {
-        alert("You can only delete your own messages.");
-        return;
-    }
-
-    const confirmed = confirm(
-        "Are you sure you want to delete this message?"
-    );
-
-    if (!confirmed) {
-        return;
-    }
-
-    try {
-
-        const control = getChatAccountControl(
-            currentProfile
-        );
-
-        if (
-            control.blocked ||
-            control.messagingRestricted
-        ) {
-            alert(control.message);
-            return;
-        }
-
-        const messageRef = doc(
-            db,
-            "chats",
-            chatId,
-            "messages",
-            messageId
-        );
-
-        await deleteDoc(messageRef);
-
-        /*
-         * Delete the associated photo from Storage.
-         * A failed photo deletion will not restore
-         * the already deleted message.
-         */
-
-        if (message.imagePaths) {
-
-            for (const path of message.imagePaths) {
-
-                try {
-
-                    await deleteObject(
-                        ref(storage, path)
-                    );
-
-                } catch (error) {
-
-                    console.warn(
-                        "Could not delete photo:",
-                        error
-                    );
-
-                }
-
-            }
-
-        } else if (message.imagePath) {
-
-            try {
-
-                await deleteObject(
-                    ref(storage, message.imagePath)
-                );
-
-            } catch (error) {
-
-                console.warn(
-                    "Could not delete photo:",
-                    error
-                );
-
-            }
-
-        }
-
-    } catch (error) {
-
-        console.error("DELETE MESSAGE ERROR:", error);
-
-        alert("Message could not be deleted.");
-
-    }
-
-}
-
-
-/* =====================================================
-   MESSAGE ACTIONS
-===================================================== */
-
-function showMessageActions(messageId) {
-
-    const message = latestMessages.find(
-        item => item.id === messageId
-    );
-
-    if (
-        !message ||
-        message.senderId !== currentUser.uid
-    ) {
-        return;
-    }
-
-    const actions = [];
-
-    if (message.type === "text") {
-        actions.push("Edit");
-    }
-
-    actions.push("Delete");
-
-    const choice = prompt(
-        `Choose an action:\n\n${actions.map(
-            (action, index) =>
-                `${index + 1}. ${action}`
-        ).join("\n")}\n\nEnter the number:`
-    );
-
-    if (choice === null) {
-        return;
-    }
-
-    if (
-        choice.trim() === "1" &&
-        message.type === "text"
-    ) {
-
-        editMessage(messageId);
-
-    } else if (
-        choice.trim() ===
-        (message.type === "text" ? "2" : "1")
-    ) {
-
-        deleteMessage(messageId);
-
-    }
-
-}
-
-
-/* =====================================================
    RENDER MESSAGES
 ===================================================== */
 
@@ -2565,101 +2298,76 @@ function renderMessages(
 
             let messageContent = "";
 
-if (message.type === "images") {
 
-    const images = Array.isArray(message.images)
-        ? message.images
-        : [];
+            if (isImage) {
 
-    messageContent = `
-        <div class="multiple-message-images">
-            ${images.map(image => `
-                <a
-                    href="${escapeHtml(image.url)}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    <img
-                        src="${escapeHtml(image.url)}"
-                        alt="Shared photo"
-                        loading="lazy"
+                messageContent =
+                    renderImageMessage(
+                        message,
+                        tick
+                    );
+
+            } else {
+
+                messageContent = `
+
+                    <span
+                        class="message-text"
+                    >${escapeHtml(
+                        message.text || ""
+                    )}</span>
+
+                    <span
+                        class="message-meta"
                     >
-                </a>
-            `).join("")}
-        </div>
 
-        <span class="message-meta">
-            <span class="message-time">
-                ${formatTime(message.createdAt)}
-            </span>
-            ${message.edited ? "Edited" : ""}
-            ${tick}
-        </span>
-    `;
+                        <span
+                            class="message-time"
+                        >
+                            ${formatTime(
+                                message.createdAt
+                            )}
+                        </span>
 
-} else if (isImage) {
+                        ${tick}
 
-    messageContent = renderImageMessage(
-        message,
-        tick
-    );
+                    </span>
 
-} else {
+                `;
 
-    messageContent = `
-        <span class="message-text">
-            ${escapeHtml(message.text || "")}
-        </span>
-
-        <span class="message-meta">
-            <span class="message-time">
-                ${formatTime(message.createdAt)}
-            </span>
-
-            ${message.edited ? "Edited" : ""}
-            ${tick}
-        </span>
-    `;
-
-}
+            }
 
 
             html += `
-    <div
-        class="
-            message-row
-            ${mine ? "outgoing" : "incoming"}
-        "
-        data-message-id="${escapeHtml(message.id)}"
-    >
 
-        <div
-            class="
-                message-bubble
-                ${isImage || message.type === "images"
-                    ? "photo-message"
-                    : ""}
-            "
-        >
-
-            ${messageContent}
-
-            ${mine ? `
-                <button
-                    type="button"
-                    class="message-options"
-                    data-message-action="${escapeHtml(message.id)}"
-                    aria-label="Message options"
-                    title="Edit or delete"
+                <div
+                    class="
+                        message-row
+                        ${mine
+                            ? "outgoing"
+                            : "incoming"}
+                    "
+                    data-message-id="${escapeHtml(
+                        message.id
+                    )}"
                 >
-                    ⋮
-                </button>
-            ` : ""}
 
-        </div>
+                    <div
+                        class="
+                            message-bubble
+                            ${isImage
+                                ? "photo-message"
+                                : ""}
+                        "
+                    >
 
-    </div>
-`;
+                        ${messageContent}
+
+                    </div>
+
+                </div>
+
+            `;
 
         }
     );
@@ -2681,27 +2389,6 @@ if (message.type === "images") {
         );
 
     }
-
-    /* =====================================================
-   MESSAGE ACTION BUTTONS
-===================================================== */
-
-box.querySelectorAll(
-    "[data-message-action]"
-).forEach(button => {
-
-    button.addEventListener("click", event => {
-
-        event.stopPropagation();
-
-        const messageId =
-            button.dataset.messageAction;
-
-        showMessageActions(messageId);
-
-    });
-
-});
 
 }
 
@@ -3210,33 +2897,67 @@ async function sendTextMessage(
    PHOTO VALIDATION
 ===================================================== */
 
-function validatePhoto(file) {
+function validatePhoto(
+    file
+) {
 
     if (!file) {
+
         return {
+
             valid: false,
-            message: "Please select a photo."
+
+            message:
+                "Please select a photo."
+
         };
+
     }
 
-    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+
+    if (
+        !ALLOWED_PHOTO_TYPES.includes(
+            file.type
+        )
+    ) {
+
         return {
+
             valid: false,
-            message: "Only JPG, PNG and WebP photos are allowed."
+
+            message:
+                "Only JPG, PNG and WebP photos are allowed. Videos are not supported."
+
         };
+
     }
 
-    if (file.size > MAX_ORIGINAL_PHOTO_SIZE) {
+
+    if (
+        file.size >
+        MAX_PHOTO_SIZE
+    ) {
+
         return {
+
             valid: false,
-            message: "Original photo must be 15 MB or smaller."
+
+            message:
+                "Photo must be 5MB or smaller."
+
         };
+
     }
+
 
     return {
+
         valid: true
+
     };
+
 }
+
 
 /* =====================================================
    PHOTO STATUS
@@ -3269,145 +2990,193 @@ function setPhotoStatus(
 
 
 /* =====================================================
-   CLEAR SELECTED PHOTOS
+   CLEAR PHOTO
 ===================================================== */
 
 function clearSelectedPhoto() {
 
-    selectedPhotos = [];
+    selectedPhoto =
+        null;
 
-    selectedPhotoPreviewUrls.forEach(url => {
-        URL.revokeObjectURL(url);
-    });
 
-    selectedPhotoPreviewUrls = [];
+    if (
+        selectedPhotoPreviewUrl
+    ) {
 
-    const input = $("photoInput");
+        URL.revokeObjectURL(
+            selectedPhotoPreviewUrl
+        );
+
+
+        selectedPhotoPreviewUrl =
+            null;
+
+    }
+
+
+    const input =
+        $("photoInput");
+
 
     if (input) {
-        input.value = "";
+
+        input.value =
+            "";
+
     }
 
-    const preview = $("photoPreview");
+
+    const preview =
+        $("photoPreview");
+
 
     if (preview) {
-        preview.classList.remove("show");
-        preview.innerHTML = "";
+
+        preview.classList.remove(
+            "show"
+        );
+
     }
 
-    setPhotoStatus("", false);
+
+    const previewImage =
+        $("photoPreviewImage");
+
+
+    if (previewImage) {
+
+        previewImage.removeAttribute(
+            "src"
+        );
+
+    }
+
+
+    setPhotoStatus(
+        "",
+        false
+    );
 
 }
 
 
 /* =====================================================
-   MULTIPLE PHOTO PREVIEW
+   PHOTO PREVIEW
 ===================================================== */
 
-function showPhotoPreview(files) {
+function showPhotoPreview(
+    file
+) {
 
-    clearSelectedPhoto();
+    const validation =
+        validatePhoto(
+            file
+        );
 
-    const selected = Array.from(files || []);
 
-    if (!selected.length) {
-        return false;
-    }
+    if (
+        !validation.valid
+    ) {
 
-    if (selected.length > MAX_PHOTOS_PER_MESSAGE) {
+        clearSelectedPhoto();
+
 
         setPhotoStatus(
-            `You can select up to ${MAX_PHOTOS_PER_MESSAGE} photos.`,
+            validation.message,
             true
         );
 
+
+        setTimeout(
+            () => {
+
+                setPhotoStatus(
+                    "",
+                    false
+                );
+
+            },
+            3500
+        );
+
+
         return false;
 
     }
 
-    for (const file of selected) {
 
-        const validation = validatePhoto(file);
+    clearSelectedPhoto();
 
-        if (!validation.valid) {
 
-            setPhotoStatus(
-                validation.message,
-                true
-            );
+    selectedPhoto =
+        file;
 
-            return false;
+
+    selectedPhotoPreviewUrl =
+        URL.createObjectURL(
+            file
+        );
+
+
+    const preview =
+        $("photoPreview");
+
+
+    const previewImage =
+        $("photoPreviewImage");
+
+
+    const previewTitle =
+        $("photoPreviewTitle");
+
+
+    const previewSize =
+        $("photoPreviewSize");
+
+
+    if (
+        preview &&
+        previewImage
+    ) {
+
+        previewImage.src =
+            selectedPhotoPreviewUrl;
+
+
+        if (previewTitle) {
+
+            previewTitle.textContent =
+                file.name || "Photo";
 
         }
 
+
+        if (previewSize) {
+
+            previewSize.textContent =
+                `${formatFileSize(
+                    file.size
+                )} • Ready to send`;
+
+        }
+
+
+        preview.classList.add(
+            "show"
+        );
+
     }
 
-    selectedPhotos = selected;
 
-    const preview = $("photoPreview");
+    setPhotoStatus(
+        "",
+        false
+    );
 
-    if (!preview) {
-        return true;
-    }
-
-    preview.innerHTML = `
-        <div class="multi-photo-preview">
-            ${selected.map((file, index) => {
-
-                const url = URL.createObjectURL(file);
-
-                selectedPhotoPreviewUrls.push(url);
-
-                return `
-                    <div class="preview-photo-item">
-                        <img
-                            src="${url}"
-                            alt="Selected photo ${index + 1}"
-                        >
-
-                        <button
-                            type="button"
-                            data-remove-photo="${index}"
-                            aria-label="Remove photo"
-                        >
-                            ×
-                        </button>
-                    </div>
-                `;
-
-            }).join("")}
-        </div>
-
-        <p>
-            ${selected.length} photos selected
-        </p>
-    `;
-
-    preview.classList.add("show");
-
-    preview.querySelectorAll(
-        "[data-remove-photo]"
-    ).forEach(button => {
-
-        button.addEventListener("click", () => {
-
-            const index = Number(
-                button.dataset.removePhoto
-            );
-
-            const remaining = selectedPhotos.filter(
-                (_, i) => i !== index
-            );
-
-            showPhotoPreview(remaining);
-
-        });
-
-    });
 
     return true;
 
- }
+}
 
 
 /* =====================================================
@@ -3446,389 +3215,277 @@ function formatFileSize(
 
 
 /* =====================================================
-   COMPRESS PHOTO
+   UPLOAD PHOTO
 ===================================================== */
 
-async function compressPhoto(file) {
+async function uploadPhoto(
+    file
+) {
 
-    if (!file.type.startsWith("image/")) {
-        throw new Error("Invalid image file.");
-    }
-
-    let bitmap;
-
-    try {
-
-        bitmap = await createImageBitmap(file);
-
-        let width = bitmap.width;
-        let height = bitmap.height;
-
-        // Resize large photos while preserving proportions.
-        const scale = Math.min(
-            1,
-            PHOTO_MAX_DIMENSION / Math.max(width, height)
+    const control =
+        getChatAccountControl(
+            currentProfile
         );
 
-        width = Math.round(width * scale);
-        height = Math.round(height * scale);
-
-        const canvas = document.createElement("canvas");
-
-        canvas.width = width;
-        canvas.height = height;
-
-        const context = canvas.getContext("2d");
-
-        if (!context) {
-            throw new Error("Photo compression is unavailable.");
-        }
-
-        // JPEG does not support transparency.
-        // Use a white background for transparent images.
-        context.fillStyle = "#ffffff";
-        context.fillRect(0, 0, width, height);
-
-        context.drawImage(
-            bitmap,
-            0,
-            0,
-            width,
-            height
-        );
-
-        // Try progressively lower JPEG quality if necessary.
-        const qualities = [0.82, 0.76, 0.70, 0.64, 0.58];
-
-        for (const quality of qualities) {
-
-            const compressed = await new Promise(
-                (resolve, reject) => {
-
-                    canvas.toBlob(
-                        blob => {
-                            if (blob) {
-                                resolve(blob);
-                            } else {
-                                reject(
-                                    new Error("Photo compression failed.")
-                                );
-                            }
-                        },
-                        "image/jpeg",
-                        quality
-                    );
-
-                }
-            );
-
-            if (compressed.size <= MAX_PHOTO_SIZE) {
-                return compressed;
-            }
-        }
-
-        // If still too large, resize further and compress again.
-        const smallerCanvas = document.createElement("canvas");
-
-        const smallerScale = Math.min(
-            1,
-            1200 / Math.max(width, height)
-        );
-
-        smallerCanvas.width = Math.round(width * smallerScale);
-        smallerCanvas.height = Math.round(height * smallerScale);
-
-        const smallerContext = smallerCanvas.getContext("2d");
-
-        if (!smallerContext) {
-            throw new Error("Photo compression is unavailable.");
-        }
-
-        smallerContext.fillStyle = "#ffffff";
-        smallerContext.fillRect(
-            0,
-            0,
-            smallerCanvas.width,
-            smallerCanvas.height
-        );
-
-        smallerContext.drawImage(
-            canvas,
-            0,
-            0,
-            smallerCanvas.width,
-            smallerCanvas.height
-        );
-
-        const finalBlob = await new Promise(
-            (resolve, reject) => {
-
-                smallerCanvas.toBlob(
-                    blob => {
-                        if (blob) {
-                            resolve(blob);
-                        } else {
-                            reject(
-                                new Error("Photo compression failed.")
-                            );
-                        }
-                    },
-                    "image/jpeg",
-                    0.65
-                );
-
-            }
-        );
-
-        if (finalBlob.size > MAX_PHOTO_SIZE) {
-            throw new Error(
-                "This photo is too large to compress. Please select a smaller photo."
-            );
-        }
-
-        return finalBlob;
-
-    } finally {
-
-        if (bitmap) {
-            bitmap.close();
-        }
-
-    }
-}
-
-
-/* =====================================================
-   UPLOAD ONE COMPRESSED PHOTO
-===================================================== */
-
-async function uploadOnePhoto(file, messageId) {
-
-    // Compress before uploading.
-    const compressedFile = await compressPhoto(file);
-
-    const extension = "jpg";
-
-    const uniqueId = (
-        typeof crypto !== "undefined" &&
-        typeof crypto.randomUUID === "function"
-    )
-        ? crypto.randomUUID()
-        : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-    const storagePath =
-        `chatPhotos/${chatId}/${currentUser.uid}/${messageId}_${uniqueId}.${extension}`;
-
-    const photoRef = ref(
-        storage,
-        storagePath
-    );
-
-    const uploadTask = uploadBytesResumable(
-        photoRef,
-        compressedFile,
-        {
-            contentType: "image/jpeg",
-            cacheControl: "public,max-age=31536000"
-        }
-    );
-
-    const snapshot = await new Promise(
-        (resolve, reject) => {
-
-            uploadTask.on(
-                "state_changed",
-                null,
-                reject,
-                () => resolve(uploadTask.snapshot)
-            );
-
-        }
-    );
-
-    const url = await getDownloadURL(snapshot.ref);
-
-    return {
-        url,
-        path: storagePath,
-        name: file.name,
-        size: compressedFile.size,
-        originalSize: file.size,
-        mimeType: "image/jpeg"
-    };
-}
-
-
-/* =====================================================
-   UPLOAD MULTIPLE PHOTOS
-===================================================== */
-
-async function uploadPhotos(files) {
-
-    const control = getChatAccountControl(
-        currentProfile
-    );
 
     if (
         control.blocked ||
         control.messagingRestricted
     ) {
-        throw new Error(control.message);
+
+        throw new Error(
+            control.message ||
+            "Private messaging has been restricted by CONNECTA."
+        );
+
     }
+
 
     if (
         !currentUser ||
         !otherUser ||
         !chatId
     ) {
-        throw new Error("Chat is not ready.");
-    }
 
-    if (
-        !files.length ||
-        files.length > MAX_PHOTOS_PER_MESSAGE
-    ) {
         throw new Error(
-            `Select between 1 and ${MAX_PHOTOS_PER_MESSAGE} photos.`
+            "Chat is not ready."
         );
-    }
-
-    for (const file of files) {
-
-        const validation = validatePhoto(file);
-
-        if (!validation.valid) {
-            throw new Error(validation.message);
-        }
 
     }
 
-    const messagesRef = collection(
-        db,
-        "chats",
-        chatId,
-        "messages"
+
+    const messagesRef =
+        collection(
+            db,
+            "chats",
+            chatId,
+            "messages"
+        );
+
+
+    const messageRef =
+        doc(
+            messagesRef
+        );
+
+
+    const extension =
+        getFileExtension(
+            file
+        );
+
+
+    const storagePath =
+        `chatPhotos/${chatId}/${currentUser.uid}/${messageRef.id}.${extension}`;
+
+
+    const photoRef =
+        ref(
+            storage,
+            storagePath
+        );
+
+
+    setPhotoStatus(
+        "Uploading photo... 0%",
+        true
     );
 
-    const messageRef = doc(messagesRef);
 
-    const uploadedPhotos = [];
+    const uploadTask =
+        uploadBytesResumable(
+            photoRef,
+            file,
+            {
 
-    try {
+                contentType:
+                    file.type,
 
-        for (let i = 0; i < files.length; i++) {
+                cacheControl:
+                    "public,max-age=31536000"
 
-            setPhotoStatus(
-                `Uploading photo ${i + 1} of ${files.length}...`,
-                true
-            );
+            }
+        );
 
-            const photo = await uploadOnePhoto(
-                files[i],
-                messageRef.id
-            );
 
-            uploadedPhotos.push(photo);
+    const snapshot =
+        await new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+
+                uploadTask.on(
+
+                    "state_changed",
+
+                    uploadSnapshot => {
+
+                        const progress =
+                            Math.round(
+                                (
+                                    uploadSnapshot.bytesTransferred /
+                                    uploadSnapshot.totalBytes
+                                ) * 100
+                            );
+
+
+                        setPhotoStatus(
+                            `Uploading photo... ${progress}%`,
+                            true
+                        );
+
+                    },
+
+                    error => {
+
+                        reject(
+                            error
+                        );
+
+                    },
+
+                    () => {
+
+                        resolve(
+                            uploadTask.snapshot
+                        );
+
+                    }
+
+                );
+
+            }
+        );
+
+
+    setPhotoStatus(
+        "Finalizing photo...",
+        true
+    );
+
+
+    const imageUrl =
+        await getDownloadURL(
+            snapshot.ref
+        );
+
+
+    const batch =
+        writeBatch(
+            db
+        );
+
+
+    batch.set(
+        messageRef,
+        {
+
+            senderId:
+                currentUser.uid,
+
+            receiverId:
+                otherUser.uid,
+
+            type:
+                "image",
+
+            text:
+                "",
+
+            imageUrl:
+                imageUrl,
+
+            imagePath:
+                storagePath,
+
+            fileName:
+                file.name || "photo",
+
+            mimeType:
+                file.type,
+
+            fileSize:
+                file.size,
+
+            createdAt:
+                serverTimestamp(),
+
+            delivered:
+                false,
+
+            deliveredAt:
+                null,
+
+            read:
+                false,
+
+            readAt:
+                null
 
         }
+    );
 
-        const chatRef = doc(
+
+    const chatRef =
+        doc(
             db,
             "chats",
             chatId
         );
 
-        const batch = writeBatch(db);
 
-        batch.set(messageRef, {
+    batch.update(
+        chatRef,
+        {
 
-            senderId: currentUser.uid,
+            lastMessage:
+                "📷 Photo",
 
-            receiverId: otherUser.uid,
+            lastMessageType:
+                "image",
 
-            type: "images",
+            lastSenderId:
+                currentUser.uid,
 
-            text: "",
+            updatedAt:
+                serverTimestamp()
 
-            images: uploadedPhotos.map(photo => ({
-                url: photo.url,
-                path: photo.path,
-                name: photo.name,
-                size: photo.size,
-                mimeType: photo.mimeType
-            })),
+        }
+    );
 
-            imagePaths: uploadedPhotos.map(
-                photo => photo.path
-            ),
 
-            createdAt: serverTimestamp(),
-
-            delivered: false,
-
-            deliveredAt: null,
-
-            read: false,
-
-            readAt: null
-
-        });
-
-        batch.update(chatRef, {
-
-            lastMessage: `📷 ${files.length} photos`,
-
-            lastMessageType: "images",
-
-            lastSenderId: currentUser.uid,
-
-            updatedAt: serverTimestamp()
-
-        });
-
-        batch.update(chatRef, {
+    batch.update(
+        chatRef,
+        {
 
             [`unreadCount.${otherUser.uid}`]:
                 increment(1)
 
-        });
-
-        await batch.commit();
-
-        setPhotoStatus(
-            `${files.length} photos sent successfully.`,
-            true
-        );
-
-    } catch (error) {
-
-        /*
-         * Remove uploaded files if the message
-         * could not be saved.
-         */
-
-        for (const photo of uploadedPhotos) {
-
-            try {
-
-                await deleteObject(
-                    ref(storage, photo.path)
-                );
-
-            } catch (cleanupError) {
-
-                console.warn(
-                    "Photo cleanup failed:",
-                    cleanupError
-                );
-
-            }
-
         }
+    );
 
-        throw error;
 
-    }
+    await batch.commit();
+
+
+    setPhotoStatus(
+        "Photo sent successfully.",
+        true
+    );
+
+
+    setTimeout(
+        () => {
+
+            setPhotoStatus(
+                "",
+                false
+            );
+
+        },
+        1500
+    );
 
 }
 
@@ -3893,82 +3550,135 @@ function getFileExtension(
 
 async function sendMessage() {
 
-    const control = getChatAccountControl(
-        currentProfile
-    );
+    const control =
+        getChatAccountControl(
+            currentProfile
+        );
+
 
     if (
         control.blocked ||
         control.messagingRestricted
     ) {
+
         showChatRestrictionNotice(
             control.message ||
             "Private messaging has been restricted by CONNECTA.",
-            control.blocked ? "account" : "messaging"
+            control.blocked
+                ? "account"
+                : "messaging"
         );
+
+
         return;
+
     }
 
-    const input = $("messageInput");
+
+    const input =
+        $("messageInput");
+
 
     if (!input) {
         return;
     }
 
-    const text = input.value.trim();
 
-    const hasText = Boolean(text);
-    const hasPhoto = selectedPhotos.length > 0;
+    const text =
+        input.value.trim();
 
-    if (!hasText && !hasPhoto) {
+
+    const hasText =
+        Boolean(text);
+
+
+    const hasPhoto =
+        Boolean(selectedPhoto);
+
+
+    if (
+        !hasText &&
+        !hasPhoto
+    ) {
+
         return;
+
     }
 
-    if (!currentUser || !otherUser || !chatId) {
+
+    if (
+        !currentUser ||
+        !otherUser ||
+        !chatId
+    ) {
+
         return;
+
     }
 
-    if (isSendingPhoto) {
-        return;
-    }
 
-    const sendButton = $("sendButton");
+    const sendButton =
+        $("sendButton");
+
 
     if (sendButton) {
-        sendButton.disabled = true;
+
+        sendButton.disabled =
+            true;
+
     }
+
 
     try {
 
-        clearTimeout(typingTimer);
+        clearTimeout(
+            typingTimer
+        );
 
-        await setTyping(false);
 
-        // Send text first, if provided.
+        await setTyping(
+            false
+        );
+
+
         if (hasText) {
 
-            await sendTextMessage(text);
+            await sendTextMessage(
+                text
+            );
 
-            input.value = "";
+
+            input.value =
+                "";
 
             resizeTextarea();
 
         }
 
-        // Upload and send all selected photos.
+
         if (hasPhoto) {
 
-            isSendingPhoto = true;
+            isSendingPhoto =
+                true;
 
-            const photos = [...selectedPhotos];
 
-            await uploadPhotos(photos);
+            const photo =
+                selectedPhoto;
+
+
+            await uploadPhoto(
+                photo
+            );
+
 
             clearSelectedPhoto();
 
-            isSendingPhoto = false;
+
+            isSendingPhoto =
+                false;
 
         }
+
 
     } catch (error) {
 
@@ -3977,56 +3687,63 @@ async function sendMessage() {
             error
         );
 
+
         console.error(
             "Error code:",
             error?.code
         );
+
 
         console.error(
             "Error message:",
             error?.message
         );
 
-        isSendingPhoto = false;
 
-        let message = "Message could not be sent.";
+        isSendingPhoto =
+            false;
 
-        if (error?.code === "storage/unauthorized") {
+
+        let message =
+            "Message could not be sent.";
+
+
+        if (
+            error?.code ===
+            "storage/unauthorized"
+        ) {
 
             message =
-                "Firebase Storage denied the photo upload. Check your Storage Rules.";
+                "Photo upload was blocked by Firebase Storage Rules.";
 
-        } else if (error?.code === "storage/canceled") {
+        }
+
+
+        if (
+            error?.code ===
+            "storage/canceled"
+        ) {
 
             message =
                 "Photo upload was cancelled.";
 
-        } else if (error?.code === "storage/unknown") {
-
-            message =
-                "An unknown Firebase Storage error occurred.";
-
-        } else if (error?.code === "permission-denied") {
-
-            message =
-                "Firebase Firestore denied saving the message. Check your Firestore Rules.";
-
-        } else if (error?.message) {
-
-            message =
-                `Sending failed: ${error.message}`;
-
         }
 
-        showChatError(message);
+
+        showChatError(
+            message
+        );
+
 
     } finally {
 
-        isSendingPhoto = false;
-
         if (sendButton) {
-            sendButton.disabled = false;
+
+            sendButton.disabled =
+                false;
+
         }
+
 
         input.focus();
 
@@ -4034,10 +3751,6 @@ async function sendMessage() {
 
 }
 
-
-/* =====================================================
-   TYPING
-===================================================== */
 
 /* =====================================================
    TYPING
@@ -4886,55 +4599,88 @@ function listenToOwnProfile(
 
 
 /* =====================================================
-   MULTIPLE PHOTO ATTACHMENT
+   PHOTO ATTACHMENT
 ===================================================== */
 
 function setupAttachmentButton() {
 
-    const button = $("attachButton");
+    const button =
+        $("attachButton");
 
-    const input = $("photoInput");
 
-    if (!button || !input) {
+    const input =
+        $("photoInput");
+
+
+    if (
+        !button ||
+        !input
+    ) {
+
         console.warn(
             "CONNECTA: Photo input elements were not found."
         );
+
+
         return;
+
     }
 
-    input.multiple = true;
 
-    input.accept = "image/jpeg,image/png,image/webp";
+    button.addEventListener(
+        "click",
+        () => {
 
-    button.addEventListener("click", () => {
+            if (
+                isSendingPhoto
+            ) {
 
-        if (isSendingPhoto) {
-            return;
+                return;
+
+            }
+
+
+            input.click();
+
         }
+    );
 
-        input.click();
 
-    });
+    input.addEventListener(
+        "change",
+        event => {
 
-    input.addEventListener("change", event => {
+            const file =
+                event.target.files?.[0];
 
-        const files = Array.from(
-            event.target.files || []
-        );
 
-        if (files.length) {
-            showPhotoPreview(files);
+            if (!file) {
+                return;
+            }
+
+
+            showPhotoPreview(
+                file
+            );
+
         }
+    );
 
-    });
 
-    const cancelButton = $("photoPreviewCancel");
+    const cancelButton =
+        $("photoPreviewCancel");
+
 
     if (cancelButton) {
 
-        cancelButton.addEventListener("click", () => {
-            clearSelectedPhoto();
-        });
+        cancelButton.addEventListener(
+            "click",
+            () => {
+
+                clearSelectedPhoto();
+
+            }
+        );
 
     }
 
@@ -5454,9 +5200,15 @@ window.addEventListener(
         );
 
 
-        selectedPhotoPreviewUrls.forEach(url => {
-           URL.revokeObjectURL(url);
-       });
+        if (
+            selectedPhotoPreviewUrl
+        ) {
+
+            URL.revokeObjectURL(
+                selectedPhotoPreviewUrl
+            );
+
+        }
 
 
         if (
