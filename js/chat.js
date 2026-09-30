@@ -3477,10 +3477,17 @@ async function uploadOnePhoto(file, messageId) {
 
     const extension = getFileExtension(file);
 
-    const storagePath =
-        `chatPhotos/${chatId}/${currentUser.uid}/${messageId}_${crypto.randomUUID()}.${extension}`;
+    const uniqueId = (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+)
+    ? crypto.randomUUID()
+    : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-    const photoRef = ref(
+     const storagePath =
+       `chatPhotos/${chatId}/${currentUser.uid}/${messageId}_${uniqueId}.${extension}`;
+
+     const photoRef = ref(
         storage,
         storagePath
     );
@@ -3877,73 +3884,37 @@ async function sendMessage() {
 
     } catch (error) {
 
-        console.error(
-            "SEND MESSAGE ERROR:",
-            error
-        );
+    console.error("SEND MESSAGE ERROR:", error);
+    console.error("Error code:", error?.code);
+    console.error("Error message:", error?.message);
 
+    isSendingPhoto = false;
 
-        console.error(
-            "Error code:",
-            error?.code
-        );
+    let message = "Message could not be sent.";
 
-
-        console.error(
-            "Error message:",
-            error?.message
-        );
-
-
-        isSendingPhoto =
-            false;
-
-
-        let message =
-            "Message could not be sent.";
-
-
-        if (
-            error?.code ===
-            "storage/unauthorized"
-        ) {
-
-            message =
-                "Photo upload was blocked by Firebase Storage Rules.";
-
-        }
-
-
-        if (
-            error?.code ===
-            "storage/canceled"
-        ) {
-
-            message =
-                "Photo upload was cancelled.";
-
-        }
-
-
-        showChatError(
-            message
-        );
-
-
-    } finally {
-
-        if (sendButton) {
-
-            sendButton.disabled =
-                false;
-
-        }
-
-
-        input.focus();
-
+    if (error?.code === "storage/unauthorized") {
+        message = "Firebase Storage denied the photo upload. Check your Storage Rules.";
+    } else if (error?.code === "storage/canceled") {
+        message = "Photo upload was cancelled.";
+    } else if (error?.code === "storage/unknown") {
+        message = "An unknown Firebase Storage error occurred.";
+    } else if (error?.code === "permission-denied") {
+        message = "Firebase Firestore denied saving the message. Check your Firestore Rules.";
+    } else if (error?.message) {
+        message = `Sending failed: ${error.message}`;
     }
 
+    showChatError(message);
+
+} finally {
+
+    isSendingPhoto = false;
+
+    if (sendButton) {
+        sendButton.disabled = false;
+    }
+
+    input.focus();
 }
 
 
