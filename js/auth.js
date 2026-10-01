@@ -1637,7 +1637,7 @@ onAuthStateChanged(
     if (
       user &&
       (
-        page === "login.html" ||
+        page === "index.html" ||
         page === "register.html"
       )
     ) {
@@ -1679,7 +1679,7 @@ window.connectaLogout =
 
 
     location.replace(
-      "login.html"
+      "index.html"
     );
 
   };
