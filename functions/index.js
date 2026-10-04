@@ -114,14 +114,23 @@ exports.onPrivateMessageCreated = onDocumentCreated(
         : (message.text || "Sent you a message");
 
     await sendPushToUser(receiverId, {
-      type: "private_message",
-      senderId,
-      senderName,
-      message: text,
-      messageId,
-      chatId,
-      url: `/chat.html?chatId=${encodeURIComponent(chatId)}`
-    });
+        type: "private_message",
+
+        senderId,
+
+        receiverId,
+
+        senderName,
+
+        message: text,
+
+        messageId,
+
+        chatId,
+
+        url:
+          `/chat.html?uid=${encodeURIComponent(senderId)}`
+     });
   }
 );
 
