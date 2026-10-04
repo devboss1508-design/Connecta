@@ -1916,21 +1916,20 @@ function listenToPrivateConversation(
 
                             processIncomingMessage({
 
-                                notificationType:
-                                    "private",
+                               ...data,
 
-                                parentId:
-                                    chatId,
+                               notificationType:
+                                  "private",
 
-                                chatId,
+                               parentId:
+                                 chatId,
 
-                                id:
-                                    change.doc.id,
+                               chatId,
 
-                                ...data
+                               id:
+                                 change.doc.id
 
-                            });
-
+                           });
                         }
                     );
 
