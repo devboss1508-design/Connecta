@@ -1580,11 +1580,16 @@ async function showBrowserNotification(
 
 /* =========================================================
    PROCESS INCOMING MESSAGE
+   PRIVATE MESSAGE PRIVACY PROTECTION
 ========================================================= */
 
 function processIncomingMessage(
     message
 ) {
+
+    /*
+     * Basic validation.
+     */
 
     if (
         !message ||
@@ -1597,17 +1602,104 @@ function processIncomingMessage(
     }
 
 
+    const currentUserId =
+        String(
+            currentUser.uid || ""
+        );
+
+
+    const senderId =
+        String(
+            message.senderId ||
+            message.senderUid ||
+            message.uid ||
+            ""
+        );
+
+
     /*
-     * Never notify yourself.
+     * =====================================================
+     * PRIVATE MESSAGE SECURITY CHECK
+     * =====================================================
+     *
+     * A private message MUST contain receiverId.
+     *
+     * Only the user whose UID matches receiverId
+     * is allowed to receive a private notification.
+     *
+     * Example:
+     *
+     * User A -> User B
+     *
+     * senderId   = A
+     * receiverId = B
+     *
+     * When User B is logged in:
+     *     B === B  -> notification allowed
+     *
+     * When User C is logged in:
+     *     C !== B  -> notification BLOCKED
+     *
+     * This is the important privacy fix.
      */
 
     if (
-        String(
-            message.senderId || ""
-        ) ===
-        String(
-            currentUser.uid
-        )
+        message.notificationType ===
+        "private"
+    ) {
+
+        const receiverId =
+            String(
+                message.receiverId || ""
+            );
+
+
+        /*
+         * If receiverId is missing,
+         * DO NOT show a private notification.
+         *
+         * This is safer than allowing an
+         * incorrectly addressed notification.
+         */
+
+        if (!receiverId) {
+
+            console.warn(
+                "[CONNECTA NOTIFICATIONS] Private message blocked: missing receiverId",
+                message
+            );
+
+            return;
+
+        }
+
+
+        /*
+         * ONLY the intended recipient
+         * can receive the notification.
+         */
+
+        if (
+            receiverId !==
+            currentUserId
+        ) {
+
+            return;
+
+        }
+
+    }
+
+
+    /*
+     * =====================================================
+     * NEVER NOTIFY THE SENDER
+     * =====================================================
+     */
+
+    if (
+        senderId ===
+        currentUserId
     ) {
 
         return;
@@ -1616,7 +1708,9 @@ function processIncomingMessage(
 
 
     /*
-     * Build a unique notification key.
+     * =====================================================
+     * BUILD UNIQUE NOTIFICATION KEY
+     * =====================================================
      */
 
     const messageKey =
@@ -1636,7 +1730,9 @@ function processIncomingMessage(
 
 
     /*
-     * Already handled.
+     * =====================================================
+     * PREVENT DUPLICATE NOTIFICATIONS
+     * =====================================================
      */
 
     if (
@@ -1651,10 +1747,10 @@ function processIncomingMessage(
 
 
     /*
-     * Mark BEFORE showing the notification.
+     * Mark BEFORE displaying the notification.
      *
-     * This prevents duplicate notifications if
-     * multiple realtime events arrive quickly.
+     * This prevents duplicate popups when
+     * multiple realtime events arrive.
      */
 
     markMessageProcessed(
@@ -1662,10 +1758,22 @@ function processIncomingMessage(
     );
 
 
+    /*
+     * =====================================================
+     * SHOW IN-APP POPUP
+     * =====================================================
+     */
+
     showInAppNotification(
         message
     );
 
+
+    /*
+     * =====================================================
+     * SHOW BROWSER / ANDROID NOTIFICATION
+     * =====================================================
+     */
 
     showBrowserNotification(
         message
